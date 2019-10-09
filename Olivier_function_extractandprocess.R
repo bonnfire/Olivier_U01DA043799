@@ -106,9 +106,9 @@ for(i in 1:length(cohortfiles)){
 # 4, 8
 cohort4 <-  olivierfiles("C04_ cocaine.xlsx") # 4 breaks, =
 #
-cohort5 <- olivierfiles("C05_cocaine.xlsx")
+cohort5 <- olivierfiles("C05_cocaine.xlsx") 
 cohort7 <- olivierfiles("C07_cocaine.xlsx")
-cohort8 <- olivierfiles("C08_cocaine.xlsx")
+cohort8 <- olivierfiles("C08_cocaine.xlsx") # look into why its called REWARDS, throwing off the code from Rat default
 
 cohort5 <- u01.importxlsx("C05_cocaine.xlsx")[[1]]
 
