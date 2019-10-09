@@ -70,27 +70,43 @@ test$Rat <- ifelse(grepl("..A", test$Rat), as.character(stringr::str_match(test$
 # test <- separate(test, "Rat", c("Rat", NA), sep = "-[[:space:]]") Code above preferred because of the inconsistent format
 uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) # %s placeholder for post-specified vector and %02d integer values in 2 or more digits, the first being zero if # is <10
 test$Rat <- ave(test$Rat, test$Rat, FUN = uniquify) # code from G. Grothendieck (Stack Overflow) # make experiment name unique
+
 transposetest <- data.table::transpose(test)
 colnames(transposetest) <- as.character(transposetest[1,])
 transposetest <- transposetest[-1,] # data.table cannot delete rows by reference with transposetest[1 := NULL,]  
+
 # add exp date columns 
-nm <- names(transposetest)[-1] # use these columns
-nm1 <- paste("Date", nm, sep = "_") # make these columns
+nm <- names(transposetest)[-1] # use these columns to make date columns
+nm1 <- paste("Date", nm, sep = "_") # make these date columns
 transposetest[ , ( nm1 ) := lapply( .SD, function(x) c(grep("^\\d{4}\\-(0?[1-9]|1[012])\\-(0?[1-9]|[12][0-9]|3[01])$", x, value = T)) ) ,  .SDcols = nm ]
-ind <- grep("^(Date)", names(transposetest), perl = T) # actually keep dates in character form
+ind <- grep("^(Date)", names(transposetest), perl = T) # bring dates back to posixct
 for (i in seq_along(ind)) {
   set(transposetest, NULL, ind[i], as.POSIXct(transposetest[[ind[i]]], tz = "UTC"))
 }
+transposetest <- transposetest[!grepl("^\\d{4}\\-", ShA01),] # remove the row with dates
 
+# add general comments columns
+rownumber <- which(is.na(transposetest$RFID)) %>% head(1)
+colswithcomments <- colnames(transposetest)[which(!is.na(transposetest[rownumber,]))] # return columns that have comments
+colswithcomments <- grep("^(?!Date)", colswithcomments, perl = T, value = T) # return non-date columns that have comments
+nm2 <- paste("Comment", colswithcomments, sep = "_")
+transposetest[ , ( nm2 ) := lapply( .SD, function(x) c(grep("^.", x[rownumber], value = T))) ,  .SDcols = colswithcomments ]
+transposetest <- transposetest[-rownumber,] # remove the row with dates
 
+# test if comments made it in 
+comments <- grep("Comment", names(transposetest2))
+transposetest2[, ..comments] ## checked, the comments all made it in
+
+# extract table for specfic comments
 
 # todo: 
 # change the chr to num
+keep_cols = c("a", "c")
 
-library(dplyr)
-library(data.table)
-library(tidyverse)
-library(readxl)
+dt[, ..keep_cols]
+
+########### pick up to create a list of datatables 
+
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/Olivier_George_U01DA043799 (Cocaine)/Olivier_George_U01/DATA Updated")
 path <- getwd()
 
