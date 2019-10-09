@@ -56,7 +56,9 @@ u01.importxlsx2 <- function(xlname){
   return(df)
 }
 options(scipen = 100) # fixes scientific notation
-test <- u01.importxlsx2("C01_cocaine.xlsx")[[1]] %>%
+
+filename <- "C01_cocaine.xlsx"
+test <- u01.importxlsx2(filename)[[1]] %>%
   as.data.table %>% 
   na.omit(cols = seq_along('Rat')) 
 # ind <- grep("^(?!Date)", names(test), perl = T) # actually keep dates in character form
@@ -93,12 +95,12 @@ nm2 <- paste("Comment", colswithcomments, sep = "_")
 transposetest[ , ( nm2 ) := lapply( .SD, function(x) c(grep("^.", x[rownumber], value = T))) ,  .SDcols = colswithcomments ]
 transposetest <- transposetest[-rownumber,] # remove the row with dates
 
-# extract data dictionary
+# extract [*DATA DICTIONARY*]
 datadictionary <- test[, 1:3]
 transposetest <- transposetest[-c(1:2), ]
 # set(test, 1:3, NULL) # remove data dictionary from data
 
-# extract table for specific comments
+# extract [*TABLE FOR SPECIFIC COMMENTS*]
 rownumbers <- which(is.na(transposetest$RFID))
 colswithspeccomments <- colnames(transposetest)[which(!is.na(transposetest[rownumbers[1],]))] # return columns that have comments
 colswithspeccomments <- grep("^(?![Date|Comment])", colswithspeccomments, perl = T, value = T) 
@@ -110,7 +112,8 @@ comments <- grep("Comment", names(transposetest))
 transposetest[, ..comments] ## checked, the comments all made it in
 
 # add cohort column
-## get from wake forest
+# get from file name 
+transposetest <- append(transposetest, list(data.table(Cohort = sub("_cocaine.*", "", filename)))) %>% as.data.table
 
 # add rat id column
 transposetest <- append(transposetest, list(data.table(LabAnimalID = grep("\\D\\d", names(test), value = T)))) %>% as.data.table
@@ -132,7 +135,6 @@ setnames(transposetest, gsub(" ", "_", tolower(names(transposetest))))
 
 
 # todo: 
-# change the chr to num
 # ask about series of 0 as na? 
 
 # later use: create a function that returns various things
