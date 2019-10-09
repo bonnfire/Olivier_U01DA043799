@@ -63,7 +63,7 @@ test <- u01.importxlsx2("C01_cocaine.xlsx")[[1]] %>%
 # for (i in seq_along(ind)) {
 #   set(test, NULL, ind[i], as.character(test[[ind[i]]]))
 # }
-test[, names(test) := lapply(.SD, as.character)]
+test[, names(test) := lapply(.SD, as.character)] # turn all into character for preservation in transpose
 # sapply(test, class)
 # str(test) # reformat data types # NULL represents applying to all rows
 test$Rat <- ifelse(grepl("..A", test$Rat), as.character(stringr::str_match(test$Rat,"..A")), test$Rat) # extract experiment name (ShA and LgA)
@@ -93,17 +93,52 @@ nm2 <- paste("Comment", colswithcomments, sep = "_")
 transposetest[ , ( nm2 ) := lapply( .SD, function(x) c(grep("^.", x[rownumber], value = T))) ,  .SDcols = colswithcomments ]
 transposetest <- transposetest[-rownumber,] # remove the row with dates
 
-# test if comments made it in 
-comments <- grep("Comment", names(transposetest2))
-transposetest2[, ..comments] ## checked, the comments all made it in
+# extract data dictionary
+datadictionary <- test[, 1:3]
+transposetest <- transposetest[-c(1:2), ]
+# set(test, 1:3, NULL) # remove data dictionary from data
 
-# extract table for specfic comments
+# extract table for specific comments
+rownumbers <- which(is.na(transposetest$RFID))
+colswithspeccomments <- colnames(transposetest)[which(!is.na(transposetest[rownumbers[1],]))] # return columns that have comments
+colswithspeccomments <- grep("^(?![Date|Comment])", colswithspeccomments, perl = T, value = T) 
+specificcomments <- transposetest[rownumbers, ..colswithspeccomments] # extract special comments 
+transposetest <- transposetest[-rownumbers, -..colswithspeccomments] # remove the special comments
+
+# test if comments made it in 
+comments <- grep("Comment", names(transposetest))
+transposetest[, ..comments] ## checked, the comments all made it in
+
+# add cohort column
+## get from wake forest
+
+# add rat id column
+transposetest <- append(transposetest, list(data.table(LabAnimalID = grep("\\D\\d", names(test), value = T)))) %>% as.data.table
+
+# ensure all na's are properly notated
+for(j in seq_along(transposetest)){
+  set(transposetest, i=which(transposetest[[j]]=="n/a"), j=j, value=NA)
+}
+
+# quant data should be numeric
+ind <- grep("^(?![RFID|Date|Comment])", transposetest, perl = T, value = T)
+for (i in seq_along(ind)) {
+  set(transposetest, NULL, ind[i], as.numeric(transposetest[[ind[i]]]))
+}
+
+# variable name clean
+setnames(transposetest, gsub(" ", "_", tolower(names(transposetest))))
+
+
 
 # todo: 
 # change the chr to num
-keep_cols = c("a", "c")
+# ask about series of 0 as na? 
 
-dt[, ..keep_cols]
+# later use: create a function that returns various things
+foo <- 12
+bar <- c("a", "b", "e")
+newList <- list("integer" = foo, "names" = bar)
 
 ########### pick up to create a list of datatables 
 
