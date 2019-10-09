@@ -90,16 +90,30 @@ olivierfiles <- function(filename){
 } 
 
 
-cohortfiles <- list.files()
+cohortfiles <- list.files(pattern = "*.xlsx")
+# cohort 6 is missing
 for(i in 1:length(cohortfiles)){
+  assign(paste0("cohort", i + 1), olivierfiles(cohortfiles[i]))
   if(i == 4) next 
-  assign(paste0("cohort", i), olivierfiles(cohortfiles[i]))
+  if(i > 5){
+    assign(paste0("cohort", i + 1), olivierfiles(cohortfiles[i]))
+  } 
 }
 
-cohort4 <-  olivierfiles("C04_ cocaine.xlsx") # 4 breaks, 
 
+
+# function breaks at 
+# 4, 8
+cohort4 <-  olivierfiles("C04_ cocaine.xlsx") # 4 breaks, =
 #
-cohort5ma <- u01.importxlsx("C05_cocaine.xlsx")[[1]]
+cohort5 <- olivierfiles("C05_cocaine.xlsx")
+cohort7 <- olivierfiles("C07_cocaine.xlsx")
+cohort8 <- olivierfiles("C08_cocaine.xlsx")
+
+cohort5 <- u01.importxlsx("C05_cocaine.xlsx")[[1]]
+
+u01.importxlsx("C05_cocaine.xlsx")
+"C08_cocaine.xlsx"  
 
 selfadmin <- cohort4ma %>%
   as.data.table %>% 
