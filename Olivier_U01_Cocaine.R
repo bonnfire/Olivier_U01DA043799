@@ -93,7 +93,7 @@ colswithcomments <- colnames(transposetest)[which(!is.na(transposetest[rownumber
 colswithcomments <- grep("^(?!Date)", colswithcomments, perl = T, value = T) # return non-date columns that have comments
 nm2 <- paste("Comment", colswithcomments, sep = "_")
 transposetest[ , ( nm2 ) := lapply( .SD, function(x) c(grep("^.", x[rownumber], value = T))) ,  .SDcols = colswithcomments ]
-transposetest <- transposetest[-rownumber,] # remove the row with dates
+transposetest <- transposetest[-rownumber,] # remove the row with general comments
 
 # extract [*DATA DICTIONARY*]
 datadictionary <- test[, 1:3]
