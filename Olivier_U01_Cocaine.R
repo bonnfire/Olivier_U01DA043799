@@ -43,6 +43,50 @@ WFU_Olivier_co_sexQC[5:9] <- lapply(WFU_Olivier_co[5:9], function(x) x[-1])
 colnames(WFU_Olivier_co_sexQC[5:9]) <- lapply(WFU_Olivier_co[5:9], function(x) x[1])
 
 ## process Olivier data 
+
+library(dplyr)
+library(data.table)
+library(tidyverse)
+library(readxl)
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/Olivier_George_U01DA043799 (Cocaine)/Olivier_George_U01/DATA Updated")
+
+u01.importxlsx2 <- function(xlname){
+  df <- lapply(excel_sheets(path = xlname), read_excel, path = xlname)
+  names(df) <- excel_sheets(xlname)
+  return(df)
+}
+options(scipen = 100) # fixes scientific notation
+test <- u01.importxlsx2("C01_cocaine.xlsx")[[1]] %>%
+  as.data.table %>% 
+  na.omit(cols = seq_along('Rat')) 
+# ind <- grep("^(?!Date)", names(test), perl = T) # actually keep dates in character form
+# for (i in seq_along(ind)) {
+#   set(test, NULL, ind[i], as.character(test[[ind[i]]]))
+# }
+test[, names(test) := lapply(.SD, as.character)]
+# sapply(test, class)
+# str(test) # reformat data types # NULL represents applying to all rows
+test$Rat <- ifelse(grepl("..A", test$Rat), as.character(stringr::str_match(test$Rat,"..A")), test$Rat) # extract experiment name (ShA and LgA)
+# test <- separate(test, "Rat", c("Rat", NA), sep = "-[[:space:]]") Code above preferred because of the inconsistent format
+uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) # %s placeholder for post-specified vector and %02d integer values in 2 or more digits, the first being zero if # is <10
+test$Rat <- ave(test$Rat, test$Rat, FUN = uniquify) # code from G. Grothendieck (Stack Overflow) # make experiment name unique
+transposetest <- data.table::transpose(test)
+colnames(transposetest) <- as.character(transposetest[1,])
+transposetest <- transposetest[-1,] # data.table cannot delete rows by reference with transposetest[1 := NULL,]  
+# add exp date columns 
+nm <- names(transposetest)[-1] # use these columns
+nm1 <- paste("Date", nm, sep = "_") # make these columns
+transposetest[ , ( nm1 ) := lapply( .SD, function(x) c(grep("^\\d{4}\\-(0?[1-9]|1[012])\\-(0?[1-9]|[12][0-9]|3[01])$", x, value = T)) ) ,  .SDcols = nm ]
+ind <- grep("^(Date)", names(transposetest), perl = T) # actually keep dates in character form
+for (i in seq_along(ind)) {
+  set(transposetest, NULL, ind[i], as.POSIXct(transposetest[[ind[i]]], tz = "UTC"))
+}
+
+
+
+# todo: 
+# change the chr to num
+
 library(dplyr)
 library(data.table)
 library(tidyverse)
@@ -97,31 +141,3 @@ dt2 <- u01.importxlsx("C01_cocaine.xlsx")[[2]] %>% as.data.table()
 empty_list <- append(empty_list, list(dt2))
 empty_list[2]
 
-# separate approach
-options(scipen = 100) # fixes scientific notation
-test <- u01.importxlsx("C01_cocaine.xlsx")[[1]] %>%
-  as.data.table %>% 
-  na.omit(cols = seq_along('..1')) 
-
-# test <- u01.importxlsx("C01_cocaine.xlsx")[[1]] %>%
-#   as.data.table %>% 
-#   na.omit(cols = seq_along(cols)) 
-# cols <- grep("^C0|Rat|Description", names(test), value = TRUE) # doesn't apply once I remove the columns
-# test_subset <- test[, ..cols]
-
-test2 <- dcast(melt(test, id.vars = "..1"), variable ~ "..1")
-
-
-# todo: 
-# change the chr to num
-
-
-# why are there 1,032,228 observations 
-
-
-test <- u01.importxlsx("testtodt.xlsx") %>%
-  as.data.table %>% 
-  na.omit(cols = seq_along('Sheet1....1')) 
-test2 <- test %>% # take the data.table
-  summarise_all(list( ~ sum)) %>% # get the sum of each column
-  gather(variable, sum) 
