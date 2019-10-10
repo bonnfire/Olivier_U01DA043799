@@ -18,7 +18,6 @@ olivierfiles <- function(filename){
     return(df)
   }
   
-  ## XXXXX REMOVE after troubleshooting filename = "C08_cocaine.xlsx"
   selfadmin <- u01.importxlsx(filename)[[1]] %>%
     as.data.table %>% 
     na.omit(cols = seq_along('Rat'))
@@ -30,13 +29,13 @@ olivierfiles <- function(filename){
   } # convert Excel character into dates
   
   # fix missing column names
-  if(any(grepl("REWARDS" , names(selfadmin)))){
-    setnames(selfadmin, old = c("REWARDS"), new = c("Rat")) # prepares for next code
+  if(any(grepl("REWARDS|RAT" , names(selfadmin)))){
+    setnames(selfadmin, old = c("REWARDS", "RAT"), new = c("Rat", "Rat"), skip_absent=TRUE) # prepares for next code
   }
   names(selfadmin)[length(names(selfadmin))] = "FLAG" # the last column should be FLAG
   
   # extract experiment name (ShA and LgA)
-  selfadmin$Rat <- ifelse(grepl("^\\D{2}A", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"..A")), selfadmin$Rat) # reg exp fixes issuse of extracting mA
+  selfadmin$Rat <- ifelse(grepl("^\\D{2}A", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"^\\D{2}A")), selfadmin$Rat) # reg exp fixes issuse of extracting mA
   selfadmin$Rat <- gsub(" |[(]|[)]|-", "", selfadmin$Rat) # remove all unwanted characters
   
   # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
@@ -157,12 +156,12 @@ for(i in 1:length(cohortfiles)){
 # function breaks at 
 cohort2 <- olivierfiles("C02_cocaine.xlsx")
 cohort3 <- olivierfiles("C03_cocaine.xlsx")
-cohort4 <- olivierfiles("C04_cocaine.xlsx")
-cohort5 <- olivierfiles("C05_cocaine.xlsx") 
+cohort4 <- olivierfiles("C04_cocaine.xlsx") # specific comment in non specific column 
+cohort5 <- olivierfiles("C05_cocaine.xlsx") # note about renumbering -- can we ignore
 cohort7 <- olivierfiles("C07_cocaine.xlsx")
-cohort8 <- olivierfiles("C08_cocaine.xlsx") # look into why its called REWARDS, throwing off the code from Rat default
+cohort8 <- olivierfiles("C08_cocaine.xlsx") # comments aren't working because there is a row that needs to be removed
 
-filename <- "C02_cocaine.xlsx"
+filename <- "C04_cocaine.xlsx"
 selfadmin <- u01.importxlsx("C01_cocaine.xlsx")[[1]] %>%
   as.data.table %>% 
   na.omit(cols = seq_along('Rat'))
