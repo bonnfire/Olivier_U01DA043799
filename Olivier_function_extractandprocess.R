@@ -160,8 +160,3 @@ cohort4 <- olivierfiles("C04_cocaine.xlsx") # specific comment in non specific c
 cohort5 <- olivierfiles("C05_cocaine.xlsx") # note about renumbering -- can we ignore
 cohort7 <- olivierfiles("C07_cocaine.xlsx")
 cohort8 <- olivierfiles("C08_cocaine.xlsx") # comments aren't working because there is a row that needs to be removed
-
-filename <- "C04_cocaine.xlsx"
-selfadmin <- u01.importxlsx("C01_cocaine.xlsx")[[1]] %>%
-  as.data.table %>% 
-  na.omit(cols = seq_along('Rat'))
