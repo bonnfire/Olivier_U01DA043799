@@ -131,11 +131,76 @@ olivierfiles <- function(filename){
     set(tselfadmin, NULL, ind[i], as.numeric(tselfadmin[[ind[i]]]))
   }
 
+  
+  
+  
+  # PROCESS IRRITABILITY PORTION
+  
+  options(scipen = 100, digits = 2)
+  irritability <- u01.importxlsx(filename)[[2]] %>%
+    as.data.table 
+  
+  irritability[, names(irritability) := lapply(.SD, as.character)] 
+  if(any(grepl("^[[:digit:]]{5,}", irritability$Date))){
+    irritability$Date <- as.character(as.POSIXct(as.numeric(irritability$Date) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d"))
+  } # convert Excel character into dates
+  
+  uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
+  irritability$Rat <- ave(irritability$Rat, irritability$Rat, FUN = uniquify) # make unique measure values
+  
+  irritability <- rbindlist(list(irritability, as.list(names(irritability))), fill=FALSE) # preserve experiment name as rows before tranposing
+  
+  # print(irritability)
+  
+  tirritability <- data.table::transpose(irritability)
+  colnames(tirritability) <- as.character(tirritability[1,]) # make colnames 
+  tirritability <- tirritability[-1,] # remove first row that held colnames
+  
+  # make colnames clean
+  setnames(tirritability, gsub(" ", "_", tolower(names(tirritability))))
+  
+  # make date and time values (removed a third value (scorer), only found in first cohort and all values were marked DC)
+  if(any(grep("Scorer", tirritability$rat))){
+    tirritability <- tirritability[!grepl("Scorer", rat),] # remove the row with dates
+  }
+  
+  nm_irr <- grep("^(def|agg)", names(tirritability), value = T) # use these columns to make date columns
+  nm1_irr <- paste("date", nm_irr, sep = "_") # make these date columns
+  tirritability[ , ( nm1_irr ) := lapply( .SD, function(x) c(grep("^\\d{4}\\-(0?[1-9]|1[012])\\-(0?[1-9]|[12][0-9]|3[01])$", x, value = T)) ) ,  .SDcols = nm_irr ]
+  ind_irr <- grep("^(date)", names(tirritability), perl = T) # bring date characters back to posixct
+  for (i in seq_along(ind_irr)) {
+    set(tirritability, NULL, ind_irr[i], as.POSIXct(tirritability[[ind_irr[i]]], tz = "UTC"))
+  }
+  tirritability <- tirritability[!grepl("^\\d{4}\\-", unlist(tirritability[,2])),] # remove the row with dates
+  
+  nm2_irr <- paste("timepoint", nm_irr, sep = "_") # make these time columns
+  tirritability[ , ( nm2_irr ) := lapply( .SD, function(x) c(grep("^(before|after)", x, value = T)) ) ,  .SDcols = nm_irr ]
+  tirritability <- tirritability[!grepl("^[[:alpha:]]", unlist(tirritability[,2])),] # remove the row with timepoints
+  
+  # clean up the var types (to numeric) and the character na (to NA) 
+  ind <- grep(pattern = "^(def|agg)", names(tirritability))
+  for(j in seq_along(ind)){
+    set(tirritability, i=which(tirritability[[j]]=="n/a"), j=j, value=NA)
+  }
+  
+  # quant data should be numeric
+  for (i in seq_along(ind)) {
+    set(tirritability, NULL, ind[i], as.numeric(tirritability[[ind[i]]]))
+  }
+  
+  # extract [*DATA DICTIONARY*]
+  irritability_datadictionary <- irritability[, 1:3] # vertical formatting is preferred in selfadmin
+  tirritability <- tirritability[-c(1:2), ] # remove data dictionary from data
+  
+  ### PRINT ALL 
+  
   list <- list("tselfadmin" = tselfadmin,
                "datadictionary" = datadictionary,
                "specificcomments" = tspecificcomments,
                "dead" = dead,
-               "switches" = switches)
+               "switches" = switches,
+               "tirritability" = tirritability,
+               "irritability_datadictionary" = irritability_datadictionary)
   
   return(list)
 } 
@@ -162,71 +227,5 @@ cohort7 <- olivierfiles("C07_cocaine.xlsx")
 cohort8 <- olivierfiles("C08_cocaine.xlsx") # comments aren't working because there is a row that needs to be removed
 
 
-# dealing with the irritability data 
-filename <- "C02_cocaine.xlsx"
-irritability_function <- function(filename){
-  options(scipen = 100, digits = 2)
-  irritability <- u01.importxlsx(filename)[[2]] %>%
-  as.data.table 
-  
-  irritability[, names(irritability) := lapply(.SD, as.character)] 
-  if(any(grepl("^[[:digit:]]{5,}", irritability$Date))){
-    irritability$Date <- as.character(as.POSIXct(as.numeric(irritability$Date) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d"))
-  } # convert Excel character into dates
-  
-  uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
-  irritability$Rat <- ave(irritability$Rat, irritability$Rat, FUN = uniquify) # make unique measure values
-  
-  irritability <- rbindlist(list(irritability, as.list(names(irritability))), fill=FALSE) # preserve experiment name as rows before tranposing
-  
-  # print(irritability)
-  
-  tirritability <- data.table::transpose(irritability)
-  colnames(tirritability) <- as.character(tirritability[1,]) # make colnames 
-  tirritability <- tirritability[-1,] # remove first row that held colnames
-  
-  # make colnames clean
-  setnames(tirritability, gsub(" ", "_", tolower(names(tirritability))))
-  
-  # make date and time values (removed a third value (scorer), only found in first cohort and all values were marked DC)
-  tirritability <- tirritability[!grepl("Scorer", rat),] # remove the row with dates
-  
-  nm_irr <- grep("^(def|agg)", names(tirritability), value = T) # use these columns to make date columns
-  nm1_irr <- paste("date", nm_irr, sep = "_") # make these date columns
-  tirritability[ , ( nm1_irr ) := lapply( .SD, function(x) c(grep("^\\d{4}\\-(0?[1-9]|1[012])\\-(0?[1-9]|[12][0-9]|3[01])$", x, value = T)) ) ,  .SDcols = nm_irr ]
-  ind_irr <- grep("^(date)", names(tirritability), perl = T) # bring date characters back to posixct
-  for (i in seq_along(ind_irr)) {
-    set(tirritability, NULL, ind_irr[i], as.POSIXct(tirritability[[ind_irr[i]]], tz = "UTC"))
-  }
-  tirritability <- tirritability[!grepl("^\\d{4}\\-", unlist(tirritability[,2])),] # remove the row with dates
-  
-  nm2_irr <- paste("timepoint", nm_irr, sep = "_") # make these time columns
-  tirritability[ , ( nm2_irr ) := lapply( .SD, function(x) c(grep("^.", x, value = T)) ) ,  .SDcols = nm_irr ]
-  tirritability <- tirritability[!grepl("^[[:alpha:]]", unlist(tirritability[,2])),] # remove the row with timepoints
-  
-  # clean up the var types (to numeric) and the character na (to NA) 
-  ind <- grep(pattern = "^(def|agg)", names(tirritability))
-  for(j in seq_along(ind)){
-    set(tirritability, i=which(tirritability[[j]]=="n/a"), j=j, value=NA)
-  }
-  
-  # quant data should be numeric
-  for (i in seq_along(ind)) {
-    set(tirritability, NULL, ind[i], as.numeric(tirritability[[ind[i]]]))
-  }
-  
-  print(tirritability)
-  
-}
-
-
-
-for(i in 1:length(cohortfiles)){
-  # if(i == 4) next 
-  if(i > 5){
-    assign(paste0("irritability", i + 1), irritability_function(cohortfiles[i]))
-  } else
-    assign(paste0("irritability", i), irritability_function(cohortfiles[i]))
-}
-rm(list=ls(pattern="^irr")) # conditionally clean the environment
-
+rm(list=ls(pattern="irr")) # conditionally clean the environment
+rm(list = ls())
