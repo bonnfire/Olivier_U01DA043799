@@ -36,26 +36,18 @@ list <- list("cohort1" = cohort1,
 
 selfadmin_list <- lapply(list, `[[`, 1)
 selfadmin_df <- bind_rows(selfadmin_list, .id = "cohort") # check dplyr documentation for the column compatibility
-names(selfadmin_df)
 
-pdf("cohort1_olivier_selfadmin.pdf",onefile = T)
+
+pdf("olivier_selfadmin.pdf",onefile = T)
 
 plot_list = list()
 
-values <- grep("^(def|agg)", names(cohort1$tirritability), value = T)
-df <- cohort1$tirritability
-for (i in seq_along(values)){
-  
-  plot_list[[i]] <- ggplot(df, aes(x=rat))+ geom_point(aes_string(y = values[i])) + labs(title = values[i])
-  print(plot_list[[i]])
-  
-}
+colnames(selfadmin_df) <- make.unique(names(selfadmin_df_test)) ## temporary fix, the colnames need fixing
 
-df2 <- cohort1$tselfadmin
-values2 <- grep(pattern = "^(?!rf|date|comment|lab|cohort)", names(cohort1$tselfadmin), perl = T, value = T)
-for (i in seq_along(values2)){
+selfadminmeasures <- grep(pattern = "^(?!rf|date|comment|lab|cohort)", names(selfadmin_df), perl = T, value = T)
+for (i in seq_along(selfadminmeasures)){
   
-  plot_list[[i]] <- ggplot(df2, aes(x=labanimalid))+ geom_point(aes_string(y = values2[i])) + labs(title = values2[i]) 
+  plot_list[[i]] <- ggplot(selfadmin_df, aes(x=cohort, color = cohort))+ geom_boxplot(aes_string(y = selfadminmeasures[i])) + labs(title = selfadminmeasures[i]) 
   print(plot_list[[i]])
   
 }
