@@ -11,6 +11,7 @@ library(splitstackshape)
 library(janitor)
 
 olivierfiles <- function(filename){
+  setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/Olivier_George_U01DA043799 (Cocaine)/Olivier_George_U01/DATA Updated")
   options(scipen = 100) # prevent sci notation
   u01.importxlsx <- function(xlname){
     df <- lapply(excel_sheets(path = xlname), read_excel, path = xlname)
@@ -36,11 +37,15 @@ olivierfiles <- function(filename){
   
   # extract experiment name (ShA and LgA)
   selfadmin$Rat <- ifelse(grepl("^\\D{2}A", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"^\\D{2}A")), selfadmin$Rat) # reg exp fixes issuse of extracting mA
+  selfadmin$Rat <- ifelse(grepl("^PR", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"PR")), selfadmin$Rat)
   selfadmin$Rat <- gsub(" |[(]|[)]|-", "", selfadmin$Rat) # remove all unwanted characters
+  selfadmin$Rat <- gsub("^1hr.+", "OhA", selfadmin$Rat) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+  selfadmin$Rat <- gsub("^shock.+", "Shock", selfadmin$Rat, ignore.case = T) # make the three shock variables uniform
   
   # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
   uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
   selfadmin$Rat <- ave(selfadmin$Rat, selfadmin$Rat, FUN = uniquify) 
+  selfadmin$Rat <- ifelse(grepl("Shock", selfadmin$Rat), as.character(gsub("([0])([0-9])","\\1.\\2", selfadmin$Rat)), selfadmin$Rat)
   
   ### transpose data 
   tselfadmin <- data.table::transpose(selfadmin)
