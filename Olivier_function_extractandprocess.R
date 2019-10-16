@@ -10,6 +10,15 @@ install.packages('janitor')
 library(splitstackshape)
 library(janitor)
 
+
+# incorporate if statements into function 
+
+# from Giordano's email 10/16/19
+# LgA days varies bc "we want to keep running our rats before dissection and between treatments (PR or Shock)....[weekends or vacations  -> different LgA every cohort]." 
+# Final analysis and addiction index = first 14 days of long access
+# Starting Cohort 7 and 8, dropped two shock sessions (0.1 and 0.2) because the animals were responding normally to these; so you will only see 1 intensity
+# Cohort 8 doesn't have a 1h session 
+
 olivierfiles <- function(filename){
   setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/Olivier_George_U01DA043799 (Cocaine)/Olivier_George_U01/DATA Updated")
   options(scipen = 100) # prevent sci notation
@@ -40,7 +49,9 @@ olivierfiles <- function(filename){
   selfadmin$Rat <- ifelse(grepl("^PR", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"PR")), selfadmin$Rat)
   selfadmin$Rat <- gsub(" |[(]|[)]|-", "", selfadmin$Rat) # remove all unwanted characters
   selfadmin$Rat <- gsub("^1hr.+", "OhA", selfadmin$Rat) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
-  selfadmin$Rat <- gsub("^shock.+", "Shock", selfadmin$Rat, ignore.case = T) # make the three shock variables uniform
+  selfadmin$Rat <- gsub("^shock.+", "Shock", selfadmin$Rat, ignore.case = T) # make the three shock variables uniform # XX IF COHORT 8, THEN CHANGE PRESHOCK TO LGA15, GET THE OKAY FROM GIORDANO, RESULTING IN 18 LGA RATHER THAN 17 
+  # XX SHOCK SHOULD STILL BE 0.1, 0.2, 0.3 (SINCE COHORT 7 AND 8 DON'T HAVE 0.1 AND 0.2)
+  
   
   # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
   uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
