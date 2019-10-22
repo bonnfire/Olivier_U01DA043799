@@ -25,6 +25,8 @@ dev.off()
 
 ##### 
 
+# redo pdf to create one table with all cohorts
+
 
 list <- list("cohort1" = cohort1, 
              "cohort2" = cohort2,
@@ -43,6 +45,12 @@ datadictionary_df <- bind_rows(datadic_list, .id = "cohort")
 datadictionary_df_subset <- subset(datadictionary_df, !duplicated(Rat)) ## check in on [47] formatting cohort7	Shock	Real	30% of rewards associated with 0.3 mA footshook 
 
 pdf("olivier_selfadmin.pdf", onefile = T)
+a = "Note from Giordano email: 
+The numbers of LgA days varies because we want to keep running our rats before dissection and between treatments (PR or Shock). Since sometimes there are weekends or vacations the number of LgA days will be different on every cohort.
+For the final analysis and to determine our addiction index for each rat we only use the first 14 days of long access.
+Regarding the shock sessions you are right. We decided to do only one shock session (0.3mA)  since the animals were responding normally to the other 2 intensities.
+The  preshock session in cohort 8 was a mistake by the technician. She ran a 6h session instead og a 1h that’s why the numbers look higher."
+text(1,4,a, pos=4)
 
 plot_list = list()
 plot_list2 = list()

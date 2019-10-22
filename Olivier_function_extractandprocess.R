@@ -9,6 +9,7 @@ install.packages('splitstackshape')
 install.packages('janitor')
 library(splitstackshape)
 library(janitor)
+library(stringr)
 
 
 # incorporate if statements into function 
@@ -47,16 +48,25 @@ olivierfiles <- function(filename){
   # extract experiment name (ShA and LgA)
   selfadmin$Rat <- ifelse(grepl("^\\D{2}A", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"^\\D{2}A")), selfadmin$Rat) # reg exp fixes issuse of extracting mA
   selfadmin$Rat <- ifelse(grepl("^PR", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"PR")), selfadmin$Rat)
-  selfadmin$Rat <- gsub(" |[(]|[)]|-", "", selfadmin$Rat) # remove all unwanted characters
-  selfadmin$Rat <- gsub("^1hr.+", "OhA", selfadmin$Rat) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
-  selfadmin$Rat <- gsub("^shock.+", "Shock", selfadmin$Rat, ignore.case = T) # make the three shock variables uniform # XX IF COHORT 8, THEN CHANGE PRESHOCK TO LGA15, GET THE OKAY FROM GIORDANO, RESULTING IN 18 LGA RATHER THAN 17 
+  selfadmin$Rat <- ifelse(grepl("PreShock[[:space:]][(LgA15)]", selfadmin$Rat), "LgA", selfadmin$Rat) # applies to cohort 8; technician error 
+  selfadmin$Rat <- gsub(" |[(]|[)]|[-]", "", selfadmin$Rat) # remove all unwanted characters
+  selfadmin$Rat <- gsub("^(1hr|PreShock).+", "OhA", selfadmin$Rat, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+  selfadmin$Rat <- ifelse(grepl("^Shock", selfadmin$Rat, ignore.case = T), "Shock", selfadmin$Rat)
+  # selfadmin$Rat <- ifelse(grepl("Shock", selfadmin$Rat, ignore.case = T), str_extract(selfadmin$Rat, "[0][.][1-3]"), selfadmin$Rat) # make the three shock variables uniform 
+  # selfadmin$Rat <- ifelse(grepl("^[0][.][1-3]", selfadmin$Rat), sub("([0][.][1-3])", "Shock\\1", selfadmin$Rat), selfadmin$Rat) # must separate bc str_extract ignore case function is deprecated
   # XX SHOCK SHOULD STILL BE 0.1, 0.2, 0.3 (SINCE COHORT 7 AND 8 DON'T HAVE 0.1 AND 0.2)
   
   
   # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
   uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
   selfadmin$Rat <- ave(selfadmin$Rat, selfadmin$Rat, FUN = uniquify) 
-  selfadmin$Rat <- ifelse(grepl("Shock", selfadmin$Rat), as.character(gsub("([0])([0-9])","\\1.\\2", selfadmin$Rat)), selfadmin$Rat)
+  selfadmin$Rat <- ifelse(grepl("^Shock", selfadmin$Rat, ignore.case = T), gsub("(0)(\\d)", "\\1.\\2", selfadmin$Rat), selfadmin$Rat)
+  # after it is uniquified shocks should turn into decimal numbers 
+  
+  if(grepl("7|8", filename)){
+    selfadmin$Rat <- gsub("^Shock", "Shock0.3", selfadmin$Rat)
+  } # if cohort 7 or 8, then turn the shock values to 0.3 
+ 
   
   ### transpose data 
   tselfadmin <- data.table::transpose(selfadmin)
@@ -103,8 +113,13 @@ olivierfiles <- function(filename){
   colswithspeccomments <- grep("^(?![date|comment])", colswithspeccomments, perl = T, value = T) # further prune columns that don't contain comment or date
   specificcomments <- tselfadmin[rownumbers, ..colswithspeccomments] # extract special comments
   specificcommentsdates <- sapply(colswithspeccomments, grep, names(tselfadmin), value = T)
-  specificcommentsdates <- sapply(specificcommentsdates, "[", 2) %>% as.character # extract the date column name from every item in list
-  specificcommentsdates <- tselfadmin[1, ..specificcommentsdates] ## get dates
+  
+  if(grepl("8", filename)){
+    specificcommentsdates <- specificcommentsdates[2,] %>% as.character  # extract the date column name from every item in list
+  } else{
+    specificcommentsdates <- sapply(specificcommentsdates, "[", 2) %>% as.character # extract the date column name from every item in list
+  }
+    specificcommentsdates <- tselfadmin[1, ..specificcommentsdates] ## get dates
   tselfadmin <- tselfadmin[-rownumbers, ] # remove the special comments
   
   # reshape TABLE FOR SPECIFIC COMMENTS
