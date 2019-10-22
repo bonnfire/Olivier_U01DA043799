@@ -44,7 +44,7 @@ datadictionary_df <- bind_rows(datadic_list, .id = "cohort")
 # Create subset for unique entries 
 datadictionary_df_subset <- subset(datadictionary_df, !duplicated(Rat)) ## check in on [47] formatting cohort7	Shock	Real	30% of rewards associated with 0.3 mA footshook 
 
-pdf("olivier_selfadmin.pdf", onefile = T)
+pdf("olivier_selfadmin2.pdf", onefile = T)
 a = "Note from Giordano email: 
 The numbers of LgA days varies because we want to keep running our rats before dissection and between treatments (PR or Shock). Since sometimes there are weekends or vacations the number of LgA days will be different on every cohort.
 For the final analysis and to determine our addiction index for each rat we only use the first 14 days of long access.
@@ -64,7 +64,7 @@ selfadminmeasures <- grep(pattern = "^(?!rf|date|comment|lab|cohort)", names(sel
 for (i in seq_along(selfadminmeasures)){
   
   plot_list[[i]] <- ggplot(selfadmin_df, aes(x=cohort, color = cohort))+ geom_boxplot(aes_string(y = selfadminmeasures[i])) + labs(title = paste0(selfadminmeasures[i], "_SA_U01_Olivier", "\n", wrapper(datadictionary_df_subset$Description[i+1], width = 80)))
-  plot_list2[[i]] <- ggplot(selfadmin_df, aes(color = cohort, alpha = 0.8))+ geom_density(aes_string(selfadminmeasures[i])) + labs(title = paste0(selfadminmeasures[i], "_SA_U01_Olivier", "\n", wrapper(datadictionary_df_subset$Description[i+1], width = 80)))
+  plot_list2[[i]] <- ggplot(selfadmin_df, aes(color = cohort))+ geom_density(aes_string(selfadminmeasures[i])) + labs(title = paste0(selfadminmeasures[i], "_SA_U01_Olivier", "\n", wrapper(datadictionary_df_subset$Description[i+1], width = 80)))
   print(plot_list[[i]])
   print(plot_list2[[i]])
   
