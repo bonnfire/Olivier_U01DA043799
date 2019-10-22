@@ -120,6 +120,7 @@ olivierfiles <- function(filename){
   tspecificcomments[, c("labanimalid", "conflict") := tstrsplit(conflict, ":", fixed=TRUE)] # data table splits text string
   tspecificcomments[, ("labanimalid") := sapply(.SD, function(x) c(stringr::str_extract(x, "[[:alnum:]]+[[:digit:]]+$"))) , .SDcols = "labanimalid"] # clean data
   tspecificcomments[, conflict := str_trim(conflict)] # should remove trailing whitespace
+  setcolorder(tspecificcomments, c("labanimalid", "date", "experiment", "conflict", "comment", "flag")) # reorder columns
   
   # extract [*TABLE FOR COMPROMISED ANIMALS*]
   
