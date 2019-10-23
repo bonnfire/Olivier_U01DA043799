@@ -146,7 +146,7 @@ olivierfiles <- function(filename){
   switches <- tspecificcomments[conflict %like% "(?i)switch(ed)?"]
   
   # add cohort column
-  tselfadmin <- append(tselfadmin, list(data.table(cohort = sub("_cocaine.*", "", filename)))) %>% as.data.table   # get from file name
+  # tselfadmin <- append(tselfadmin, list(data.table(cohort = sub("_cocaine.*", "", filename)))) %>% as.data.table   # get from file name # temporarily remove for the database names, cohort duplicate
   
   # add rat id column
   tselfadmin <- append(tselfadmin, list(data.table(labanimalid = grep("\\D\\d", names(selfadmin), value = T)))) %>% as.data.table
