@@ -66,10 +66,17 @@ setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/20190829_WFU_U01_ShippingMas
 
 
 ##
-# missing data
+# missing data from self admin(for gwas)
 
 selfadmin_df %>% group_by(cohort) %>% count()
 WFU_Olivier_co_test_df %>% group_by(cohort) %>% count()
 setdiff(WFU_Olivier_co_test_df$rfid, selfadmin_df$rfid) %>% length # 198 animals
 setdiff(WFU_Olivier_co_test_df$rfid, selfadmin_df$rfid)[which(setdiff(WFU_Olivier_co_test_df$rfid, selfadmin_df$rfid) %>% nchar!=15)] # same four are the ones that don't have 15 characters
+
+# sending spleens but no excel sheet data 
+anti_join(olivier_spleen_list_df, selfadmin_df, by = "rfid") 
+
+# data from spleen shipments
+setdiff(WFU_Olivier_co_test_df$rfid,olivier_spleen_list_df$rfid)
+olivier_spleen_list_df %>% group_by(cohort) %>% count()
 ##
