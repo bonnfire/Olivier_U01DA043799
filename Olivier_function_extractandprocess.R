@@ -88,6 +88,11 @@ olivierfiles <- function(filename){
   
   # extract [*DATA DICTIONARY*]
   datadictionary <- selfadmin[, 1:3] # vertical formatting is preferred in selfadmin
+  colnames(datadictionary) <- c("var_abbv", "var_type", "var_graphtext")
+  datadictionary$var_description <- NA
+  uniquify_graphtext <- function(x) if (length(x) == 1) x else paste0(sprintf("%s on day %02d", x, seq_along(x)))
+  datadictionary$var_graphtext <- ave(datadictionary$var_graphtext, datadictionary$var_graphtext, FUN = uniquify_graphtext)
+  
   tselfadmin <- tselfadmin[-c(1:2), ] # remove data dictionary from data
   
   # add general comments columns
