@@ -99,7 +99,7 @@ transposetest <- transposetest[-rownumber,] # remove the row with general commen
 datadictionary <- test[, 1:3]
 colnames(datadictionary) <- c("var_abbv", "var_type", "var_graphtext")
 datadictionary$var_description <- NA
-uniquify_graphtext <- function(x) if (length(x) == 1) x else paste0("day_", sprintf("%s%02d", x, seq_along(x)))
+uniquify_graphtext <- function(x) if (length(x) == 1) x else paste0("day_", sprintf("%s%02d", x, seq_along(x))) # don't want this 
 datadictionary$Rat <- ave(datadictionary$var_graphtext, datadictionary$var_graphtext, FUN = uniquify_graphtext)
 
 transposetest <- transposetest[-c(1:2), ]

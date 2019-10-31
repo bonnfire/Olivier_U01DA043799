@@ -37,7 +37,7 @@ list <- list("cohort1" = cohort1,
              "cohort8" = cohort8)
 
 selfadmin_list <- lapply(list, `[[`, 1)
-selfadmin_df <- bind_rows(selfadmin_list, .id = "cohort") # check dplyr documentation for the column compatibility
+selfadmin_df <- bind_rows(selfadmin_list) # check dplyr documentation for the column compatibility 
 
 datadic_list <- lapply(list, `[[`, 2)
 datadictionary_df <- bind_rows(datadic_list, .id = "cohort")
