@@ -253,7 +253,7 @@ for(i in 1:length(cohortfiles)){
     assign(paste0("cohort", i), olivierfiles(cohortfiles[i]))
 }
 
-
+## XXXXXXXXXX go back to fix cohort8, the [[7]] bc of the formatting, it resuts in a find for  grep("^\\D", selfadmin_df$rfid, value = T)
 
 # function breaks at 
 cohort2 <- olivierfiles("C02_cocaine.xlsx")
