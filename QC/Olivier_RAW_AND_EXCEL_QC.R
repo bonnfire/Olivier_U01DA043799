@@ -43,7 +43,7 @@ selfadmin_df_gwascopy <- selfadmin_df %>%
          sex_sd = sd()) %>% 
   ungroup() %>%
   mutate(add_ind = (maxpr - sex_mean)/sex_df,
-         add_ind_cat = ifelse(addind>0.49|addind==0.49, "High AI", "Low AI")
+         add_ind_cat = ifelse(addind>0.49|addind==0.49, "High AI", "Low AI"))
 # `add ind` =IF(BW2>=0.49,"High AI","Low AI")
 # `fr` =IF(BT2>=0.49,"High FR","Low FR")
 # `pr` =IF(BU2>=0.49,"High PR","Low PR")
@@ -79,4 +79,10 @@ anti_join(olivier_spleen_list_df, selfadmin_df, by = "rfid")
 # data from spleen shipments
 setdiff(WFU_Olivier_co_test_df$rfid,olivier_spleen_list_df$rfid)
 olivier_spleen_list_df %>% group_by(cohort) %>% count()
-##
+
+## checking for comments 
+specificcomments_list_df <- lapply(list, `[[`, 3) %>% rbindlist(fill = T)
+dead_list_df <- lapply(list, `[[`, 'dead') %>% rbindlist(fill = T)
+# compare here: 
+missingdataspleenextractions <- anti_join(olivier_spleen_list_df[which(olivier_spleen_list_df$experiment=="Cocaine"),], selfadmin_df, by = "rfid") %>% dplyr::filter(!is.na(rfid)) %>% select(labanimalid)
+specificcomments_list_df %>% dplyr::filter(labanimalid %in% missingdataspleenextractions)
