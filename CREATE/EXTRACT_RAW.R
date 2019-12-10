@@ -14,7 +14,6 @@ readrewards <- function(x){
   return(rewards)
 }
 rewards_cohort1 <- lapply(olivier_cocaine_files, readrewards)
-#indices_rewards_cohort1 <- grep("^0:$", rewards_cohort1$V1)
 rewards_cohort1_split <- lapply(rewards_cohort1, function(x){
   indices_rewards <- grep("^0:$", x$V1)
   split_x <- split(x, cumsum(1:nrow(x) %in% indices_rewards))
