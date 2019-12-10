@@ -5,7 +5,10 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
 # extract the new files 
 
-olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T)
+# olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T)
+
+olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*SHA", value = T)
+
 # filter to the new files for lga in cohort 1
 
 #extract names to be assigned for various tables later
@@ -15,8 +18,14 @@ readsubjects <- function(x){
   return(subjects)
 }
 names <- lapply(olivier_cocaine_files, readsubjects) %>% rbindlist()
-names_append <- names$V1 %>% paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names$filename))
-
+names_append <- names %>% 
+  select(V1) %>% 
+  unlist() %>% 
+  as.vector() %>% 
+  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names$filename)) %>% 
+  toupper() %>%
+  str_extract("F\\d+.*")
+names_append <- names_append[!is.na(names_append)]
 
 #### MANY FUNCTIONS EDITION #####
 #extract the rewards 
