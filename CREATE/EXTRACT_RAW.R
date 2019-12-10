@@ -94,10 +94,14 @@ read_fread <- function(x, varname){
       nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ] # remove excessively trailing 0's 
       processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
       if(any(processeddata_df$timestamps > 7500)){
-        processeddata_df %<>% mutate(bin = cut(timestamps, breaks=seq(from = 1, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1)))
+        processeddata_df %<>% 
+          mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1))) %<>% 
+          dplyr::filter(timestamps != 0)
       }
         else{
-          processeddata_df %<>% mutate(bin = cut(timestamps, breaks=seq(from = 1, length.out = 25, by = 300), right = FALSE, labels = seq(from = 1, to = 24, by =1)))
+          processeddata_df %<>% 
+            mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% 
+            dplyr::filter(timestamps != 0)
       }
       return(processeddata_df)
     }) 
@@ -113,11 +117,15 @@ read_fread <- function(x, varname){
 
 
 definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps")
+# for(i in 1:length(definedvars)){
+# definedvars_list[i] <- lapply(olivier_cocaine_files, read_fread, definedvars[i]) %>% unlist(recursive = F)
+# #list2env(definedvars_list, envir = .GlobalEnv)
+# }
 
 rightresponses <- lapply(olivier_cocaine_files, read_fread, "rightresponses") %>% unlist(recursive = F)
 names(rightresponses) <- names_append
 
-right_time_responses <- lapply(olivier_cocaine_files, read_fread, "righttimestamps") %>% unlist(recursive = F)
+right_time_responses <- lapply(olivier_cocaine_files, read_fread, definedvars[6]) %>% unlist(recursive = F)
 names(right_time_responses) <- names_append
-
+right_time_responses[[1]]
 
