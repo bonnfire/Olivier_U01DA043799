@@ -7,7 +7,7 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
 # olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T)
 
-olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*SHA", value = T)
+olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T)
 
 # filter to the new files for lga in cohort 1
 
@@ -17,7 +17,7 @@ readsubjects <- function(x){
   subjects$filename <- x
   return(subjects)
 }
-names <- lapply(olivier_cocaine_files, readsubjects) %>% rbindlist()
+names <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
 names_append <- names %>% 
   select(V1) %>% 
   unlist() %>% 
@@ -125,7 +125,7 @@ definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps",
 rightresponses <- lapply(olivier_cocaine_files, read_fread, "rightresponses") %>% unlist(recursive = F)
 names(rightresponses) <- names_append
 
-right_time_responses <- lapply(olivier_cocaine_files, read_fread, definedvars[6]) %>% unlist(recursive = F)
+right_time_responses <- lapply(olivier_cocaine_files_sha, read_fread, definedvars[4]) %>% unlist(recursive = F)
 names(right_time_responses) <- names_append
-right_time_responses[[1]]
+right_time_responses[[3]]
 
