@@ -40,18 +40,63 @@ names(rewards_times_cohort1) <- names_append
 #extract timestamps for right responses
 readrightresponses_time <- function(x){
   rightresponses <- fread(paste0("awk '/Y:/{flag=1;next}/^$/{flag=0}flag' ", "'", x, "'"), fill = T) # matching to empty lines
-  return(rightresponses)
+  indices_right_resp_time <- grep("^0:$", rightresponses$V1)
+  split_right_resp_time <- split(rightresponses, cumsum(1:nrow(rightresponses) %in% indices_right_resp_time))
+  return(split_right_resp_time)
 }
-rightresponses_time <- lapply(olivier_cocaine_files[2], readrightresponses_time)
-rightresponses_time_indices <- grep("^0:$", rightresponses_time[[1]]$V1)
-rightresponses_time_split <- split(rightresponses_time[[1]], cumsum(1:nrow(rightresponses_time[[1]]) %in% rightresponses_time_indices))
-names(rightresponses_time_split) <- lapply(olivier_cocaine_files[2], readsubjects) %>% rbindlist() %>% unlist() %>% as.character()
-
-
+rightresponses_time <- lapply(olivier_cocaine_files, readrightresponses_time) %>% unlist(recursive = F) 
+names(rightresponses_time) <- names_append
 
 #create the dataframe with vector in it
+# check that the column we are removing ends with 5 or 0 and then remove
+
+# write a df containing the fread statements and function for extracting the different dfs
+
+
+read_fread <- function(x, varname){
+  
+  fread_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps"),
+                                 statement = c("awk '/L:/{flag=1;next}/R:/{flag=0}flag' ",
+                                               "awk '/R:/{flag=1;next}/U:/{flag=0}flag' ",
+                                               "awk '/W:/{flag=1;next}/Y:/{flag=0}flag' ", 
+                                               "awk '/U:/{flag=1;next}/V:/{flag=0}flag' ",
+                                               "awk '/Y:/{flag=1;next}/^$/{flag=0}flag' ",
+                                               "awk '/V:/{flag=1;next}/W:/{flag=0}flag' "))
+  statement <- fread_statements[which(fread_statements$varname == varname),]$statement
+  rawdata <- fread(paste0(statement, "'", x, "'"), fill = T)
+  data_indices <- grep("^0:$", rawdata$V1)
+  split_data <- split(rawdata, cumsum(1:nrow(rawdata) %in% data_indices))
+  # return(split_data)
+
+  keepzeroes <- c("leftresponses", "rightresponses", "rewards") # preserve bin sequences
+
+  if(varname %in% keepzeroes){
+  processeddata <- lapply(split_data, function(x){
+    indexremoved <- x[,-1]
+    processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(indexremoved)))) # transpose to get by row
+    return(processeddata_df)
+    })
+  }
+  else{
+    processeddata <- lapply(split_data, function(x){
+      indexremoved <- x[,-1]
+      nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ]
+      processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
+      return(processeddata_df)
+      })
+  }
+
+  names(processeddata) <- grep("C01LGA01", names_append, value = T)
+
+  return(processeddata)
+  }
+
+rightresponseslga01 <- read_fread(olivier_cocaine_files[[2]], "rightresponses")
+
 test <- rightresponses_time_split[[1]][,-1]
 test <- test[rowSums(test[, -1] > 0) != 0, ]
-data.frame(timestamps = as.vector(data.matrix(test))) 
+data.frame(timestamps = as.vector(matrix(test, byrow = T))) 
+
+
 
 
