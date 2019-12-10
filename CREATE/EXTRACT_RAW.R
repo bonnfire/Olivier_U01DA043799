@@ -17,6 +17,8 @@ readsubjects <- function(x){
 names <- lapply(olivier_cocaine_files, readsubjects) %>% rbindlist()
 names_append <- names$V1 %>% paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names$filename))
 
+
+#### MANY FUNCTIONS EDITION #####
 #extract the rewards 
 readrewards <- function(x){
   rewards <- fread(paste0("awk '/W:/{flag=1;next}/Y:/{flag=0}flag' ", "'", x, "'"), fill = T)
@@ -47,12 +49,11 @@ readrightresponses_time <- function(x){
 rightresponses_time <- lapply(olivier_cocaine_files, readrightresponses_time) %>% unlist(recursive = F) 
 names(rightresponses_time) <- names_append
 
+#### ONE FUNCTIONS EDITION #####
 #create the dataframe with vector in it
 # check that the column we are removing ends with 5 or 0 and then remove
 
 # write a df containing the fread statements and function for extracting the different dfs
-
-
 read_fread <- function(x, varname){
   
   fread_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps"),
@@ -73,7 +74,8 @@ read_fread <- function(x, varname){
   if(varname %in% keepzeroes){
   processeddata <- lapply(split_data, function(x){
     indexremoved <- x[,-1]
-    processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(indexremoved)))) # transpose to get by row
+    processeddata_df <- data.frame(counts = as.vector(t(data.matrix(indexremoved)))) %>% # transpose to get by row
+      mutate(bin = ifelse(row_number() == 1, "total", as.character(row_number() - 1)))
     return(processeddata_df)
     })
   }
@@ -81,22 +83,27 @@ read_fread <- function(x, varname){
     processeddata <- lapply(split_data, function(x){
       indexremoved <- x[,-1]
       nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ]
-      processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
+      processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) %>% # transpose to get by row
+        mutate(bin = cut(timestamps, breaks=seq(from = 1, length.out = 75, by = 300), right = FALSE, labels = seq(from = 1, to = 74, by =1) ))
       return(processeddata_df)
       })
   }
 
-  names(processeddata) <- grep("C01LGA01", names_append, value = T)
+# names(processeddata) <- grep("C01LGA01", names_append, value = T)
 
   return(processeddata)
-  }
-
-rightresponseslga01 <- read_fread(olivier_cocaine_files[[2]], "rightresponses")
-
-test <- rightresponses_time_split[[1]][,-1]
-test <- test[rowSums(test[, -1] > 0) != 0, ]
-data.frame(timestamps = as.vector(matrix(test, byrow = T))) 
+}
 
 
+# rightresponseslga01 <- read_fread(olivier_cocaine_files[[2]], "rightresponses")
+
+
+definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps")
+
+rightresponses <- lapply(olivier_cocaine_files, read_fread, "rightresponses") %>% unlist(recursive = F)
+names(rightresponses) <- names_append
+
+right_time_responses <- lapply(olivier_cocaine_files, read_fread, "righttimestamps") %>% unlist(recursive = F)
+names(right_time_responses) <- names_append
 
 
