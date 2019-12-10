@@ -82,12 +82,17 @@ read_fread <- function(x, varname){
   else{
     processeddata <- lapply(split_data, function(x){
       indexremoved <- x[,-1]
-      nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ]
-      processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) %>% # transpose to get by row
-        mutate(bin = cut(timestamps, breaks=seq(from = 1, length.out = 75, by = 300), right = FALSE, labels = seq(from = 1, to = 74, by =1) ))
+      nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ] # remove excessively trailing 0's 
+      processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
+      if(any(processeddata_df$timestamps > 7500)){
+        processeddata_df %<>% mutate(bin = cut(timestamps, breaks=seq(from = 1, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1)))
+      }
+        else{
+          processeddata_df %<>% mutate(bin = cut(timestamps, breaks=seq(from = 1, length.out = 25, by = 300), right = FALSE, labels = seq(from = 1, to = 24, by =1)))
+      }
       return(processeddata_df)
-      })
-  }
+    }) 
+    }
 
 # names(processeddata) <- grep("C01LGA01", names_append, value = T)
 
