@@ -13,42 +13,6 @@ readsubjects <- function(x){
   return(subjects)
 }
 
-
-
-# olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T) # filter to the new files for lga in cohort 1
-
-## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
-
-################################
-########## SHA #################
-################################
-olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 178 files
-names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
-names_sha_append <- names_sha %>% 
-  select(V1) %>% 
-  unlist() %>% 
-  as.vector() %>% 
-  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names_sha$filename)) %>% 
-  toupper() %>%
-  str_extract("F\\d+.*")
-names_sha_append <- names_sha_append[!is.na(names_sha_append)]
-
-
-################################
-########## LGA #################
-################################
-olivier_cocaine_files_lga <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 329 files
-names_lga <- lapply(olivier_cocaine_files_lga, readsubjects) %>% rbindlist()
-names_append <- names %>% 
-  select(V1) %>% 
-  unlist() %>% 
-  as.vector() %>% 
-  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names$filename)) %>% 
-  toupper() %>%
-  str_extract("F\\d+.*")
-names_append <- names_append[!is.na(names_append)]
-
-
 #### ONE FUNCTIONS EDITION #####
 # create the dataframe with vector in it
 # check that the column we are removing ends with 5 or 0 and then remove
@@ -68,15 +32,15 @@ read_fread <- function(x, varname){
   data_indices <- grep("^0:$", rawdata$V1)
   split_data <- split(rawdata, cumsum(1:nrow(rawdata) %in% data_indices))
   # return(split_data)
-
+  
   keepzeroes <- c("leftresponses", "rightresponses", "rewards") # preserve bin sequences
-
+  
   if(varname %in% keepzeroes){
-  processeddata <- lapply(split_data, function(x){
-    indexremoved <- x[,-1]
-    processeddata_df <- data.frame(counts = as.vector(t(data.matrix(indexremoved)))) %>% # transpose to get by row
-      mutate(bin = ifelse(row_number() == 1, "total", as.character(row_number() - 1)))
-    return(processeddata_df)
+    processeddata <- lapply(split_data, function(x){
+      indexremoved <- x[,-1]
+      processeddata_df <- data.frame(counts = as.vector(t(data.matrix(indexremoved)))) %>% # transpose to get by row
+        mutate(bin = ifelse(row_number() == 1, "total", as.character(row_number() - 1)))
+      return(processeddata_df)
     })
   }
   else{
@@ -89,34 +53,92 @@ read_fread <- function(x, varname){
           mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1))) %<>% 
           dplyr::filter(timestamps != 0)
       }
-        else{
-          processeddata_df %<>% 
-            mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% 
-            dplyr::filter(timestamps != 0)
+      else{
+        processeddata_df %<>% 
+          mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% 
+          dplyr::filter(timestamps != 0)
       }
       return(processeddata_df)
     }) 
-    }
-
-# names(processeddata) <- grep("C01LGA01", names_append, value = T)
-
+  }
+  
+  # names(processeddata) <- grep("C01LGA01", names_append, value = T)
+  
   return(processeddata)
 }
 
 
+join_wfu_oli_cocaine <- function(x){
+  
+}
+# olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T) # filter to the new files for lga in cohort 1
+
+## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
+
+################################
+########## SHA #################
+################################
+olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 178 files
+names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
+names_sha_append <- names_sha %>% 
+  select(V1) %>% 
+  unlist() %>% 
+  as.vector() %>% 
+  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names_sha$filename)) %>% 
+  toupper() %>%
+  str_extract("[FM]\\d+.*")
+names_sha_append <- names_sha_append[!is.na(names_sha_append)] #with na, 2783; 2716 without na
+
+rightresponses_sha <- lapply(olivier_cocaine_files_sha[1:10], read_fread, "rightresponses") %>% unlist(recursive = F)
+names(rightresponses_sha) <- names_sha_append[1:10]
+rightresponses_sha <- rightresponses_sha %>% 
+  rbindlist(fill = T, idcol = "labanimalid") %>% 
+  mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
+         file_exp = str_extract(labanimalid, "\\D+\\d+$"), 
+         labanimalid = str_extract(labanimalid,"^\\D\\d+")) %>% 
+  ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
+  
+  
+  
+  
+################################
+########## LGA #################
+################################
+olivier_cocaine_files_lga <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 329 files
+names_lga <- lapply(olivier_cocaine_files_lga, readsubjects) %>% rbindlist()
+names_append <- names %>% 
+  select(V1) %>% 
+  unlist() %>% 
+  as.vector() %>% 
+  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names$filename)) %>% 
+  toupper() %>%
+  str_extract("F\\d+.*")
+names_append <- names_append[!is.na(names_append)]
+
+
 # rightresponseslga01 <- read_fread(olivier_cocaine_files[[2]], "rightresponses")
+olivier_cocaine_files_lga <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 329 files
+names_lga <- lapply(olivier_cocaine_files_lga, readsubjects) %>% rbindlist()
+names_lga_append <- names_lga %>% 
+  select(V1) %>% 
+  unlist() %>% 
+  as.vector() %>% 
+  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names_lga$filename)) %>% 
+  toupper() %>%
+  str_extract("F\\d+.*")
+names_lga_append <- names_lga_append[!is.na(names_lga_append)]
 
-
-definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps")
-# for(i in 1:length(definedvars)){
-# definedvars_list[i] <- lapply(olivier_cocaine_files, read_fread, definedvars[i]) %>% unlist(recursive = F)
-# #list2env(definedvars_list, envir = .GlobalEnv)
-# }
-
-rightresponses <- lapply(olivier_cocaine_files_sha[1:10], read_fread, "rightresponses") %>% unlist(recursive = F)
-names(rightresponses) <- names_sha_append[1:10]
+rightresponses_lga <- lapply(olivier_cocaine_files_lga[1:10], read_fread, "rightresponses") %>% unlist(recursive = F)
+names(rightresponses_lga) <- names_lga_append[1:10]
 
 right_time_responses <- lapply(olivier_cocaine_files_lga, read_fread, definedvars[4]) %>% unlist(recursive = F)
 names(right_time_responses) <- names_append
 right_time_responses[[3]]
 
+### for loop to process of variables of interest and create objects in the glob env
+definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps")
+# for(i in 1:length(definedvars)){
+# definedvars_list[i] <- lapply(olivier_cocaine_files, read_fread, definedvars[i]) %>% unlist(recursive = F)
+# provide names as well 
+# #list2env(definedvars_list, envir = .GlobalEnv)
+# }
