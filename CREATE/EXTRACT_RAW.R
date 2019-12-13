@@ -5,20 +5,40 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
 # extract the new files 
 
-# olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T)
-
-olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T)
-olivier_cocaine_files_lga ## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
-
-# filter to the new files for lga in cohort 1
-
-#extract names to be assigned for various tables later
+## USEFUL FUNCTIONS
+# #extract names to be assigned for various tables later
 readsubjects <- function(x){
   subjects <- fread(paste0("awk '/Subject/{print $2}' ", "'", x, "'"),fill = T,header=F)
   subjects$filename <- x
   return(subjects)
 }
-names <- lapply(olivier_cocaine_files_lga, readsubjects) %>% rbindlist()
+
+
+
+# olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T) # filter to the new files for lga in cohort 1
+
+## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
+
+################################
+########## SHA #################
+################################
+olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 178 files
+names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
+names_sha_append <- names_sha %>% 
+  select(V1) %>% 
+  unlist() %>% 
+  as.vector() %>% 
+  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names_sha$filename)) %>% 
+  toupper() %>%
+  str_extract("F\\d+.*")
+names_sha_append <- names_sha_append[!is.na(names_sha_append)]
+
+
+################################
+########## LGA #################
+################################
+olivier_cocaine_files_lga <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 329 files
+names_lga <- lapply(olivier_cocaine_files_lga, readsubjects) %>% rbindlist()
 names_append <- names %>% 
   select(V1) %>% 
   unlist() %>% 
@@ -28,39 +48,9 @@ names_append <- names %>%
   str_extract("F\\d+.*")
 names_append <- names_append[!is.na(names_append)]
 
-#### MANY FUNCTIONS EDITION #####
-#extract the rewards 
-readrewards <- function(x){
-  rewards <- fread(paste0("awk '/W:/{flag=1;next}/Y:/{flag=0}flag' ", "'", x, "'"), fill = T)
-  indices_reward <- grep("^0:$", rewards$V1)
-  split_rewards <- split(rewards, cumsum(1:nrow(rewards) %in% indices_rewards))
-  return(split_rewards)
-} 
-rewards_cohort1 <- lapply(olivier_cocaine_files, readrewards) %>% unlist(recursive = F) # needs one level of unlisting bc otherwise it is a list of lists
-names(rewards_cohort1) <- names_append
-
-#extract timestamps for rewards 
-readreward_times <- function(x){
-  rewards_times <- fread(paste0("awk '/V:/{flag=1;next}/W:/{flag=0}flag' ", "'", x, "'"), fill = T)
-  indices_rewards_times <- grep("^0:$", rewards_times$V1)
-  split_rewards_times <- split(rewards_times, cumsum(1:nrow(rewards_times) %in% indices_rewards_times))
-  return(split_rewards_times)
-}
-rewards_times_cohort1 <- lapply(olivier_cocaine_files, readreward_times) %>% unlist(recursive = F) 
-names(rewards_times_cohort1) <- names_append
-
-#extract timestamps for right responses
-readrightresponses_time <- function(x){
-  rightresponses <- fread(paste0("awk '/Y:/{flag=1;next}/^$/{flag=0}flag' ", "'", x, "'"), fill = T) # matching to empty lines
-  indices_right_resp_time <- grep("^0:$", rightresponses$V1)
-  split_right_resp_time <- split(rightresponses, cumsum(1:nrow(rightresponses) %in% indices_right_resp_time))
-  return(split_right_resp_time)
-}
-rightresponses_time <- lapply(olivier_cocaine_files, readrightresponses_time) %>% unlist(recursive = F) 
-names(rightresponses_time) <- names_append
 
 #### ONE FUNCTIONS EDITION #####
-#create the dataframe with vector in it
+# create the dataframe with vector in it
 # check that the column we are removing ends with 5 or 0 and then remove
 
 # write a df containing the fread statements and function for extracting the different dfs
@@ -123,8 +113,8 @@ definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps",
 # #list2env(definedvars_list, envir = .GlobalEnv)
 # }
 
-rightresponses <- lapply(olivier_cocaine_files, read_fread, "rightresponses") %>% unlist(recursive = F)
-names(rightresponses) <- names_append
+rightresponses <- lapply(olivier_cocaine_files_sha[1:10], read_fread, "rightresponses") %>% unlist(recursive = F)
+names(rightresponses) <- names_sha_append[1:10]
 
 right_time_responses <- lapply(olivier_cocaine_files_lga, read_fread, definedvars[4]) %>% unlist(recursive = F)
 names(right_time_responses) <- names_append
