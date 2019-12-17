@@ -80,23 +80,39 @@ join_wfu_oli_cocaine <- function(x){
 ################################
 olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 178 files
 names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
-names_sha_append <- names_sha %>% 
-  select(V1) %>% 
-  unlist() %>% 
-  as.vector() %>% 
-  paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names_sha$filename)) %>% 
-  toupper() %>%
-  str_extract("[FM]\\d+.*")
-names_sha_append <- names_sha_append[!is.na(names_sha_append)] #with na, 2783; 2716 without na
 
-rightresponses_sha <- lapply(olivier_cocaine_files_sha[1:10], read_fread, "rightresponses") %>% unlist(recursive = F)
-names(rightresponses_sha) <- names_sha_append[1:10]
+# 12/16 for rsm: 
+names_sha_rsm <- names_sha %>% 
+  rename("labanimalid"="V1") %>% 
+  mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+"),
+         file_cohort = str_extract(filename, "C\\d+"), 
+         #file_exp = str_extract(toupper(filename), "\\D+\\d+$"))
+  file_exp = sub('.*HS', '', filename)) %>% 
+  group_by(labanimalid) %>% 
+  add_count(file_exp) %>% 
+  ungroup() 
+
+names_sha_rsm <- names_sha_rsm[gtools::mixedorder(names_sha_rsm$labanimalid),]
+
+# names_sha_append <- names_sha %>% 
+#   select(V1) %>% 
+#   unlist() %>% 
+#   as.vector() %>% 
+#   paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names_sha$filename)) %>% 
+#   toupper() %>%
+#   str_extract("[FM]\\d+.*")
+# names_sha_append <- names_sha_append[!is.na(names_sha_append)] #with na, 2783; 2716 without na
+
+rightresponses_sha <- lapply(olivier_cocaine_files_sha, read_fread, "rightresponses") %>% unlist(recursive = F)
+# names(rightresponses_sha) <- names_sha_append
+names(rightresponses_sha) <- toupper(names_sha$V1)
 rightresponses_sha <- rightresponses_sha %>% 
   rbindlist(fill = T, idcol = "labanimalid") %>% 
   mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
          file_exp = str_extract(labanimalid, "\\D+\\d+$"), 
          labanimalid = str_extract(labanimalid,"^\\D\\d+")) %>% 
   ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
+  
   
   
   
@@ -128,8 +144,16 @@ names_lga_append <- names_lga %>%
   str_extract("F\\d+.*")
 names_lga_append <- names_lga_append[!is.na(names_lga_append)]
 
-rightresponses_lga <- lapply(olivier_cocaine_files_lga[1:10], read_fread, "rightresponses") %>% unlist(recursive = F)
-names(rightresponses_lga) <- names_lga_append[1:10]
+rightresponses_lga <- lapply(olivier_cocaine_files_lga, read_fread, "rightresponses") %>% unlist(recursive = F)
+names(rightresponses_lga) <- names_lga_append
+rightresponses_lga <- rightresponses_lga %>% 
+  rbindlist(fill = T, idcol = "labanimalid") %>% 
+  mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
+         file_exp = str_extract(labanimalid, "\\D+\\d+$"), 
+         labanimalid = str_extract(labanimalid,"^\\D\\d+")) 
+%>% 
+  ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
+  
 
 right_time_responses <- lapply(olivier_cocaine_files_lga, read_fread, definedvars[4]) %>% unlist(recursive = F)
 names(right_time_responses) <- names_append

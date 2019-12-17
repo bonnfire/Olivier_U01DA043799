@@ -85,8 +85,17 @@ dev.off()
 ## plotting raw 
 ##############################################
 
+# prepare graphable df
 
-pdf("cohort1_olivier_selfadmin.pdf",onefile = T)
+rightresponses_sha_graph <- rightresponses_sha %>% 
+  dplyr::filter(bin == "total") %>% 
+  arrange(labanimalid)
+
+rightresponses_lga_graph <- rightresponses_lga %>% 
+  dplyr::filter(bin == "total") %>% 
+  arrange(labanimalid)
+
+pdf("olivier_raw_selfadmin.pdf",onefile = T)
 
 plot_list = list()
 
