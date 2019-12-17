@@ -84,15 +84,19 @@ names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
 # 12/16 for rsm: 
 names_sha_rsm <- names_sha %>% 
   rename("labanimalid"="V1") %>% 
-  mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+"),
-         file_cohort = str_extract(filename, "C\\d+"), 
+  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+")), 
          #file_exp = str_extract(toupper(filename), "\\D+\\d+$"))
-  file_exp = sub('.*HS', '', filename)) %>% 
+  file_exp = sub('.*HS', '', toupper(filename))) %>% 
   group_by(labanimalid) %>% 
   add_count(file_exp) %>% 
   ungroup() 
 
-names_sha_rsm <- names_sha_rsm[gtools::mixedorder(names_sha_rsm$labanimalid),]
+exps_vs_id <- table(names_sha_rsm$file_exp, factor(names_sha_rsm$labanimalid, levels = unique(gtools::mixedsort(names_sha_rsm$labanimalid)))) %>% t()
+exps_vs_id <- cbind(exps_vs_id, Total = rowSums(exps_vs_id))
+# exps_vs_id <- rbind(exps_vs_id, Total = colSums(exps_vs_id))
+openxlsx::write.xlsx(exps_vs_id, file = "exps_vs_id_2.xlsx",col.names=TRUE, row.names=TRUE)
+
+#openxlsx::write.xlsx(exps_vs_id, file = "exps_vs_id.xlsx",col.names=TRUE, row.names=TRUE)
 
 # names_sha_append <- names_sha %>% 
 #   select(V1) %>% 
@@ -103,14 +107,19 @@ names_sha_rsm <- names_sha_rsm[gtools::mixedorder(names_sha_rsm$labanimalid),]
 #   str_extract("[FM]\\d+.*")
 # names_sha_append <- names_sha_append[!is.na(names_sha_append)] #with na, 2783; 2716 without na
 
-rightresponses_sha <- lapply(olivier_cocaine_files_sha, read_fread, "rightresponses") %>% unlist(recursive = F)
+names_sha_append <- names_sha %>% 
+  rename("labanimalid"="V1") %>% 
+  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename))))
+                              
+
+rewards_sha <- lapply(olivier_cocaine_files_sha, read_fread, "rewards") %>% unlist(recursive = F)
 # names(rightresponses_sha) <- names_sha_append
-names(rightresponses_sha) <- toupper(names_sha$V1)
-rightresponses_sha <- rightresponses_sha %>% 
+names(rewards_sha) <- toupper(names_sha_append$labanimalid)
+rewards_sha_df <- rewards_sha %>% 
   rbindlist(fill = T, idcol = "labanimalid") %>% 
   mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
-         file_exp = str_extract(labanimalid, "\\D+\\d+$"), 
-         labanimalid = str_extract(labanimalid,"^\\D\\d+")) %>% 
+         file_exp = str_extract(labanimalid, "SHA\\d+$"), 
+         labanimalid = str_extract(labanimalid,"^\\D\\d+"))
   ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
   
   
