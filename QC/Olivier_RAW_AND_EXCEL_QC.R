@@ -86,3 +86,30 @@ dead_list_df <- lapply(list, `[[`, 'dead') %>% rbindlist(fill = T)
 # compare here: 
 missingdataspleenextractions <- anti_join(olivier_spleen_list_df[which(olivier_spleen_list_df$experiment=="Cocaine"),], selfadmin_df, by = "rfid") %>% dplyr::filter(!is.na(rfid)) %>% select(labanimalid)
 specificcomments_list_df %>% dplyr::filter(labanimalid %in% missingdataspleenextractions)
+
+
+
+
+
+
+
+
+
+## internal and external qc 
+# clean the raw files
+rewards_sha_df_graph[duplicated(rewards_sha_df_graph[,c("labanimalid", "file_exp")]), ] #should only be one data point for each animal but we are seeing multiple
+
+rewards_sha_df_graph <- rewards_sha_df %>% 
+  dplyr::filter(bin == "total") %>% 
+  merge(., rewards_sha_df %>% 
+          dplyr::filter(bin != "total") %>% 
+          group_by(labanimalid, file_exp) %>% 
+          summarize(tot_counts_calc = sum(counts))) # merge df of sum of existing numbers to calculated sums
+
+rewards_sha_df_graph %>% dplyr::filter(tot_counts_calc != counts) %>% 
+  select(labanimalid, file_cohort, counts, tot_counts_calc, filename, file_exp)# show cases that these values don't match
+
+# thinking that it may be duplicated 
+rewards_sha_df_graph[duplicated(rewards_sha_df_graph[,c("labanimalid", "file_exp")]), ]
+
+

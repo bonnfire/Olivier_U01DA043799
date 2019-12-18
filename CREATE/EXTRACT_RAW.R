@@ -13,6 +13,25 @@ readsubjects <- function(x){
   return(subjects)
 }
 
+# for these cases, the group number is not 0 and the subject is found elsewhere.  # 12/18 only lga
+readgroups <- function(x){
+  groups_files <- fread(paste0("grep -ir \"Group:\" | grep -v \"Group: 0\""),fill = T,header=F)
+  return(groups_files)
+}
+
+groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TRUE) %>% 
+  gsub("\r", "", .) %>% 
+  as.data.frame() %>% 
+  rename("filename" = ".") %>% 
+  separate(filename, c("filename", "group"), sep = ":", extra = "merge") %>%  # only split specified number of times
+  mutate(group = str_match(group, "[FM]\\d{1,3}"))         
+
+readboxes <- function(x){
+  boxes <- fread(paste0("awk '/Subject/{print $2}' ", "'", x, "'"),fill = T,header=F)
+  boxes$filename <- x
+  return(boxes)
+}
+
 #### ONE FUNCTIONS EDITION #####
 # create the dataframe with vector in it
 # check that the column we are removing ends with 5 or 0 and then remove
@@ -109,7 +128,7 @@ openxlsx::write.xlsx(exps_vs_id, file = "exps_vs_id_2.xlsx",col.names=TRUE, row.
 
 names_sha_append <- names_sha %>% 
   rename("labanimalid"="V1") %>% 
-  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename))))
+  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "__", toupper(filename)))
                               
 
 rewards_sha <- lapply(olivier_cocaine_files_sha, read_fread, "rewards") %>% unlist(recursive = F)
@@ -118,7 +137,8 @@ names(rewards_sha) <- toupper(names_sha_append$labanimalid)
 rewards_sha_df <- rewards_sha %>% 
   rbindlist(fill = T, idcol = "labanimalid") %>% 
   mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
-         file_exp = str_extract(labanimalid, "SHA\\d+$"), 
+         file_exp = str_extract(labanimalid, "SHA\\d+(-\\d)?$"), 
+         filename = sub(".*__", "", labanimalid),
          labanimalid = str_extract(labanimalid,"^\\D\\d+"))
   ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
   
@@ -160,7 +180,7 @@ rightresponses_lga <- rightresponses_lga %>%
   mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
          file_exp = str_extract(labanimalid, "\\D+\\d+$"), 
          labanimalid = str_extract(labanimalid,"^\\D\\d+")) 
-%>% 
+  # %>% 
   ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
   
 
