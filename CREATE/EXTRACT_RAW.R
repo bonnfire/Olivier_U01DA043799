@@ -108,6 +108,15 @@ read_fread_old <- function(x, varname){
   return(rawdata)
 }
 
+## OLD 
+## read_fread_old
+# function(x){
+#   # binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", " | grep -v \"[list|endl]\""))
+#   binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", "| grep -v \"endl\""), header = F)
+#   binrewards$filename <- x
+#   return(binrewards)
+# }
+
 ## all ts + iri labels (4) are appended w 2000, count labels (3) have just 24
 
 read_iri_old <- function(x){
@@ -213,9 +222,11 @@ rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),
 
 ########### OLD SHA
 
+# get the files of interest
 setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS/")
 sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T)
 
+# extract the subject id information
 sha_subject_old <- lapply(sha_old_files, read_subject_old) %>% rbindlist()
 sha_subject_old_use <- sha_subject_old %>% 
   rename("labanimalid" = "V1") %>% 
@@ -225,6 +236,7 @@ sha_subject_old_use <- sha_subject_old %>%
                               sub("C.*", "", sub(".*/.*/.*/.*/", "", filename)), "_", 
                               str_extract(filename, "\\d{8}(-\\d+)?"))) # subject id, cohort, experiment, computer, date
 
+# extract the subject sha data
 sha_old <- lapply(sha_old_files, read_fread_old) 
 sha_old <- lapply(sha_old, function(x){
   Index <- which(x[,1]=="list")
@@ -244,14 +256,14 @@ sha_old_df <- sha_old_split %>%
   dplyr::filter(counts != "list") %>% 
   separate(labanimalid, into = c("labanimalid", "file_cohort", "file_exp", "computer", "file_date"), sep = "_")
 
-
-iri <- lapply(cohort1_old_files, read_iri_old) %>% rbindlist()
+# extract iri data 
+iri <- lapply(sha_old_files, read_iri_old) %>% rbindlist()
 iri %>%
   dplyr::filter(iritime == "list", iricode != "list") %>% 
   nrow() # should be none! since we are using cbind, make sure that the df's are "synced"
 iri_indices <- grep("list", iri$iritime)
-cohort1_old_iri <- split(iri, cumsum(1:nrow(iri) %in% iri_indices))
-names(cohort1_old_iri) <- cohort1_subject_old_use$labanimalid ## still wrong because of the data are longer than the number of names we can assign
+sha_old_iri <- split(iri, cumsum(1:nrow(iri) %in% iri_indices))
+names(sha_old_iri) <- sha_subject_old_use$labanimalid ## still wrong because of the data are longer than the number of names we can assign
 
 cohort1_old_iri_df <- lapply(cohort1_old_iri, convert_iri_matrix_to_df) %>% rbindlist(idcol = "labanimalid")
 
