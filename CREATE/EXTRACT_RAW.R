@@ -134,19 +134,109 @@ read_fread_old_oneatatime <- function(x){
 }
 
 read_fread_old <- function(x, varname){
-  fread_old_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps"),
-                                 statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/BinsTOInActiveResponses/{flag=0}flag' ",
-                                               "awk '/^ResponsesActBins/{flag=1;next}/TOResponsesActBins/{flag=0}flag' ",
-                                               "awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", 
-                                               "",
+  fread_old_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards", "iri", "iricodes", "lefttimestamps", "righttimestamps", "rewardstimestamps"),
+                                 statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/endl/{flag=0}flag' ",
+                                               "awk '/^ResponsesActBins/{flag=1;next}/endl/{flag=0}flag' ",
+                                               "awk '/BinRewards/{flag=1;next}/endl/{flag=0}flag' ", 
+                                               "awk '/^IRI/{flag=1;next}/endl/{flag=0}flag' ",
+                                               "awk '/^IRICode/{flag=1;next}/endl/{flag=0}flag' ",
                                                "",
                                                ""))  #### 	 In=L Act=R  Rew=W InTS=U	ActTS=Y  RewTS=V  RewIRI=Z 	
   statement <- fread_statements[which(fread_statements$varname == varname),]$statement
   rawdata <- fread(paste0(statement, "'", x, "'"), fill = T, header = F)
   rawdata$filename <- x
-  return(binrewards)
+  
+  
+  if(varname == "iri"){
+    rawdata$V1 <- (rawdata$V1)/10
+  }
+  
+  return(rawdata)
 }
 
+## all ts + iri labels (4) are appended w 2000, count labels (3) have just 24
+
+read_iri <- function(x){
+  iri <- fread(paste0("awk '/^IRI\\r/{flag=1;next}/endl/{flag=0}flag' ", "'", x, "'"), fill = T, header = F)
+  iri$filename <- x
+  names(iri)[1] <- "iritime"
+  
+  iricode <- fread(paste0("awk '/^IRICode\\r/{flag=1;next}/endl/{flag=0}flag' ", "'", x, "'"), fill = T, header = F)
+  iricode$filename <- x
+  names(iricode)[1] <- "iricode"
+  
+
+  rawdata <- cbind(iri, iricode)
+  rawdata <- rawdata[,-2]
+  
+  return(rawdata)
+}
+
+
+iri <- lapply(cohort1_old_files, read_iri) %>% rbindlist()
+iri %>%
+  dplyr::filter(iritime == "list", iricode != "list") %>% 
+  nrow() # should be none! since we are using cbind, make sure that the df's are "synced"
+iri_indices <- grep("list", iri$iritime)
+cohort1_old_iri <- split(iri, cumsum(1:nrow(iri) %in% iri_indices))
+names(cohort1_old_iri) <- cohort1_subject_old_use$labanimalid ## still wrong because of the data are longer than the number of names we can assign
+
+cohort1_old_iri_df <- lapply(cohort1_old_iri, function(x){
+  if((x[2,1] == nrow(x) -2) == T){
+    x <- x[-c(1:2),]
+    x <- x %>% 
+      mutate(iritime = as.numeric(iritime),
+             iritime = iritime/100)
+  }
+
+  timer = x$iritime[1]
+
+  for(i in 1:nrow(x)){
+    timer = timer + x$iritime[i]
+    # timer2 = timer + x$iritime[3]
+    # timer3 = timer2 + x$iritime[4]
+    # print <- paste(timer,timer2,timer3)
+    if(x$iricode[i] %in% c(1,4)){
+      x$activeTS[i] = timer
+    } else x$activeTS[i] = NA 
+    
+    if(x$iricode[i] %in% c(3,5)){
+      x$inactiveTS[i] = timer
+    } else x$inactiveTS[i] = NA 
+    
+    
+    if(x$iricode[i] == 1){
+      x$rewardTS[i] = timer
+    } else x$rewardTS[i] = NA 
+    
+    # 
+    # x <- x %>%
+    #   mutate(activeTS = ifelse(iricode %in% c(1,4), timer, NA),
+    #          c = ifelse(iricode %in% c(3,5), timer, NA),
+    #          rewardTS = ifelse(iricode == 1, timer, NA))
+    # i = i + 1
+  }
+
+  return(x)
+}) 
+
+%>% rbindlist(idcol = "labanimalid")
+
+cohort1_old_iri_df <- cohort1_old_iri_df %>% 
+  mutate(righttimestamps = , 
+         lefttimestamps = )
+
+timer=timer+as.numeric(IRIMatrix[p,1])
+if(IRIMatrix[p,2]==1 || IRIMatrix[p,2]==4) {
+  ActiveTimestamps[p]=timer
+}
+if(IRIMatrix[p,2]==3 || IRIMatrix[p,2]==5){
+  InactiveTimestamps[p]=timer
+}
+if(IRIMatrix[p,2]==1){
+  RewTimestamps[p]=timer
+}	
+}
 
 
 
