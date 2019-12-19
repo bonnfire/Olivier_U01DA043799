@@ -29,6 +29,7 @@ readboxes <- function(x){
   return(boxes)
 }
 
+# to differentiate the bad sessions from the good ones; find the typical amount of time spent on a session and filter
 readdate_time <- function(x){
   
 }
@@ -89,13 +90,7 @@ read_fread <- function(x, varname){
 ## know how many subjects to expect in each filename
 ## find . -name "SHA" -exec grep -ira1 "NumberOfSubjects" {} +
 
-read_fread_old <- function(x){
-  # binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", " | grep -v \"[list|endl]\""))
-  binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", "| grep -v \"endl\""), header = F)
-  binrewards$filename <- x
-  return(binrewards)
-}
-
+setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS/C01/Old/SHA")
 cohort1_old_files <- list.files(pattern = ".*txt")
 cohort1_old <- lapply(cohort1_old_files, read_fread_old) 
 cohort1_old_i <- lapply(cohort1_old, function(x){
@@ -110,14 +105,51 @@ list_indices <- grep("list", cohort1_old_i$V1)
 cohort1_old_i <- split(cohort1_old_i, cumsum(1:nrow(cohort1_old_i) %in% list_indices))
 
 read_subject_old <- function(x){
-  # binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", " | grep -v \"[list|endl]\""))
-  subject_old <- fread(paste0("grep -ia1 'ratnumber'", "'", x, "'", "| grep -iE \"[F|M][0-9]+\""), header = F)
+  subject_old <- fread(paste0("grep -iEo \"[F|M][0-9]+\" ", "'", x, "'"), header = F)
   subject_old$filename <- x 
   return(subject_old)
 }
 
+cohort1_subject_old <- lapply(cohort1_old_files, read_subject_old) %>% rbindlist()
+cohort1_subject_old_use <- cohort1_subject_old %>% 
+  rename("labanimalid" = "V1") %>% 
+  mutate(labanimalid = paste0(str_match(toupper(labanimalid), "[FM]\\d{1,3}"), "_", 
+                              str_extract(filename, "C\\d+"), "_", 
+                              gsub(".*HS([^.]+)[-].*", "\\1", toupper(filename)), "_", 
+                              str_extract(filename, "^\\D\\d"), "_", 
+                              gsub(".*[-]([^.]+).txt", "\\1", filename) )) 
 
-cohort1_subject_old <- lapply(cohort1_old_files, read_subject_old) 
+names(cohort1_old_i) <- cohort1_subject_old_use$labanimalid
+cohort1_old_df <- cohort1_old_i %>% 
+  rbindlist(idcol = "labanimalid") %>%
+  rename("counts" = "V1") %>% 
+  dplyr::filter(counts != "list") %>% 
+  separate(labanimalid, into = c("labanimalid", "file_cohort", "file_exp", "computer", "file_date"), sep = "_")
+
+read_fread_old_oneatatime <- function(x){
+  # binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", " | grep -v \"[list|endl]\""))
+  binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", "| grep -v \"endl\""), header = F)
+  binrewards$filename <- x
+  return(binrewards)
+}
+
+read_fread_old <- function(x, varname){
+  fread_old_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps"),
+                                 statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/BinsTOInActiveResponses/{flag=0}flag' ",
+                                               "awk '/^ResponsesActBins/{flag=1;next}/TOResponsesActBins/{flag=0}flag' ",
+                                               "awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", 
+                                               "",
+                                               "",
+                                               ""))  #### 	 In=L Act=R  Rew=W InTS=U	ActTS=Y  RewTS=V  RewIRI=Z 	
+  statement <- fread_statements[which(fread_statements$varname == varname),]$statement
+  rawdata <- fread(paste0(statement, "'", x, "'"), fill = T, header = F)
+  rawdata$filename <- x
+  return(binrewards)
+}
+
+
+
+
 # join_wfu_oli_cocaine <- function(x){
 #   
 # }
