@@ -82,7 +82,7 @@ dev.off()
 # ggplot(df, aes(x=rat, y = defensive))+ geom_point()
 
 ##############################################
-## plotting raw 
+## plotting raw self admin data
 ##############################################
 
 # prepare graphable df

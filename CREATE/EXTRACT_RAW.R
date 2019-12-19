@@ -13,23 +13,24 @@ readsubjects <- function(x){
   return(subjects)
 }
 
-# for these cases, the group number is not 0 and the subject is found elsewhere.  # 12/18 only lga
-readgroups <- function(x){
-  groups_files <- fread(paste0("grep -ir \"Group:\" | grep -v \"Group: 0\""),fill = T,header=F)
-  return(groups_files)
-}
-
+# #notice system call, doing it recurisvely for the entire directory; for these cases, the group number is not 0 and the subject is found elsewhere.  # 12/18 only lga
 groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TRUE) %>% 
   gsub("\r", "", .) %>% 
   as.data.frame() %>% 
   rename("filename" = ".") %>% 
-  separate(filename, c("filename", "group"), sep = ":", extra = "merge") %>%  # only split specified number of times
-  mutate(group = str_match(group, "[FM]\\d{1,3}"))         
+  separate(filename, c("filename", "labanimalid"), sep = ":", extra = "merge") %>%  # only split specified number of times
+  mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', groups_files$filename) ), 
+         comment = "labanimalid extracted from group in raw files") %>% 
+  select(-filename)
 
 readboxes <- function(x){
-  boxes <- fread(paste0("awk '/Subject/{print $2}' ", "'", x, "'"),fill = T,header=F)
+  boxes <- fread(paste0("awk '/Box/{print $2}' ", "'", x, "'"),fill = T,header=F)
   boxes$filename <- x
   return(boxes)
+}
+
+readdate_time <- function(x){
+  
 }
 
 #### ONE FUNCTIONS EDITION #####
@@ -85,11 +86,41 @@ read_fread <- function(x, varname){
   
   return(processeddata)
 }
+## know how many subjects to expect in each filename
+## find . -name "SHA" -exec grep -ira1 "NumberOfSubjects" {} +
 
-
-join_wfu_oli_cocaine <- function(x){
-  
+read_fread_old <- function(x){
+  # binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", " | grep -v \"[list|endl]\""))
+  binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", "| grep -v \"endl\""), header = F)
+  binrewards$filename <- x
+  return(binrewards)
 }
+
+cohort1_old_files <- list.files(pattern = ".*txt")
+cohort1_old <- lapply(cohort1_old_files, read_fread_old) 
+cohort1_old_i <- lapply(cohort1_old, function(x){
+  Index <- which(x[,1]=="list")
+  if(x[(Index+1),] == 12){
+    x <- x[-(Index+1),]
+  }
+  return(x)
+}) %>% # use indexing to remove the 12 value if it follows list
+  rbindlist()
+list_indices <- grep("list", cohort1_old_i$V1)
+cohort1_old_i <- split(cohort1_old_i, cumsum(1:nrow(cohort1_old_i) %in% list_indices))
+
+read_subject_old <- function(x){
+  # binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", " | grep -v \"[list|endl]\""))
+  subject_old <- fread(paste0("grep -ia1 'ratnumber'", "'", x, "'", "| grep -iE \"[F|M][0-9]+\""), header = F)
+  subject_old$filename <- x 
+  return(subject_old)
+}
+
+
+cohort1_subject_old <- lapply(cohort1_old_files, read_subject_old) 
+# join_wfu_oli_cocaine <- function(x){
+#   
+# }
 # olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T) # filter to the new files for lga in cohort 1
 
 ## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
@@ -101,51 +132,47 @@ olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, ful
 names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
 
 # 12/16 for rsm: 
-names_sha_rsm <- names_sha %>% 
-  rename("labanimalid"="V1") %>% 
-  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+")), 
-         #file_exp = str_extract(toupper(filename), "\\D+\\d+$"))
-  file_exp = sub('.*HS', '', toupper(filename))) %>% 
-  group_by(labanimalid) %>% 
-  add_count(file_exp) %>% 
-  ungroup() 
+# names_sha_rsm <- names_sha %>%
+#   rename("labanimalid"="V1") %>%
+#   mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+")),
+#          #file_exp = str_extract(toupper(filename), "\\D+\\d+$"))
+#   file_exp = sub('.*HS', '', toupper(filename))) %>%
+#   group_by(labanimalid) %>%
+#   add_count(file_exp) %>%
+#   ungroup()
+# 
+# exps_vs_id <- table(names_sha_rsm$file_exp, factor(names_sha_rsm$labanimalid, levels = unique(gtools::mixedsort(names_sha_rsm$labanimalid)))) %>% t()
+# exps_vs_id <- cbind(exps_vs_id, Total = rowSums(exps_vs_id))
+# # # exps_vs_id <- rbind(exps_vs_id, Total = colSums(exps_vs_id)) # this line gets rid of the row name values for the excel
+# openxlsx::write.xlsx(exps_vs_id, file = "exps_vs_id.xlsx",col.names=TRUE, row.names=TRUE)
 
-exps_vs_id <- table(names_sha_rsm$file_exp, factor(names_sha_rsm$labanimalid, levels = unique(gtools::mixedsort(names_sha_rsm$labanimalid)))) %>% t()
-exps_vs_id <- cbind(exps_vs_id, Total = rowSums(exps_vs_id))
-# exps_vs_id <- rbind(exps_vs_id, Total = colSums(exps_vs_id))
-openxlsx::write.xlsx(exps_vs_id, file = "exps_vs_id_2.xlsx",col.names=TRUE, row.names=TRUE)
-
-#openxlsx::write.xlsx(exps_vs_id, file = "exps_vs_id.xlsx",col.names=TRUE, row.names=TRUE)
-
-# names_sha_append <- names_sha %>% 
-#   select(V1) %>% 
-#   unlist() %>% 
-#   as.vector() %>% 
-#   paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names_sha$filename)) %>% 
-#   toupper() %>%
-#   str_extract("[FM]\\d+.*")
-# names_sha_append <- names_sha_append[!is.na(names_sha_append)] #with na, 2783; 2716 without na
-
+# use for actual names vector
 names_sha_append <- names_sha %>% 
   rename("labanimalid"="V1") %>% 
-  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "__", toupper(filename)))
-                              
+  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename)))
+
+# merge to this dataset to acquire more metadata
+sha_boxes <- lapply(olivier_cocaine_files_sha, readboxes) %>% 
+  rbindlist() %>% 
+  rename("box" = "V1")
 
 rewards_sha <- lapply(olivier_cocaine_files_sha, read_fread, "rewards") %>% unlist(recursive = F)
 # names(rightresponses_sha) <- names_sha_append
-names(rewards_sha) <- toupper(names_sha_append$labanimalid)
+names(rewards_sha) <- names_sha_append$labanimalid
 rewards_sha_df <- rewards_sha %>% 
   rbindlist(fill = T, idcol = "labanimalid") %>% 
-  mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
-         file_exp = str_extract(labanimalid, "SHA\\d+(-\\d)?$"), 
-         filename = sub(".*__", "", labanimalid),
-         labanimalid = str_extract(labanimalid,"^\\D\\d+"))
-  ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
-  
-  
-  
-  
-  
+  separate(labanimalid, c("labanimalid", "file_cohort", "file_exp", "filename"), "_")
+
+# double check all labanimalids are valid
+rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% View() # NA labanimalid
+rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% dplyr::filter(bin == "total") %>% View()
+
+## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
+
+
+
+
+
 ################################
 ########## LGA #################
 ################################
@@ -180,9 +207,9 @@ rightresponses_lga <- rightresponses_lga %>%
   mutate(file_cohort = str_extract(labanimalid, "C\\d+"), 
          file_exp = str_extract(labanimalid, "\\D+\\d+$"), 
          labanimalid = str_extract(labanimalid,"^\\D\\d+")) 
-  # %>% 
-  ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
-  
+# %>% 
+## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
+
 
 right_time_responses <- lapply(olivier_cocaine_files_lga, read_fread, definedvars[4]) %>% unlist(recursive = F)
 names(right_time_responses) <- names_append

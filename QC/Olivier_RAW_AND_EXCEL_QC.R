@@ -23,7 +23,9 @@ u01.importxlsx <- function(xlname){
 
 ## TO DO:  
 # import the xl, extract the first table, extract the colorcoded table, assign the logic to create new variables in selfadmin_df
-
+########################
+# GWAS New Excel - DrB #
+########################
 GWAS_database_xl <- u01.importxlsx("GWAS database Giordano NEW.xlsx")
 selfadmindatabasexl <- GWAS_database_xl[[1]]
 selfadmindatabasexl_subset <- selfadmindatabasexl %>% 
@@ -94,8 +96,15 @@ specificcomments_list_df %>% dplyr::filter(labanimalid %in% missingdataspleenext
 
 
 
-
+##############################
 ## internal and external qc 
+############################## 
+
+## for existing excel, are they consistent with the raw
+# sha 
+rewards_sha_df
+
+
 # clean the raw files
 rewards_sha_df_graph[duplicated(rewards_sha_df_graph[,c("labanimalid", "file_exp")]), ] #should only be one data point for each animal but we are seeing multiple
 
