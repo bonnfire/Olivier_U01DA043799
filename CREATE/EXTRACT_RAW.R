@@ -34,9 +34,10 @@ groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TR
   as.data.frame() %>% 
   rename("filename" = ".") %>% 
   separate(filename, c("filename", "labanimalid"), sep = ":", extra = "merge") %>%  # only split specified number of times
-  mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename) ), 
-         comment = "labanimalid extracted from group in raw files") %>% 
-  select(-filename)
+  # mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename) ),
+  #        comment = "labanimalid extracted from group in raw files") %>%
+  mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename) ),
+         filename = paste0("./", filename))
 
 readboxes <- function(x){
   boxes <- fread(paste0("awk '/Box/{print $2}' ", "'", x, "'"),fill = T,header=F)
@@ -217,10 +218,18 @@ convert_iri_matrix_to_df <- function(x){
 ########## SHA #################
 ################################
 
-########### NEW SHA
-olivier_cocaine_files_sha <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 178 files
-names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
+## get the filename and subject names 
+sha_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 329 files
+sha_new_files <- sha_new_files[-1] # duplicate, 329 -> 328
+sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T) # 424 files
 
+# get subjects 
+sha_subjects_new <- process_subjects_new(sha_new_files)
+sha_subjects_old <- process_subjects_old(sha_old_files)
+
+
+
+########### NEW SHA
 # 12/16 for rsm: 
 # names_sha_rsm <- names_sha %>%
 #   rename("labanimalid"="V1") %>%
@@ -237,9 +246,6 @@ names_sha <- lapply(olivier_cocaine_files_sha, readsubjects) %>% rbindlist()
 # openxlsx::write.xlsx(exps_vs_id, file = "exps_vs_id.xlsx",col.names=TRUE, row.names=TRUE)
 
 # use for actual names vector
-names_sha_append <- names_sha %>% 
-  rename("labanimalid"="V1") %>% 
-  mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename)))
 
 # merge to this dataset to acquire more metadata
 sha_boxes <- lapply(olivier_cocaine_files_sha, readboxes) %>% 
@@ -260,29 +266,6 @@ rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),
 ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
 
 ########### OLD SHA
-
-# get the files of interest
-setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS/")
-sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T)
-
-# extract the subject id information
-sha_subjects_old <- lapply(sha_old_files, function(x){
-  subject_old <- fread(paste0("grep -iA1 \"ratnumber\" ", "'", x, "'"), header = F)
-  subject_old$filename <- x 
-  return(subject_old)
-}) # to find the order that the problematic id falls w/in the files
-
-sha_subjects_old_use <- sha_subjects_old %>% rbindlist() %>% 
-  rename("labanimalid" = "V1") %>% 
-  mutate(labanimalid=replace(labanimalid, labanimalid=="999", "F000"), # create placeholder for the problematic cases
-    labanimalid = paste0(str_match(toupper(labanimalid), "[FM]\\d{1,3}"), "_", 
-                              str_extract(filename, "C\\d+"), "_", 
-                              sub("-.*", "", sub(".*HS([^.]+)[-].*", "\\1", toupper(filename))), "_", 
-                              sub("C.*", "", sub(".*/.*/.*/.*/", "", filename)), "_", 
-                              str_extract(filename, "\\d{8}(-\\d+)?"))) %>%  # subject id, cohort, experiment, computer, date  
-  dplyr::filter(!grepl("^NA", labanimalid))
-
-# goal: sha_subjects_old <- lapply(sha_old_files, function(x))
 
 # extract the subject sha data
 sha_old <- lapply(sha_old_files, read_fread_old, "rewards") 
@@ -344,9 +327,10 @@ lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pat
 lga_subjects_new <- process_subjects_new(lga_new_files)
 lga_subjects_old <- process_subjects_old(lga_old_files)
 
+# process new files subjects that were lost in the group info
+lga_subjects_new[which(lga_subjects_new$filename %in% groups_files$filename),]$labanimalid <- groups_files$labanimalid # replace with group info
 
-
-
+# XX issue: lga_subjects_new %>% dplyr::filter(!grepl("^[MF]", labanimalid)) %>% head
 
 
 
