@@ -7,11 +7,26 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
 ## USEFUL FUNCTIONS
 # #extract names to be assigned for various tables later
-readsubjects <- function(x){
-  subjects <- fread(paste0("awk '/Subject/{print $2}' ", "'", x, "'"),fill = T,header=F)
-  subjects$filename <- x
-  return(subjects)
+process_subjects_new <- function(x){
+  
+  read_subjects_new <- function(x){
+    subjects <- fread(paste0("awk '/Subject/{print $2}' ", "'", x, "'"),fill = T,header=F)
+    subjects$filename <- x
+    return(subjects)
+  }
+  
+  
+  names_sha_append <- lapply(x, read_subjects_new) %>% rbindlist() %>% 
+    rename("labanimalid"="V1") %>% 
+    mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", 
+                                str_extract(filename, "C\\d+"), "_", 
+                                sub('.*HS', '', toupper(filename)), "_", 
+                                sub(".*/.*/.*/", '', filename))) # subject id, cohort, experiment, file/location perhaps
+  
+  return(names_sha_append)
+  
 }
+
 
 # #notice system call, doing it recurisvely for the entire directory; for these cases, the group number is not 0 and the subject is found elsewhere.  # 12/18 only lga
 groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TRUE) %>% 
@@ -19,7 +34,7 @@ groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TR
   as.data.frame() %>% 
   rename("filename" = ".") %>% 
   separate(filename, c("filename", "labanimalid"), sep = ":", extra = "merge") %>%  # only split specified number of times
-  mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', groups_files$filename) ), 
+  mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename) ), 
          comment = "labanimalid extracted from group in raw files") %>% 
   select(-filename)
 
@@ -30,9 +45,9 @@ readboxes <- function(x){
 }
 
 # to differentiate the bad sessions from the good ones; find the typical amount of time spent on a session and filter
-readdate_time <- function(x){
-  
-}
+# readdate_time <- function(x){
+#   
+# }
 
 #### ONE FUNCTIONS EDITION #####
 # create the dataframe with vector in it
@@ -90,10 +105,34 @@ read_fread <- function(x, varname){
 ## know how many subjects to expect in each filename
 ## find . -name "SHA" -exec grep -ira1 "NumberOfSubjects" {} +
 
-read_subject_old <- function(x){
-    subject_old <- fread(paste0("grep -iEo \"[F|M][0-9]+\" ", "'", x, "'"), header = F)
-  subject_old$filename <- x 
-  return(subject_old)
+# read_subject_old <- function(x){
+#     subject_old <- fread(paste0("grep -iEo \"[F|M][0-9]+\" ", "'", x, "'"), header = F)
+#   subject_old$filename <- x 
+#   return(subject_old)
+# }
+
+
+
+
+process_subjects_old <- function(x){
+  
+  read_subjects_old <- function(x){
+    subject_old <- fread(paste0("grep -iA1 \"ratnumber\" ", "'", x, "'"), header = F)
+    subject_old$filename <- x 
+    return(subject_old)
+  }
+  
+  subjects_old_use <- lapply(x, read_subjects_old) %>% rbindlist() %>% 
+    rename("labanimalid" = "V1") %>% 
+    mutate(labanimalid=replace(labanimalid, labanimalid=="999", "F000"), # create placeholder for the problematic cases
+           labanimalid = paste0(str_match(toupper(labanimalid), "[FM]\\d{1,3}"), "_", 
+                                str_extract(filename, "C\\d+"), "_", 
+                                sub("-.*", "", sub(".*HS([^.]+)[-].*", "\\1", toupper(filename))), "_", 
+                                sub("C.*", "", sub(".*/.*/.*/.*/", "", filename)), "_", 
+                                str_extract(filename, "\\d{8}(-\\d+)?"))) %>%  # subject id, cohort, experiment, computer, date  
+    dplyr::filter(!grepl("^NA", labanimalid))
+  
+  return(subjects_old_use)
 }
 
 
@@ -102,7 +141,7 @@ read_fread_old <- function(x, varname){
                                  statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/endl/{flag=0}flag' ",
                                                "awk '/^ResponsesActBins/{flag=1;next}/endl/{flag=0}flag' ",
                                                "awk '/BinRewards/{flag=1;next}/endl/{flag=0}flag' "))  #### 	 In=L Act=R  Rew=W InTS=U	ActTS=Y  RewTS=V  RewIRI=Z 	
-  statement <- fread_statements[which(fread_statements$varname == varname),]$statement
+  statement <- fread_old_statements[which(fread_old_statements$varname == varname),]$statement
   rawdata <- fread(paste0(statement, "'", x, "'"), fill = T, header = F)
   rawdata$filename <- x
   return(rawdata)
@@ -227,46 +266,13 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS/")
 sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T)
 
 # extract the subject id information
-sha_subject_old <- lapply(sha_old_files, read_subject_old) %>% rbindlist()
-sha_subject_old_use <- sha_subject_old %>% 
-  rename("labanimalid" = "V1") %>% 
-  mutate(labanimalid = paste0(str_match(toupper(labanimalid), "[FM]\\d{1,3}"), "_", 
-                              str_extract(filename, "C\\d+"), "_", 
-                              sub("-.*", "", sub(".*HS([^.]+)[-].*", "\\1", toupper(filename))), "_", 
-                              sub("C.*", "", sub(".*/.*/.*/.*/", "", filename)), "_", 
-                              str_extract(filename, "\\d{8}(-\\d+)?"))) # subject id, cohort, experiment, computer, date
-# # handle the problematic cases 
-sha_problem_files <- c("./C01/Old/SHA/K2C01HSSHA06-20170807.txt", "./C02/Old/SHA/Q3C02HSSHA01-20171017.txt")
-sha_problem_subjects <- lapply(sha_problem_files, function(x){
+sha_subjects_old <- lapply(sha_old_files, function(x){
   subject_old <- fread(paste0("grep -iA1 \"ratnumber\" ", "'", x, "'"), header = F)
   subject_old$filename <- x 
   return(subject_old)
 }) # to find the order that the problematic id falls w/in the files
 
-sha_problem_subjects_df <- sha_subject_old_use[which(sha_subject_old_use$filename %in% sha_problem_files),] %>% 
-  tibble::rownames_to_column() %>% 
-  group_by(filename) %>% 
-  do(head(.,1)) %>% # happens to be the first case for both; used sha_problem_subjects to find this
-  ungroup() %>% 
-  select(rowname, filename) %>% 
-  mutate(rowname = as.numeric(rowname))
-sha_subject_old_use_test <- do.call("rbind", list(sha_subject_old_use[1:sha_problem_subjects_df$rowname[1]-1, ], 
-                                                  data.frame(labanimalid="NA_C01_SHA06_K2_20170807", filename="./C01/Old/SHA/K2C01HSSHA06-20170807.txt"), 
-                                                  sha_subject_old_use[sha_problem_subjects_df$rowname[1]+1:sha_problem_subjects_df$rowname[2]-1, ], 
-                                                  data.frame(labanimalid="NA_C02_SHA01_K1_20170117", filename="./C02/Old/SHA/Q3C02HSSHA01-20171017.txt"),
-                                                  sha_subject_old_use[sha_problem_subjects_df$rowname[2]+1:nrow(sha_subject_old_use), ])) %>% 
-  dplyr::filter(!is.na(labanimalid))
-rownames(sha_subject_old_use_test) <- seq(length=nrow(sha_subject_old_use_test)) # fix missing id cases
-
-
-# approach 2 for handling problematic cases
-sha_subjects <- lapply(sha_old_files, function(x){
-  subject_old <- fread(paste0("grep -iA1 \"ratnumber\" ", "'", x, "'"), header = F)
-  subject_old$filename <- x 
-  return(subject_old)
-}) # to find the order that the problematic id falls w/in the files
-
-sha_subjects_old_use <- sha_subjects %>% rbindlist() %>% 
+sha_subjects_old_use <- sha_subjects_old %>% rbindlist() %>% 
   rename("labanimalid" = "V1") %>% 
   mutate(labanimalid=replace(labanimalid, labanimalid=="999", "F000"), # create placeholder for the problematic cases
     labanimalid = paste0(str_match(toupper(labanimalid), "[FM]\\d{1,3}"), "_", 
@@ -276,10 +282,10 @@ sha_subjects_old_use <- sha_subjects %>% rbindlist() %>%
                               str_extract(filename, "\\d{8}(-\\d+)?"))) %>%  # subject id, cohort, experiment, computer, date  
   dplyr::filter(!grepl("^NA", labanimalid))
 
-
+# goal: sha_subjects_old <- lapply(sha_old_files, function(x))
 
 # extract the subject sha data
-sha_old <- lapply(sha_old_files, read_fread_old) 
+sha_old <- lapply(sha_old_files, read_fread_old, "rewards") 
 sha_old <- lapply(sha_old, function(x){
   Index <- which(x[,1]=="list")
   if(x[(Index+1),] == 12){
@@ -288,9 +294,22 @@ sha_old <- lapply(sha_old, function(x){
   return(x)
 }) %>% rbindlist() # use indexing to remove the 12 value if it follows list
 
+old_sha_varname = c("leftresponses", "rightresponses", "rewards")
+for(i in 1:length(old_sha_varname)){
+  sha_old <- lapply(sha_old_files, read_fread_old, old_sha_varname[i]) 
+  sha_old <- lapply(sha_old, function(x){
+    Index <- which(x[,1]=="list")
+    if(x[(Index+1),] == 12){
+      x <- x[-(Index+1),]
+    }
+    return(x)
+  }) %>% rbindlist() 
+}
+
+
 list_indices <- grep("list", sha_old$V1)
 sha_old_split <- split(sha_old, cumsum(1:nrow(sha_old) %in% list_indices))
-names(sha_old_split) <- sha_subject_old_use$labanimalid ## XX NOW TWO SUBJECT LNES SHORTER THAN THE DATA # but this code shows that there should be 1255 'ratnumber' values so reconsider how to extract
+names(sha_old_split) <- sha_subjects_old_use$labanimalid ## subject lines should match the length of list data
 # find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec grep -i 'ratnumber' {} \; | wc -l
 # find . -regextype sed -regex ".*/C0[0-9]/Old/SHA" -exec sh -c 'grep -ira1 "ratnumber" | grep -Eiv "[F|M]" | grep -vi "ratnumber"' sh {} \;
 # find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec sh -c 'grep -ira1 "ratnumber"' sh {} \;
@@ -305,10 +324,11 @@ sha_old_df <- sha_old_split %>%
 iri <- lapply(sha_old_files, read_iri_old) %>% rbindlist()
 iri %>%
   dplyr::filter(iritime == "list", iricode != "list") %>% 
-  nrow() # should be none! since we are using cbind, make sure that the df's are "synced"
+  nrow() == 0  # should be none/TRUE! since we are using cbind, this ensrues that the df's are "synced"
 iri_indices <- grep("list", iri$iritime)
 sha_old_iri <- split(iri, cumsum(1:nrow(iri) %in% iri_indices))
-names(sha_old_iri) <- sha_subject_old_use$labanimalid ## still wrong because of the data are longer than the number of names we can assign
+length(sha_old_iri) == length(sha_subjects_old_use$labanimalid)
+names(sha_old_iri) <- sha_subjects_old_use$labanimalid ## subject lines now match the length of list data
 
 cohort1_old_iri_df <- lapply(cohort1_old_iri, convert_iri_matrix_to_df) %>% rbindlist(idcol = "labanimalid")
 
@@ -316,16 +336,59 @@ cohort1_old_iri_df <- lapply(cohort1_old_iri, convert_iri_matrix_to_df) %>% rbin
 ################################
 ########## LGA #################
 ################################
-olivier_cocaine_files_lga <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 329 files
-names_lga <- lapply(olivier_cocaine_files_lga, readsubjects) %>% rbindlist()
-names_append <- names %>% 
+lga_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 329 files
+lga_new_files <- lga_new_files[-1] # duplicate, 329 -> 328
+lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
+
+# get subjects 
+lga_subjects_new <- process_subjects_new(lga_new_files)
+lga_subjects_old <- process_subjects_old(lga_old_files)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# extract the subject id information
+lga_subjects <- lapply(olivier_cocaine_files_lga, readsubjects) %>% rbindlist()
+lga_subjects_use <- lga_subjects %>% 
   select(V1) %>% 
   unlist() %>% 
   as.vector() %>% 
   paste0(gsub(".*(C\\d+)HS(.*)","\\1\\2", names$filename)) %>% 
   toupper() %>%
   str_extract("F\\d+.*")
-names_append <- names_append[!is.na(names_append)]
+lga_subjects_use <- lga_subjects_use[!is.na(lga_subjects_use)]
 
 
 # rightresponseslga01 <- read_fread(olivier_cocaine_files[[2]], "rightresponses")
