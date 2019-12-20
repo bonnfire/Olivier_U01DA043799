@@ -91,7 +91,7 @@ read_fread <- function(x, varname){
 ## find . -name "SHA" -exec grep -ira1 "NumberOfSubjects" {} +
 
 read_subject_old <- function(x){
-  subject_old <- fread(paste0("grep -iEo \"[F|M][0-9]+\" ", "'", x, "'"), header = F)
+    subject_old <- fread(paste0("grep -iEo \"[F|M][0-9]+\" ", "'", x, "'"), header = F)
   subject_old$filename <- x 
   return(subject_old)
 }
@@ -235,6 +235,48 @@ sha_subject_old_use <- sha_subject_old %>%
                               sub("-.*", "", sub(".*HS([^.]+)[-].*", "\\1", toupper(filename))), "_", 
                               sub("C.*", "", sub(".*/.*/.*/.*/", "", filename)), "_", 
                               str_extract(filename, "\\d{8}(-\\d+)?"))) # subject id, cohort, experiment, computer, date
+# # handle the problematic cases 
+sha_problem_files <- c("./C01/Old/SHA/K2C01HSSHA06-20170807.txt", "./C02/Old/SHA/Q3C02HSSHA01-20171017.txt")
+sha_problem_subjects <- lapply(sha_problem_files, function(x){
+  subject_old <- fread(paste0("grep -iA1 \"ratnumber\" ", "'", x, "'"), header = F)
+  subject_old$filename <- x 
+  return(subject_old)
+}) # to find the order that the problematic id falls w/in the files
+
+sha_problem_subjects_df <- sha_subject_old_use[which(sha_subject_old_use$filename %in% sha_problem_files),] %>% 
+  tibble::rownames_to_column() %>% 
+  group_by(filename) %>% 
+  do(head(.,1)) %>% # happens to be the first case for both; used sha_problem_subjects to find this
+  ungroup() %>% 
+  select(rowname, filename) %>% 
+  mutate(rowname = as.numeric(rowname))
+sha_subject_old_use_test <- do.call("rbind", list(sha_subject_old_use[1:sha_problem_subjects_df$rowname[1]-1, ], 
+                                                  data.frame(labanimalid="NA_C01_SHA06_K2_20170807", filename="./C01/Old/SHA/K2C01HSSHA06-20170807.txt"), 
+                                                  sha_subject_old_use[sha_problem_subjects_df$rowname[1]+1:sha_problem_subjects_df$rowname[2]-1, ], 
+                                                  data.frame(labanimalid="NA_C02_SHA01_K1_20170117", filename="./C02/Old/SHA/Q3C02HSSHA01-20171017.txt"),
+                                                  sha_subject_old_use[sha_problem_subjects_df$rowname[2]+1:nrow(sha_subject_old_use), ])) %>% 
+  dplyr::filter(!is.na(labanimalid))
+rownames(sha_subject_old_use_test) <- seq(length=nrow(sha_subject_old_use_test)) # fix missing id cases
+
+
+# approach 2 for handling problematic cases
+sha_subjects <- lapply(sha_old_files, function(x){
+  subject_old <- fread(paste0("grep -iA1 \"ratnumber\" ", "'", x, "'"), header = F)
+  subject_old$filename <- x 
+  return(subject_old)
+}) # to find the order that the problematic id falls w/in the files
+
+sha_subjects_old_use <- sha_subjects %>% rbindlist() %>% 
+  rename("labanimalid" = "V1") %>% 
+  mutate(labanimalid=replace(labanimalid, labanimalid=="999", "F000"), # create placeholder for the problematic cases
+    labanimalid = paste0(str_match(toupper(labanimalid), "[FM]\\d{1,3}"), "_", 
+                              str_extract(filename, "C\\d+"), "_", 
+                              sub("-.*", "", sub(".*HS([^.]+)[-].*", "\\1", toupper(filename))), "_", 
+                              sub("C.*", "", sub(".*/.*/.*/.*/", "", filename)), "_", 
+                              str_extract(filename, "\\d{8}(-\\d+)?"))) %>%  # subject id, cohort, experiment, computer, date  
+  dplyr::filter(!grepl("^NA", labanimalid))
+
+
 
 # extract the subject sha data
 sha_old <- lapply(sha_old_files, read_fread_old) 
@@ -248,7 +290,10 @@ sha_old <- lapply(sha_old, function(x){
 
 list_indices <- grep("list", sha_old$V1)
 sha_old_split <- split(sha_old, cumsum(1:nrow(sha_old) %in% list_indices))
-names(sha_old_split) <- sha_subject_old_use$labanimalid ## XX NOW TWO SUBJECT LNES SHORTER THAN THE DATA
+names(sha_old_split) <- sha_subject_old_use$labanimalid ## XX NOW TWO SUBJECT LNES SHORTER THAN THE DATA # but this code shows that there should be 1255 'ratnumber' values so reconsider how to extract
+# find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec grep -i 'ratnumber' {} \; | wc -l
+# find . -regextype sed -regex ".*/C0[0-9]/Old/SHA" -exec sh -c 'grep -ira1 "ratnumber" | grep -Eiv "[F|M]" | grep -vi "ratnumber"' sh {} \;
+# find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec sh -c 'grep -ira1 "ratnumber"' sh {} \;
 
 sha_old_df <- sha_old_split %>% 
   rbindlist(idcol = "labanimalid") %>%
