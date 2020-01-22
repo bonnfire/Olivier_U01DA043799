@@ -490,3 +490,17 @@ definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps",
 # provide names as well 
 # #list2env(definedvars_list, envir = .GlobalEnv)
 # }
+
+
+
+
+
+################################
+########## PR ##################
+################################
+
+pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*PR/", value = T) # 53 files
+pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*PR/", value = T) # 62 files
+
+pr_subjects_new <- process_subjects_new(pr_new_files) #800 
+pr_rewards_new <- lapply(pr_new_files, read_fread, "rewards")  %>% unlist(recursive = F) #785 MISSING REWARDS ARRAY
