@@ -320,7 +320,7 @@ cohort1_old_iri_df <- lapply(cohort1_old_iri, convert_iri_matrix_to_df) %>% rbin
 ########## LGA #################
 ################################
 lga_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 329 files
-lga_new_files <- lga_new_files[-1] # duplicate, 329 -> 328
+lga_new_files <- lga_new_files[-1] # duplicate, 329 -> 328 # confirmed on bash
 lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
 
 # get subjects 
@@ -331,6 +331,16 @@ lga_subjects_old <- process_subjects_old(lga_old_files)
 lga_subjects_new[which(lga_subjects_new$filename %in% groups_files$filename),]$labanimalid <- groups_files$labanimalid # replace with group info
 
 # XX issue: lga_subjects_new %>% dplyr::filter(!grepl("^[MF]", labanimalid)) %>% head
+lga_subjects_new_totroubleshoot <- lga_subjects_new %>% group_by(filename) %>% mutate(occurence_seq = row_number())
+
+## get data
+
+rewards_lga_new <- lapply(lga_new_files, read_fread, "rewards") %>% unlist(recursive = F)
+# names(rightresponses_sha) <- names_sha_append
+names(rewards_lga_new) <- lga_subjects_new$labanimalid
+rewards_lga_new_df <- rewards_lga_new %>% 
+  rbindlist(fill = T, idcol = "labanimalid") %>% 
+  separate(labanimalid, c("labanimalid", "file_cohort", "file_exp", "filename"), "_")
 
 
 
