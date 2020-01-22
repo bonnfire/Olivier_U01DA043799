@@ -3,8 +3,6 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
 # after cohort 5, there are only new files
 
-# extract the new files 
-
 ## USEFUL FUNCTIONS
 # #extract names to be assigned for various tables later
 process_subjects_new <- function(x){
@@ -16,13 +14,12 @@ process_subjects_new <- function(x){
   }
   
   
-  names_sha_append <- lapply(x, read_subjects_new) %>% rbindlist() %>% 
-    rename("labanimalid"="V1") %>% 
-    mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_", 
-                                str_extract(filename, "C\\d+"), "_", 
-                                sub('.*HS', '', toupper(filename)), "_", 
+  names_sha_append <- lapply(x, read_subjects_new) %>% rbindlist() %>% rename("labanimalid"="V1") %>%
+    mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_",
+                                str_extract(filename, "C\\d+"), "_",
+                                sub('.*HS', '', toupper(filename)), "_",
                                 sub(".*/.*/.*/", '', filename))) # subject id, cohort, experiment, file/location perhaps
-  
+
   return(names_sha_append)
   
 }
@@ -219,15 +216,14 @@ convert_iri_matrix_to_df <- function(x){
 ################################
 
 ## get the filename and subject names 
-sha_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 329 files
-sha_new_files <- sha_new_files[-1] # duplicate, 329 -> 328
-sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T) # 424 files
+sha_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 178 files
+sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T) # 214 files
 
 # get subjects 
 sha_subjects_new <- process_subjects_new(sha_new_files)
 sha_subjects_old <- process_subjects_old(sha_old_files)
 
-
+## sha_subjects_new %>% dplyr::filter(!grepl("^[MF]", labanimalid)) %>% head
 
 ########### NEW SHA
 # 12/16 for rsm: 
@@ -248,13 +244,13 @@ sha_subjects_old <- process_subjects_old(sha_old_files)
 # use for actual names vector
 
 # merge to this dataset to acquire more metadata
-sha_boxes <- lapply(olivier_cocaine_files_sha, readboxes) %>% 
+sha_boxes <- lapply(sha_new_files, readboxes) %>% 
   rbindlist() %>% 
   rename("box" = "V1")
 
-rewards_sha <- lapply(olivier_cocaine_files_sha, read_fread, "rewards") %>% unlist(recursive = F)
+rewards_sha <- lapply(sha_new_files, read_fread, "rewards") %>% unlist(recursive = F)
 # names(rightresponses_sha) <- names_sha_append
-names(rewards_sha) <- names_sha_append$labanimalid
+names(rewards_sha) <- sha_subjects_new$labanimalid # 2783 matches! 
 rewards_sha_df <- rewards_sha %>% 
   rbindlist(fill = T, idcol = "labanimalid") %>% 
   separate(labanimalid, c("labanimalid", "file_cohort", "file_exp", "filename"), "_")
@@ -263,6 +259,14 @@ rewards_sha_df <- rewards_sha %>%
 rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% View() # NA labanimalid
 rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% dplyr::filter(bin == "total") %>% View()
 
+rewards_sha_totalsession_df <- rewards_sha_df %>% dplyr::filter(bin == "total") %>% select(-c(bin, filename)) %>% spread(file_exp, counts)
+# cannot spread bc there are duplicate values for the experiment
+# see the duplicated values
+## XXXXXXXXXXXXXXXXXXX LAUREN 
+rewards_sha_df %>% dplyr::filter(bin == "total", labanimalid != "NA") %>% group_by(labanimalid) %>% add_count(file_exp) %>% subset(n != 1) %>% View()
+rewards_sha_bybin_df <- rewards_sha_df %>% dplyr::filter(bin != "total")
+
+ratinfo_list_replacements_processed %>% head
 ## merge(WFU_Olivier_co_test_df[, c("cohort", labanimalnumber", "rfid")])
 
 ########### OLD SHA
@@ -277,31 +281,47 @@ sha_old <- lapply(sha_old, function(x){
   return(x)
 }) %>% rbindlist() # use indexing to remove the 12 value if it follows list
 
-old_sha_varname = c("leftresponses", "rightresponses", "rewards")
-for(i in 1:length(old_sha_varname)){
-  sha_old <- lapply(sha_old_files, read_fread_old, old_sha_varname[i]) 
-  sha_old <- lapply(sha_old, function(x){
-    Index <- which(x[,1]=="list")
-    if(x[(Index+1),] == 12){
-      x <- x[-(Index+1),]
-    }
-    return(x)
-  }) %>% rbindlist() 
-}
+# old_sha_varname = c("leftresponses", "rightresponses", "rewards")
+# for(i in 1:length(old_sha_varname)){
+#   sha_old <- lapply(sha_old_files, read_fread_old, old_sha_varname[i]) 
+#   sha_old <- lapply(sha_old, function(x){
+#     Index <- which(x[,1]=="list")
+#     if(x[(Index+1),] == 12){
+#       x <- x[-(Index+1),]
+#     }
+#     return(x)
+#   }) %>% rbindlist() 
+# }
 
+rewards_sha_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlist()
+rewards_sha_old_indices <- grep("list", rewards_sha_old$V1)
+rewards_sha_old_split <- split(rewards_sha_old, cumsum(1:nrow(rewards_sha_old) %in% rewards_sha_old_indices))
+names(rewards_sha_old_split) <- sha_subjects_old$labanimalid ##  1255 matches! subject lines should match the length of list data
+rewards_sha_old_df <- rewards_sha_old_split %>% 
+  rbindlist(idcol = "labanimalid") %>% 
+  rename("counts" = "V1") %>% 
+  group_by(labanimalid) %>% 
+  slice(3:n()) %>% 
+  summarize(tot_rewards = sum(as.numeric(counts), na.rm = T)) %>% 
+  separate(labanimalid, into = c("labanimalid", "file_cohort", "file_exp", "computer", "file_date"), sep = "_")
 
-list_indices <- grep("list", sha_old$V1)
-sha_old_split <- split(sha_old, cumsum(1:nrow(sha_old) %in% list_indices))
-names(sha_old_split) <- sha_subjects_old_use$labanimalid ## subject lines should match the length of list data
-# find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec grep -i 'ratnumber' {} \; | wc -l
-# find . -regextype sed -regex ".*/C0[0-9]/Old/SHA" -exec sh -c 'grep -ira1 "ratnumber" | grep -Eiv "[F|M]" | grep -vi "ratnumber"' sh {} \;
-# find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec sh -c 'grep -ira1 "ratnumber"' sh {} \;
+## try to make into for loop
+# list_indices <- grep("list", sha_old$V1)
+# sha_old_split <- split(sha_old, cumsum(1:nrow(sha_old) %in% list_indices))
+# names(sha_old_split) <- sha_subjects_old$labanimalid ##  1255 matches! subject lines should match the length of list data
+# # find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec grep -i 'ratnumber' {} \; | wc -l
+# # find . -regextype sed -regex ".*/C0[0-9]/Old/SHA" -exec sh -c 'grep -ira1 "ratnumber" | grep -Eiv "[F|M]" | grep -vi "ratnumber"' sh {} \;
+# # find . -regex ".*/C0[0-9]/Old/SHA/[^/]*.txt" -exec sh -c 'grep -ira1 "ratnumber"' sh {} \;
 
 sha_old_df <- sha_old_split %>% 
   rbindlist(idcol = "labanimalid") %>%
   rename("counts" = "V1") %>% 
   dplyr::filter(counts != "list") %>% 
   separate(labanimalid, into = c("labanimalid", "file_cohort", "file_exp", "computer", "file_date"), sep = "_")
+
+# check if labanimalids are valid
+sha_old_df[str_detect(sha_old_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% View() # no NA labanimalid, but what is F000
+sha_old_df %>% subset(labanimalid == "F000") # using the placeholder for problematic cases
 
 # extract iri data 
 iri <- lapply(sha_old_files, read_iri_old) %>% rbindlist()
@@ -310,11 +330,15 @@ iri %>%
   nrow() == 0  # should be none/TRUE! since we are using cbind, this ensrues that the df's are "synced"
 iri_indices <- grep("list", iri$iritime)
 sha_old_iri <- split(iri, cumsum(1:nrow(iri) %in% iri_indices))
-length(sha_old_iri) == length(sha_subjects_old_use$labanimalid)
-names(sha_old_iri) <- sha_subjects_old_use$labanimalid ## subject lines now match the length of list data
+length(sha_old_iri) == length(sha_subjects_old$labanimalid)
+names(sha_old_iri) <- sha_subjects_old$labanimalid ## subject lines now match the length of list data
 
-cohort1_old_iri_df <- lapply(cohort1_old_iri, convert_iri_matrix_to_df) %>% rbindlist(idcol = "labanimalid")
-
+old_iri_df <- lapply(sha_old_iri, convert_iri_matrix_to_df) %>% rbindlist(idcol = "labanimalid") %>% 
+  separate(labanimalid, c("labanimalid", "file_cohort", "file_exp", "computer",  "filedate"), "_") %>% 
+  mutate(filedate = lubridate::ymd(gsub("-\\d", "", filedate))) # bc the file extension has -2 (and maybe other tails) that need to be removed before we can parse into dates
+# checking valid id's
+old_iri_df[str_detect(old_iri_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% View()
+old_iri_df %>% subset(labanimalid == "F000") 
 
 ################################
 ########## LGA #################
@@ -323,15 +347,40 @@ lga_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T)
 lga_new_files <- lga_new_files[-1] # duplicate, 329 -> 328 # confirmed on bash
 lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
 
+
 # get subjects 
 lga_subjects_new <- process_subjects_new(lga_new_files)
 lga_subjects_old <- process_subjects_old(lga_old_files)
 
+
+################################ NEW
+
 # process new files subjects that were lost in the group info
 lga_subjects_new[which(lga_subjects_new$filename %in% groups_files$filename),]$labanimalid <- groups_files$labanimalid # replace with group info
 
+missingsubjects_filename <- lga_subjects_new_totroubleshoot %>% 
+  group_by(filename) %>% 
+  summarise(occurence_seq = max(occurence_seq)) %>% 
+  mutate(filename = gsub("./", "", filename, fixed = T)) %>% 
+  merge(rewards_lga_new_troubleshoot_count) %>% 
+  dplyr::filter(occurence_seq != count)  %>% 
+  rename("num_subject" = "occurence_seq", "num_rewards_array" = "count") %>% 
+  select(filename) %>% unlist() %>% as.character()%>% paste0("./", .)
+r <- as.numeric(c("2546", "2561", "2592", "2607", "2622", "2637")) - 1
+for(i in 1:length(missingsubjects_filename)){
+  newrow <- c(paste0("M753", "_", 
+                     str_extract(missingsubjects_filename[i], "C\\d+"), "_", 
+                     sub('.*HS', '', toupper(missingsubjects_filename[i])), "_", 
+                     sub(".*/.*/.*/", '', missingsubjects_filename[i])), missingsubjects_filename[i])
+  lga_subjects_new <- rbind(lga_subjects_new[1:r[i],], newrow, lga_subjects_new[-(1:r[i]),])
+}
+
 # XX issue: lga_subjects_new %>% dplyr::filter(!grepl("^[MF]", labanimalid)) %>% head
+
+
 lga_subjects_new_totroubleshoot <- lga_subjects_new %>% group_by(filename) %>% mutate(occurence_seq = row_number())
+lga_subjects_new_totroubleshoot %>% ungroup()  %>% rownames_to_column() %>% subset(filename %in% missingsubjects_filename&occurence_seq == 1) %>% select(rowname) %>% unlist() %>% as.character() 
+
 
 ## get data
 
@@ -352,6 +401,10 @@ rewards_lga_new_troubleshoot_sub_count <- rewards_lga_new_troubleshoot_sub_count
 sum(as.numeric(rewards_lga_new_troubleshoot_sub_count$count), na.rm = T) # 4935 
 
 lga_subjects_new_totroubleshoot %>% group_by(filename) %>% summarise(occurence_seq = max(occurence_seq)) %>% mutate(filename = gsub("./", "", filename, fixed = T)) %>%  merge(rewards_lga_new_troubleshoot_count) %>% dplyr::filter(occurence_seq != count)  %>% rename("num_subject" = "occurence_seq", "num_rewards_array" = "count")
+
+# to get the row numbers 
+lga_subjects_new_totroubleshoot %>% group_by(filename) %>% summarise(occurence_seq = max(occurence_seq)) %>% mutate(filename = gsub("./", "", filename, fixed = T)) %>%  merge(rewards_lga_new_troubleshoot_count) %>% rownames_to_column() %>% subset(occurence_seq != count)  %>% rename("num_subject" = "occurence_seq", "num_rewards_array" = "count") %>%  `[[`("rowname") 
+
 
 # names(rightresponses_sha) <- names_sha_append
 names(rewards_lga_new) <- lga_subjects_new$labanimalid
