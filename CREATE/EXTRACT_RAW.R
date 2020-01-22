@@ -336,16 +336,34 @@ lga_subjects_new_totroubleshoot <- lga_subjects_new %>% group_by(filename) %>% m
 ## get data
 
 rewards_lga_new <- lapply(lga_new_files, read_fread, "rewards") %>% unlist(recursive = F)
+
+rewards_lga_new_troubleshoot <- rewards_lga_new %>% rbindlist() %>% subset(bin == "total")
+
+rewards_lga_new_troubleshoot_count <- data.frame(results = system("grep -r -c \"W:\" */New_medassociates/LGA*", intern = T)) 
+rewards_lga_new_troubleshoot_count <- rewards_lga_new_troubleshoot_count %>% 
+  separate(results, into = c("filename", "count"), sep = ":") %>% 
+  mutate(count = as.numeric(count))
+sum(as.numeric(rewards_lga_new_troubleshoot_count$count), na.rm = T) # 4935 
+
+rewards_lga_new_troubleshoot_sub_count <- data.frame(results = system("grep -r -c \"Subject:\" */New_medassociates/LGA*", intern = T)) 
+rewards_lga_new_troubleshoot_sub_count <- rewards_lga_new_troubleshoot_sub_count %>% 
+  separate(results, into = c("filename", "count"), sep = ":") %>% 
+  mutate(count = as.numeric(count))
+sum(as.numeric(rewards_lga_new_troubleshoot_sub_count$count), na.rm = T) # 4935 
+
+lga_subjects_new_totroubleshoot %>% group_by(filename) %>% summarise(occurence_seq = max(occurence_seq)) %>% mutate(filename = gsub("./", "", filename, fixed = T)) %>%  merge(rewards_lga_new_troubleshoot_count) %>% dplyr::filter(occurence_seq != count)  %>% rename("num_subject" = "occurence_seq", "num_rewards_array" = "count")
+
 # names(rightresponses_sha) <- names_sha_append
 names(rewards_lga_new) <- lga_subjects_new$labanimalid
 rewards_lga_new_df <- rewards_lga_new %>% 
   rbindlist(fill = T, idcol = "labanimalid") %>% 
   separate(labanimalid, c("labanimalid", "file_cohort", "file_exp", "filename"), "_")
+lga_subjects_new %>% 
+  separate(labanimalid, c("labanimalid", "file_cohort", "file_exp", "filename"), "_") %>% add_count(file_cohort)
 
 
 
-
-
+ratinfo_list_deaths_processed 
 
 
 
