@@ -220,22 +220,36 @@ date_time_subject_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subje
 )
 
 date_time_subject_df <- date_time_subject_df %>% 
-  mutate(start_date = format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y"),
+  mutate(start_date = lubridate::mdy(format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y")),
          start_time = chron::chron(times = start_time),
          end_time = chron::chron(times = end_time), 
          experiment_duration = end_time - start_time,
-         experiment_duration = 60 * 24 * as.numeric(chron::times(experiment_duration)),
-         experiment_duration_bin = case_when(
-           grepl("SHOCK", exp) & experiment_duration > 60 ~ "valid",
-           grepl("SHA", exp) & experiment_duration > 120 ~ "valid",
-           grepl("LGA", exp) & experiment_duration > 360 ~ "valid",
-           grepl("PR", exp) & experiment_duration < 360 ~ "valid")
+         experiment_duration = 60 * 24 * as.numeric(chron::times(experiment_duration))
          ) 
 
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
 # allcohorts2 %>% select(matches("date|cohort")) %>% distinct()
+cohorts_exp_date <- allcohorts2 %>% 
+  mutate(date_lga19 = replace(date_lga19, cohort == "cohort5", lubridate::ymd("2018-09-19"))) %>% select(matches("date|cohort")) %>% distinct() %>% # for record keeping, make sure to make this change on the actual excel! 
+gather(v, value, date_sha01:date_preshock) %>% 
+  separate(v, c("date", "exp")) %>% 
+  arrange(cohort) %>% 
+  select(-date) %>% 
+  mutate(cohort = paste0("C", str_pad(gsub("COHORT", "", toupper(cohort)),  2, "left","0")),
+         exp = toupper(exp),
+         value = lubridate::ymd(value))
 
+date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, by = c("cohort", "exp")) %>%
+  mutate(experiment_duration_bin = case_when(
+    grepl("SHOCK", exp) & experiment_duration > 60 & value == start_date ~ "valid",
+    grepl("SHA", exp) & experiment_duration > 120 & value == start_date~ "valid",
+    grepl("LGA", exp) & experiment_duration > 360 & value == start_date~ "valid",
+    grepl("PR", exp) & experiment_duration < 360 & value == start_date~ "valid")
+  )
 
+date_time_subject_df_comp %>% subset(start_date != value) %>% View()
+# for email
+date_time_subject_df_comp %>% subset(start_date != value) %>% select(cohort, exp, start_date, value, filename) %>% distinct() %>% View()
 # join_wfu_oli_cocaine <- function(x){
 #   
 # }
