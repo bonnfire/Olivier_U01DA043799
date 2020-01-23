@@ -20,6 +20,12 @@ process_subjects_new <- function(x){
                                 sub('.*HS', '', toupper(filename)), "_",
                                 sub(".*/.*/.*/", '', filename))) # subject id, cohort, experiment, file/location perhaps
 
+  read_meta_subjects_new <- function(x){
+    subjects <- fread(paste0("awk '/Subject/{print $2}' ", "'", x, "'"),fill = T,header=F)
+    subjects$filename <- x
+    return(subjects)
+  }
+  
   return(names_sha_append)
   
 }
@@ -252,29 +258,31 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
     valid = replace(valid, is.na(valid), "no")
   ) 
 
-date_time_subject_df_comp %>% subset(start_date != value) %>% View()
-# for email
-date_time_subject_df_comp %>% subset(start_date != value) %>% select(cohort, exp, start_date, value, filename) %>% distinct() %>% View()
-# join_wfu_oli_cocaine <- function(x){
-#   
-# }
-# olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T) # filter to the new files for lga in cohort 1
-View(date_time_subject_df %>% dplyr::filter() %>% select(cohort, exp, start_date) %>% distinct() %>% spread(exp, start_date))
-# files that have different dates 
-View(date_time_subject_df %>% select(cohort, exp, start_date) %>% distinct() %>% group_by(cohort, exp) %>% dplyr::filter(n() > 1))
-## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
-date_time_subject_df %>% 
-  dplyr::filter(!(cohort == "C07"&exp=="SHA07"&start_date==as.Date("2019-01-25")), 
-                !(cohort == "C07"&exp=="LGA04"&start_date==as.Date("2019-02-11")), 
-                !(cohort == "C08"&exp=="LGA08"&start_date==as.Date("2019-07-12"))) %>% 
-  select(cohort, exp, start_date) %>% distinct()%>% group_by(cohort, exp) %>% dplyr::filter(n() > 1)
-
-View(date_time_subject_df %>% 
-  dplyr::filter(!(cohort == "C07"&exp=="SHA07"&start_date==as.Date("2019-01-25")), 
-                !(cohort == "C07"&exp=="LGA04"&start_date==as.Date("2019-02-11")), 
-                !(cohort == "C08"&exp=="LGA08"&start_date==as.Date("2019-07-12"))) %>% 
-  select(cohort, exp, start_date) %>% distinct()%>% spread(exp, start_date)
-  )
+# date_time_subject_df_comp %>% subset(start_date != value) %>% View()
+# # for email
+# date_time_subject_df_comp %>% subset(start_date != value) %>% select(cohort, exp, start_date, value, filename) %>% distinct() %>% View()
+# # join_wfu_oli_cocaine <- function(x){
+# #   
+# # }
+# # olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T) # filter to the new files for lga in cohort 1
+# View(date_time_subject_df %>% dplyr::filter() %>% select(cohort, exp, start_date) %>% distinct() %>% spread(exp, start_date))
+# # files that have different dates 
+# View(date_time_subject_df %>% select(cohort, exp, start_date) %>% distinct() %>% group_by(cohort, exp) %>% dplyr::filter(n() > 1))
+# ## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
+# date_time_subject_df %>% 
+#   dplyr::filter(!(cohort == "C07"&exp=="SHA07"&start_date==as.Date("2019-01-25")), 
+#                 !(cohort == "C07"&exp=="LGA04"&start_date==as.Date("2019-02-11")), 
+#                 !(cohort == "C08"&exp=="LGA08"&start_date==as.Date("2019-07-12"))) %>% 
+#   select(cohort, exp, start_date) %>% distinct()%>% group_by(cohort, exp) %>% dplyr::filter(n() > 1)
+# 
+# View(date_time_subject_df %>% 
+#   dplyr::filter(!(cohort == "C07"&exp=="SHA07"&start_date==as.Date("2019-01-25")), 
+#                 !(cohort == "C07"&exp=="LGA04"&start_date==as.Date("2019-02-11")), 
+#                 !(cohort == "C08"&exp=="LGA08"&start_date==as.Date("2019-07-12"))) %>% 
+#   select(cohort, exp, start_date) %>% distinct()%>% spread(exp, start_date)
+#   )
+# do any valid files have rats that are assigned to the wrong boxes (no)
+# date_time_subject_df_comp %>% dplyr::filter(subject != 0, valid == "yes") %>% select(subject, box, exp, valid) %>% group_by(subject, box, exp) %>% dplyr::filter(n() > 1) %>% arrange(subject) 
 
 ################################
 ########## SHA #################
