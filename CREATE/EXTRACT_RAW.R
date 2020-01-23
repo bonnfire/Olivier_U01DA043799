@@ -12,24 +12,40 @@ process_subjects_new <- function(x){
     subjects$filename <- x
     return(subjects)
   }
+
+  read_meta_subjects_new <- function(x){
+    date_time <- fread(paste0("awk '/Start/{print $3}' ", "'", x, "'"),fill = T,header=F)
+    return(date_time)
+  }
+  date_time <- lapply(x, read_meta_subjects_new) %>% rbindlist() 
   
+  date <- date_time %>% dplyr::filter(grepl("/", V1)) %>% unlist() %>% as.character()
+  time <- date_time %>% dplyr::filter(grepl(":", V1)) %>% unlist() %>% as.character()
+  date_time_bind <- data.frame(date = date, time = time) %>% 
+    mutate(date_time = paste0(date, "_", time))
   
   names_sha_append <- lapply(x, read_subjects_new) %>% rbindlist() %>% rename("labanimalid"="V1") %>%
+    cbind(., date_time_bind) %>% 
     mutate(labanimalid = paste0(str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_",
                                 str_extract(filename, "C\\d+"), "_",
                                 sub('.*HS', '', toupper(filename)), "_",
-                                sub(".*/.*/.*/", '', filename))) # subject id, cohort, experiment, file/location perhaps
-
-  read_meta_subjects_new <- function(x){
-    subjects <- fread(paste0("awk '/Subject/{print $2}' ", "'", x, "'"),fill = T,header=F)
-    subjects$filename <- x
-    return(subjects)
-  }
+                                sub(".*/.*/.*/", '', filename), "_",
+                                date_time)) %>%  # subject id, cohort, experiment, file/location perhaps
+  select(-c(date_time, date, time))
+  
+  # date_time_bind <- cbind(date, time)
+  # 
+  # names_sha_append_bind <- cbind(names_sha_append, date_time_bind)
+  # colnames(names_sha_append_bind) <- c("labanimalid", "filename", "start_date", "start_time")
+  # names_sha_append_bind <- names_sha_append_bind %>% 
+  #   mutate(start_date = lubridate::mdy(start_date),
+  #          start_time = chron::times(start_time))
   
   return(names_sha_append)
   
 }
 
+process_subjects_new("./C07/New_medassociates/SHA/MED1113C07HSSHA01")
 
 # #notice system call, doing it recurisvely for the entire directory; for these cases, the group number is not 0 and the subject is found elsewhere.  # 12/18 only lga
 groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TRUE) %>% 
@@ -214,7 +230,7 @@ read_date_time_subject <- system("grep -a7r --no-group-separator \"Start Date: \
 read_date_time_subject <- gsub("\\r", "", read_date_time_subject)
 read_date_time_subject <- read_date_time_subject[!grepl("/LGA/:", read_date_time_subject)] # remove the duplicate file
 
-date_time_subject_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)),
+date_time_subject_df <- data.frame(labanimalid = gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)) %>% toupper,
                                    cohort = str_match(grep("Subject", read_date_time_subject, value = T), "C\\d{2}") %>% unlist() %>% as.character(),  
                                    exp = toupper(sub('.*HS', '', grep("Subject", read_date_time_subject, value = T) %>% gsub("-Subject.*", "", .))),
                                    start_date = gsub(".*Start Date: ", "", grep("Start Date:", read_date_time_subject, value = T)),
@@ -231,7 +247,15 @@ date_time_subject_df <- date_time_subject_df %>%
          end_time = chron::chron(times = end_time), 
          experiment_duration = end_time - start_time,
          experiment_duration = 60 * 24 * as.numeric(chron::times(experiment_duration))
-         ) 
+         ) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  mutate(labanimalid = replace(labanimalid, labanimalid == "M7678", "M768")) %>% # verified by box
+  mutate(labanimalid = if_else(grepl("^C0", labanimalid), str_match(labanimalid,"[FM]\\d{1,3}" %>% unlist() %>% as.character()), labanimalid %>% as.character()))
+
+## problems in being too lax in accepting all forms of subjects 
+# gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)) %>% toupper %>% table()
+date_time_subject_df[str_detect(date_time_subject_df$labanimalid, "^(M|F)\\d{4}", negate = F),]
+date_time_subject_df$labanimalid %>% table()
 
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
 # allcohorts2 %>% select(matches("date|cohort")) %>% distinct()
@@ -258,6 +282,7 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
     valid = replace(valid, is.na(valid), "no")
   ) 
 
+# date_time_subject_df_comp %>% dplyr::filter(valid == "yes", labanimalid != 0) %>% group_by(labanimalid, exp) %>% dplyr::filter(n() > 1)
 # date_time_subject_df_comp %>% subset(start_date != value) %>% View()
 # # for email
 # date_time_subject_df_comp %>% subset(start_date != value) %>% select(cohort, exp, start_date, value, filename) %>% distinct() %>% View()
@@ -294,6 +319,7 @@ sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pat
 
 # get subjects 
 sha_subjects_new <- process_subjects_new(sha_new_files)
+
 sha_subjects_old <- process_subjects_old(sha_old_files)
 
 ## sha_subjects_new %>% dplyr::filter(!grepl("^[MF]", labanimalid)) %>% head
@@ -317,23 +343,44 @@ sha_subjects_old <- process_subjects_old(sha_old_files)
 # use for actual names vector
 
 # merge to this dataset to acquire more metadata
-sha_boxes <- lapply(sha_new_files, readboxes) %>% 
-  rbindlist() %>% 
-  rename("box" = "V1")
+# sha_boxes <- lapply(sha_new_files, readboxes) %>% 
+#   rbindlist() %>% 
+#   rename("box" = "V1")
 
 rewards_sha <- lapply(sha_new_files, read_fread, "rewards") %>% unlist(recursive = F)
 # names(rightresponses_sha) <- names_sha_append
 names(rewards_sha) <- sha_subjects_new$labanimalid # 2783 matches! 
 rewards_sha_df <- rewards_sha %>% 
   rbindlist(fill = T, idcol = "labanimalid") %>% 
-  separate(labanimalid, c("labanimalid", "file_cohort", "file_exp", "filename"), "_")
+  separate(labanimalid, c("labanimalid", "cohort", "exp", "filename", "start_date", "start_time"), "_") %>% 
+  mutate(start_date = lubridate::mdy(start_date),
+           start_time = chron::times(start_time)) %>% 
+  merge(., date_time_subject_df_comp %>% subset(valid == "yes")) %>% # dropped from 87395 to 50205 files
+  distinct()
+
+rewards_sha %>% 
+  rbindlist(fill = T, idcol = "labanimalid") %>% 
+  separate(labanimalid, c("labanimalid", "cohort", "exp", "filename", "start_date", "start_time"), "_") %>% 
+  mutate(start_date = lubridate::mdy(start_date),
+         start_time = chron::times(start_time)) %>% 
+  merge(., date_time_subject_df_comp) %>% # dropped from 87395 to 50205 files
+  distinct() %>% 
+  subset(labanimalid == "F1"&bin =="total")
 
 # double check all labanimalids are valid
 rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% View() # NA labanimalid
 rewards_sha_df[str_detect(rewards_sha_df$labanimalid, "^[MF]\\d+$", negate = T),] %>% dplyr::filter(bin == "total") %>% View()
 
-rewards_sha_totalsession_df <- rewards_sha_df %>% dplyr::filter(bin == "total") %>% select(-c(bin, filename)) %>% spread(file_exp, counts)
-# cannot spread bc there are duplicate values for the experiment
+# checking for typos in the labanimalid 
+rewards_sha_df %>% dplyr::filter(bin == "total") %>% group_by(labanimalid, exp) %>% dplyr::filter(n() > 1) %>% View()
+
+rewards_sha_totalsession_with_date_df <- rewards_sha_df %>% dplyr::filter(bin == "total") %>% select(-c(bin, filename)) %>% spread(exp, counts) %>% arrange(labanimalid, start_date, start_time)
+rewards_sha_totalsession_df <- rewards_sha_df %>% 
+  dplyr::filter(bin == "total") %>% 
+  select(-c("bin", "filename", "start_date", "start_time", "end_time", "excel_date", "experiment_duration")) %>% 
+  spread(exp, counts) %>% 
+  mutate_at("box", as.numeric) %>% 
+  arrange(cohort, box) # cannot spread bc there are duplicate values for the experiment
 # see the duplicated values
 ## XXXXXXXXXXXXXXXXXXX LAUREN 
 rewards_sha_df %>% dplyr::filter(bin == "total", labanimalid != "NA") %>% group_by(labanimalid) %>% add_count(file_exp) %>% subset(n != 1) %>% View()
