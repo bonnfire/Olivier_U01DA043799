@@ -65,8 +65,8 @@ olivierfiles <- function(filename){
   # after it is uniquified shocks should turn into decimal numbers 
   
   if(grepl("7|8", filename)){
-    selfadmin$Rat <- gsub("^Shock", "Shock0.3", selfadmin$Rat)
-  } # if cohort 7 or 8, then turn the shock values to 0.3 
+    selfadmin$Rat <- gsub("^Shock", "Shock03", selfadmin$Rat)
+  } # if cohort 7 or 8, then turn the shock values to 03 #originally 0.3 but this creates problems in merging  
  
   
   ### transpose data 

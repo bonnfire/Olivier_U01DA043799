@@ -230,26 +230,27 @@ date_time_subject_df <- date_time_subject_df %>%
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
 # allcohorts2 %>% select(matches("date|cohort")) %>% distinct()
 # reformat exported excel object to prepare for merge and check with in file dates ((wrong dates should be noted and possbily removed))
-allcohorts2_shockmod <- allcohorts2
-names(allcohorts2_shockmod) <- gsub("\\.", "", names(allcohorts2))
-cohorts_exp_date <- allcohorts2_shockmod %>% 
+
+cohorts_exp_date <- allcohorts2 %>% 
   mutate(date_lga19 = replace(date_lga19, cohort == "cohort5", lubridate::ymd("2018-09-19")),
          date_sha02 = replace(date_sha02, cohort == "cohort5", lubridate::ymd("2018-07-31"))) %>% select(matches("date|cohort")) %>% distinct() %>% # for record keeping, make sure to make this change on the actual excel! 
-gather(v, value, date_sha01:date_preshock) %>% 
+gather(v, value, date_sha01:date_lga23) %>% 
   separate(v, c("date", "exp")) %>% 
   arrange(cohort) %>% 
   select(-date) %>% 
   mutate(cohort = paste0("C", str_pad(gsub("COHORT", "", toupper(cohort)),  2, "left","0")),
          exp = toupper(exp),
-         value = lubridate::ymd(value))
+         value = lubridate::ymd(value)) %>% 
+  rename("excel_date" = "value")
 
 date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, by = c("cohort", "exp")) %>%
-  mutate(experiment_duration_bin = case_when(
-    grepl("SHOCK", exp) & experiment_duration > 60 & value == start_date ~ "valid",
-    grepl("SHA", exp) & experiment_duration > 120 & value == start_date~ "valid",
-    grepl("LGA", exp) & experiment_duration > 360 & value == start_date~ "valid",
-    grepl("PR", exp) & experiment_duration < 360 & experiment_duration > 0 & value == start_date~ "valid")
-  )
+  mutate(valid = case_when(
+    grepl("SHOCK", exp) & experiment_duration > 60 & excel_date == start_date ~ "yes",
+    grepl("SHA", exp) & experiment_duration > 120 & excel_date == start_date~ "yes",
+    grepl("LGA", exp) & experiment_duration > 360 & excel_date == start_date~ "yes",
+    grepl("PR", exp) & experiment_duration < 360 & experiment_duration > 0 & excel_date == start_date~ "yes"),
+    valid = replace(valid, is.na(valid), "no")
+  ) 
 
 date_time_subject_df_comp %>% subset(start_date != value) %>% View()
 # for email
