@@ -550,3 +550,24 @@ pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), patt
 
 pr_subjects_new <- process_subjects_new(pr_new_files) #800 
 pr_rewards_new <- lapply(pr_new_files, read_fread, "rewards")  %>% unlist(recursive = F) #785 XX MISSING REWARDS ARRAY
+
+read_pr <- system("grep -iEa1r --no-group-separator  \"(Subject|H|A|G):\" */New_medassociates/PR* | grep -iE \"(Subject|A|G| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
+read_pr <- gsub("\r", "", read_pr)
+
+pr_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_pr, value = T)),
+                    cohort = str_match(grep("Subject", read_pr, value = T), "C\\d{2}") %>% unlist() %>% as.character(),  
+                    exp = toupper(sub('.*HS', '', grep("Subject", read_pr, value = T))) %>% gsub(":SUBJECT.*", "", .),
+                    left_inactivepresses = gsub(".*A: ", "", grep("A:", read_pr, value = T)),
+                    right_activepresses = gsub(".*G: ", "", grep("G:", read_pr, value = T)),
+                    extra_presses = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 4)%>% gsub("[[:space:]]", "", .),
+                    breakpoint = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[[', 2) %>% gsub("[[:space:]]", "", .),
+                    filename = sub(".*/.*/.*/", '', grep("Subject", read_pr, value = T)) %>% gsub("-Subject.*", "", .),
+                    directory = str_match(grep("Subject", read_pr, value = T) %>% gsub("-Subject.*", "", .), "New_medassociates|Old") %>% unlist() %>% as.character()
+)
+
+
+
+# read_pr <- function(x){
+#   
+# }
+
