@@ -51,7 +51,7 @@ olivierfiles <- function(filename){
   selfadmin$Rat <- ifelse(grepl("^PR", selfadmin$Rat), as.character(stringr::str_match(selfadmin$Rat,"PR")), selfadmin$Rat)
   selfadmin$Rat <- ifelse(grepl("PreShock[[:space:]][(LgA15)]", selfadmin$Rat), "LgA", selfadmin$Rat) # applies to cohort 8; technician error 
   selfadmin$Rat <- gsub(" |[(]|[)]|[-]", "", selfadmin$Rat) # remove all unwanted characters
-  selfadmin$Rat <- gsub("^(1hr|PreShock).+", "OhA", selfadmin$Rat, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+  selfadmin$Rat <- gsub("^(1hr|PreShock).+", "preshock", selfadmin$Rat, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
   selfadmin$Rat <- ifelse(grepl("^Shock", selfadmin$Rat, ignore.case = T), "Shock", selfadmin$Rat)
   # selfadmin$Rat <- ifelse(grepl("Shock", selfadmin$Rat, ignore.case = T), str_extract(selfadmin$Rat, "[0][.][1-3]"), selfadmin$Rat) # make the three shock variables uniform 
   # selfadmin$Rat <- ifelse(grepl("^[0][.][1-3]", selfadmin$Rat), sub("([0][.][1-3])", "Shock\\1", selfadmin$Rat), selfadmin$Rat) # must separate bc str_extract ignore case function is deprecated
@@ -61,7 +61,7 @@ olivierfiles <- function(filename){
   # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
   uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
   selfadmin$Rat <- ave(selfadmin$Rat, selfadmin$Rat, FUN = uniquify) 
-  selfadmin$Rat <- ifelse(grepl("^Shock", selfadmin$Rat, ignore.case = T), gsub("(0)(\\d)", "\\1.\\2", selfadmin$Rat), selfadmin$Rat)
+  selfadmin$Rat <- ifelse(grepl("^Shock", selfadmin$Rat, ignore.case = T), gsub("(0)(\\d)", "\\1\\2", selfadmin$Rat), selfadmin$Rat) # remove the decimal pt in between because it causes problems in separation later ## note that later cohorts use shock03 as the only shock, so this may look like shock01
   # after it is uniquified shocks should turn into decimal numbers 
   
   if(grepl("7|8", filename)){
@@ -156,6 +156,7 @@ olivierfiles <- function(filename){
   
   # add rat id column
   tselfadmin <- append(tselfadmin, list(data.table(labanimalid = grep("\\D\\d", names(selfadmin), value = T)))) %>% as.data.table
+  tselfadmin[,ncol(tselfadmin)] <- NULL
   
   # ensure all na's are properly notated
   # ind <- grep(pattern = "^[[:alpha:]]{2,3}[[:digit:]]{2}$", names(tselfadmin), perl = T)
@@ -263,6 +264,14 @@ cohort4 <- olivierfiles("C04_cocaine.xlsx") # specific comment in non specific c
 cohort5 <- olivierfiles("C05_cocaine.xlsx") # note about renumbering -- can we ignore
 cohort7 <- olivierfiles("C07_cocaine.xlsx")
 cohort8 <- olivierfiles("C08_cocaine.xlsx") # comments aren't working because there is a row that needs to be removed
+
+### spot checking 
+# cohort 5 typo in LGA19 1981 year should be 2018 AND
+# cohort 5 conversion in date doesn't take the SHA02 excel string so this code leaves it as NA 
+cohort5$tselfadmin[, date_lga19 := lubridate::ymd("2018-09-19")]
+cohort5$tselfadmin[, date_sha02 := lubridate::ymd("2018-07-31")]
+
+## don't use this line bc this converts the data.table to dataframe and throws off the rbindlist in create_dataabasestructure to make allcohorts2 # cohort5$tselfadmin %<>% mutate(date_lga19 = lubridate::ymd("2018-09-19"), date_sha02 = lubridate::ymd("2018-07-31"))
 
 
 rm(list=ls(pattern="irr")) # conditionally clean the environment

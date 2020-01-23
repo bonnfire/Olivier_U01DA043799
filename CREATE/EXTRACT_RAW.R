@@ -229,8 +229,12 @@ date_time_subject_df <- date_time_subject_df %>%
 
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
 # allcohorts2 %>% select(matches("date|cohort")) %>% distinct()
-cohorts_exp_date <- allcohorts2 %>% 
-  mutate(date_lga19 = replace(date_lga19, cohort == "cohort5", lubridate::ymd("2018-09-19"))) %>% select(matches("date|cohort")) %>% distinct() %>% # for record keeping, make sure to make this change on the actual excel! 
+# reformat exported excel object to prepare for merge and check with in file dates ((wrong dates should be noted and possbily removed))
+allcohorts2_shockmod <- allcohorts2
+names(allcohorts2_shockmod) <- gsub("\\.", "", names(allcohorts2))
+cohorts_exp_date <- allcohorts2_shockmod %>% 
+  mutate(date_lga19 = replace(date_lga19, cohort == "cohort5", lubridate::ymd("2018-09-19")),
+         date_sha02 = replace(date_sha02, cohort == "cohort5", lubridate::ymd("2018-07-31"))) %>% select(matches("date|cohort")) %>% distinct() %>% # for record keeping, make sure to make this change on the actual excel! 
 gather(v, value, date_sha01:date_preshock) %>% 
   separate(v, c("date", "exp")) %>% 
   arrange(cohort) %>% 
@@ -244,7 +248,7 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
     grepl("SHOCK", exp) & experiment_duration > 60 & value == start_date ~ "valid",
     grepl("SHA", exp) & experiment_duration > 120 & value == start_date~ "valid",
     grepl("LGA", exp) & experiment_duration > 360 & value == start_date~ "valid",
-    grepl("PR", exp) & experiment_duration < 360 & value == start_date~ "valid")
+    grepl("PR", exp) & experiment_duration < 360 & experiment_duration > 0 & value == start_date~ "valid")
   )
 
 date_time_subject_df_comp %>% subset(start_date != value) %>% View()
@@ -254,8 +258,22 @@ date_time_subject_df_comp %>% subset(start_date != value) %>% select(cohort, exp
 #   
 # }
 # olivier_cocaine_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*C01..*LGA", value = T) # filter to the new files for lga in cohort 1
-
+View(date_time_subject_df %>% dplyr::filter() %>% select(cohort, exp, start_date) %>% distinct() %>% spread(exp, start_date))
+# files that have different dates 
+View(date_time_subject_df %>% select(cohort, exp, start_date) %>% distinct() %>% group_by(cohort, exp) %>% dplyr::filter(n() > 1))
 ## SECTION OFF R SCRIPT TO DIFFERENTIATE THESE FILES, XX ALSO SECTION OFF BASED ON PR AND FR (DON'T FORGET THE CONSTRAINTS ON THE PR)
+date_time_subject_df %>% 
+  dplyr::filter(!(cohort == "C07"&exp=="SHA07"&start_date==as.Date("2019-01-25")), 
+                !(cohort == "C07"&exp=="LGA04"&start_date==as.Date("2019-02-11")), 
+                !(cohort == "C08"&exp=="LGA08"&start_date==as.Date("2019-07-12"))) %>% 
+  select(cohort, exp, start_date) %>% distinct()%>% group_by(cohort, exp) %>% dplyr::filter(n() > 1)
+
+View(date_time_subject_df %>% 
+  dplyr::filter(!(cohort == "C07"&exp=="SHA07"&start_date==as.Date("2019-01-25")), 
+                !(cohort == "C07"&exp=="LGA04"&start_date==as.Date("2019-02-11")), 
+                !(cohort == "C08"&exp=="LGA08"&start_date==as.Date("2019-07-12"))) %>% 
+  select(cohort, exp, start_date) %>% distinct()%>% spread(exp, start_date)
+  )
 
 ################################
 ########## SHA #################
@@ -578,9 +596,4 @@ pr_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_pr, v
 #looking for missing 0: arrays 
 # test <- system("grep -iEa1r --no-group-separator  \"(Subject|H):\" */New_medassociates/PR* | grep -iE \"(Subject| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
 # C02HSPR03 trouble file
-
-
-# read_pr <- function(x){
-#   
-# }
 
