@@ -21,7 +21,8 @@ library(stringr)
 # Cohort 8 doesn't have a 1h session 
 
 olivierfiles <- function(filename){
-  setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/Olivier_George_U01DA043799 (Cocaine)/Olivier_George_U01/DATA Updated")
+  # setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/Olivier_George_U01DA043799 (Cocaine)/Olivier_George_U01/DATA Updated")
+  setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/DATA Updated")
   options(scipen = 100) # prevent sci notation
   u01.importxlsx <- function(xlname){
     df <- lapply(excel_sheets(path = xlname), read_excel, path = xlname)

@@ -18,7 +18,7 @@ list <- list("cohort1" = cohort1$tselfadmin,
 #   return(x)
 # })
 
-allcohorts <- bind_rows(list, .id = "cohort")
+# allcohorts <- bind_rows(list, .id = "cohort") # creates blank inaccessible columns
 allcohorts2 <- rbindlist(list, idcol = "cohort", fill= T)
 
 # make dataframe 

@@ -232,6 +232,10 @@ date_time_subject_df <- date_time_subject_df %>%
            grepl("PR", exp) & experiment_duration < 360 ~ "valid")
          ) 
 
+# include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
+# allcohorts2 %>% select(matches("date|cohort")) %>% distinct()
+
+
 # join_wfu_oli_cocaine <- function(x){
 #   
 # }
