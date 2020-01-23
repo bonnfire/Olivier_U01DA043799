@@ -36,11 +36,12 @@ groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TR
   mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename) ),
          filename = paste0("./", filename))
 
-readboxes <- function(x){
-  boxes <- fread(paste0("awk '/Box/{print $2}' ", "'", x, "'"),fill = T,header=F)
-  boxes$filename <- x
-  return(boxes)
-}
+# commented out because of the system function below to create the read_date_time_subject object
+# readboxes <- function(x){
+#   boxes <- fread(paste0("awk '/Box/{print $2}' ", "'", x, "'"),fill = T,header=F)
+#   boxes$filename <- x
+#   return(boxes)
+# }
 
 # to differentiate the bad sessions from the good ones; find the typical amount of time spent on a session and filter
 # readdate_time <- function(x){
@@ -201,8 +202,35 @@ convert_iri_matrix_to_df <- function(x){
   
   return(x)}
   
+## TO VALIDATE ENTRIES
+## extract date and start time/end time to determine valid sessions
+read_date_time_subject <- system("grep -a7r --no-group-separator \"Start Date: \" . | grep -E \"(Start Date|End|Subject|Box|Start Time|End Time):\"", intern = T)
+read_date_time_subject <- gsub("\\r", "", read_date_time_subject)
+read_date_time_subject <- read_date_time_subject[!grepl("/LGA/:", read_date_time_subject)] # remove the duplicate file
 
+date_time_subject_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)),
+                                   cohort = str_match(grep("Subject", read_date_time_subject, value = T), "C\\d{2}") %>% unlist() %>% as.character(),  
+                                   exp = toupper(sub('.*HS', '', grep("Subject", read_date_time_subject, value = T) %>% gsub("-Subject.*", "", .))),
+                                   start_date = gsub(".*Start Date: ", "", grep("Start Date:", read_date_time_subject, value = T)),
+                                   box = gsub(".*Box: ", "", grep("Box", read_date_time_subject, value = T)),
+                                   start_time = gsub(".*Start Time: ", "", grep("Start Time", read_date_time_subject, value = T)),
+                                   end_time = gsub(".*End Time: ", "", grep("End Time", read_date_time_subject, value = T)),
+                                   filename = sub(".*/.*/.*/", '', grep("Subject", read_date_time_subject, value = T)) %>% gsub("-Subject.*", "", .),
+                                   directory = str_match(grep("Subject", read_date_time_subject, value = T) %>% gsub("-Subject.*", "", .), "New_medassociates|Old") %>% unlist() %>% as.character()
+)
 
+date_time_subject_df <- date_time_subject_df %>% 
+  mutate(start_date = format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y"),
+         start_time = chron::chron(times = start_time),
+         end_time = chron::chron(times = end_time), 
+         experiment_duration = end_time - start_time,
+         experiment_duration = 60 * 24 * as.numeric(chron::times(experiment_duration)),
+         experiment_duration_bin = case_when(
+           grepl("SHOCK", exp) & experiment_duration > 60 ~ "valid",
+           grepl("SHA", exp) & experiment_duration > 120 ~ "valid",
+           grepl("LGA", exp) & experiment_duration > 360 ~ "valid",
+           grepl("PR", exp) & experiment_duration < 360 ~ "valid")
+         ) 
 
 # join_wfu_oli_cocaine <- function(x){
 #   
@@ -503,4 +531,4 @@ pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), patt
 pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*PR/", value = T) # 62 files
 
 pr_subjects_new <- process_subjects_new(pr_new_files) #800 
-pr_rewards_new <- lapply(pr_new_files, read_fread, "rewards")  %>% unlist(recursive = F) #785 MISSING REWARDS ARRAY
+pr_rewards_new <- lapply(pr_new_files, read_fread, "rewards")  %>% unlist(recursive = F) #785 XX MISSING REWARDS ARRAY
