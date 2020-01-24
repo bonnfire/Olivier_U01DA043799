@@ -229,16 +229,17 @@ date_time_subject_mut$labanimalid %>% table()
 
 #trying to fix the subject 0
 subject0 <- date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(x){
-  x <- x %>% arrange(as.numeric(box)) %>% dplyr::filter(labanimalid == "0"|lead(labanimalid == "0")|lag(labanimalid == "0")) %>% 
-    mutate(dbcomment = ifelse(labanimalid == "0", "box info used to fill labanimalid", NA)) %>% 
-    group_by(box) %>% mutate(labanimalid = labanimalid[labanimalid != "0"][1])
-    # mutate(labanimalid = ifelse(row_number() %% 2 == 0, dplyr::lag(labanimalid, 1), labanimalid))
+  x <- x %>% arrange(as.numeric(box)) %>% dplyr::filter(!grepl("[MF]", labanimalid)|lead(!grepl("[MF]", labanimalid))|lag(!grepl("[MF]", labanimalid))) %>% 
+    mutate(dbcomment = ifelse(!grepl("[MF]", labanimalid), "box info used to fill labanimalid", NA)) %>% 
+    group_by(box) %>% mutate(labanimalid = labanimalid[grepl("[MF]", labanimalid)][1])
   return(x)}
-  ) %>% rbindlist(., idcol = "cohort")
+) %>% rbindlist(., idcol = "cohort")
+
+# replace rbindlist... with openxlsx::write.xlsx(., "labanimalid_assign_bybox.xlsx") to create the excel sheets that I sent to their lab 
 
 # remove labanimalid0 subset from original df and then insert the corrected ones (keep the dbcomment variable)
 date_time_subject_df <- date_time_subject_mut %>% 
-  dplyr::filter(labanimalid != "0") %>% 
+  dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
   plyr::rbind.fill(., subject0) %>% # rbind with the added function of creating an NA column for nonmatching columns bw dfs A and B
   arrange(cohort, start_date, as.numeric(box))
 
