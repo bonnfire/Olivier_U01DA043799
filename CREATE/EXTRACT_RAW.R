@@ -208,7 +208,7 @@ date_time_subject <- data.frame(labanimalid = gsub(".*Subject: ", "", grep("Subj
                                    directory = str_match(grep("Subject", read_date_time_subject, value = T) %>% gsub("-Subject.*", "", .), "New_medassociates|Old") %>% unlist() %>% as.character()
 )
 
-date_time_subject_df <- date_time_subject %>% 
+date_time_subject_mut <- date_time_subject %>% 
   mutate(start_date = lubridate::mdy(format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y")),
          start_time = chron::chron(times = start_time),
          end_time = chron::chron(times = end_time), 
@@ -223,20 +223,24 @@ date_time_subject_df <- date_time_subject %>%
 
 ## problems in being too lax in accepting all forms of subjects 
 # gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)) %>% toupper %>% table() # before processing
-# date_time_subject_df[str_detect(date_time_subject_df$labanimalid, "^(M|F)\\d{4}", negate = F),]
-date_time_subject_df$labanimalid %>% table()
+# date_time_subject_mut[str_detect(date_time_subject_mut$labanimalid, "^(M|F)\\d{4}", negate = F),]
+# date_time_subject_df %>% subset(labanimalid == "0") %>% group_by(filename) %>% dplyr::filter(n() > 5) # more than 5 is most likely a broken file but less than five is most likely a dead rat? 
+date_time_subject_mut$labanimalid %>% table()
 
 #trying to fix the subject 0
-subject0 <- date_time_subject_df %>% split(., .$cohort) %>% lapply(., function(x){
+subject0 <- date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(x){
   x <- x %>% arrange(as.numeric(box)) %>% dplyr::filter(labanimalid == "0"|lead(labanimalid == "0")|lag(labanimalid == "0")) %>% 
     mutate(dbcomment = ifelse(labanimalid == "0", "box info used to fill labanimalid", NA)) %>% 
     group_by(box) %>% mutate(labanimalid = labanimalid[labanimalid != "0"][1])
     # mutate(labanimalid = ifelse(row_number() %% 2 == 0, dplyr::lag(labanimalid, 1), labanimalid))
-  return(x)})
+  return(x)}
+  ) %>% rbindlist(., idcol = "cohort")
 
-%>% group_by(labanimalid, exp) %>% add_count(box) %>% head() 
-#trying to fix the subject 0
-date_time_subject_df %>% subset(labanimalid == "0") %>% group_by(filename) %>% dplyr::filter(n() > 5) %>%  View()
+# remove labanimalid0 subset from original df and then insert the corrected ones (keep the dbcomment variable)
+date_time_subject_df <- date_time_subject_mut %>% 
+  dplyr::filter(labanimalid != "0") %>% 
+  plyr::rbind.fill(., subject0) %>% # rbind with the added function of creating an NA column for nonmatching columns bw dfs A and B
+  arrange(cohort, start_date, as.numeric(box))
 
 
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
