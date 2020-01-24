@@ -4,6 +4,8 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 # after cohort 5, there are only new files
 
 ## USEFUL FUNCTIONS
+
+# FOR ~NEW~ DIRECTORIES
 # #extract names to be assigned for various tables later
 process_subjects_new <- function(x){
   
@@ -33,19 +35,11 @@ process_subjects_new <- function(x){
                                 date_time)) %>%  # subject id, cohort, experiment, file/location perhaps
   select(-c(date_time, date, time))
   
-  # date_time_bind <- cbind(date, time)
-  # 
-  # names_sha_append_bind <- cbind(names_sha_append, date_time_bind)
-  # colnames(names_sha_append_bind) <- c("labanimalid", "filename", "start_date", "start_time")
-  # names_sha_append_bind <- names_sha_append_bind %>% 
-  #   mutate(start_date = lubridate::mdy(start_date),
-  #          start_time = chron::times(start_time))
-  
   return(names_sha_append)
   
 }
 
-process_subjects_new("./C07/New_medassociates/SHA/MED1113C07HSSHA01")
+# bc some animals don't have id's under subject, mistake in manual entry; extract subject information from experiment or group? 
 
 # #notice system call, doing it recurisvely for the entire directory; for these cases, the group number is not 0 and the subject is found elsewhere.  # 12/18 only lga
 groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TRUE) %>% 
@@ -58,24 +52,12 @@ groups_files <- system("grep -ir \"Group:\" | grep -v \"Group: 0\"", intern = TR
   mutate(labanimalid = paste0(str_match(labanimalid, "[FM]\\d{1,3}"), "_", str_extract(filename, "C\\d+"), "_", sub('.*HS', '', toupper(filename)), "_", sub(".*/.*/.*/", '', filename) ),
          filename = paste0("./", filename))
 
-# commented out because of the system function below to create the read_date_time_subject object
-# readboxes <- function(x){
-#   boxes <- fread(paste0("awk '/Box/{print $2}' ", "'", x, "'"),fill = T,header=F)
-#   boxes$filename <- x
-#   return(boxes)
-# }
-
-# to differentiate the bad sessions from the good ones; find the typical amount of time spent on a session and filter
-# readdate_time <- function(x){
-#   
-# }
-
-#### ONE FUNCTIONS EDITION #####
+# FOR ~NEW~ DIRECTORIES
+# extracting left/right responses/timestamps 
 # create the dataframe with vector in it
 # check that the column we are removing ends with 5 or 0 and then remove
-
 # write a df containing the fread statements and function for extracting the different dfs
-read_fread <- function(x, varname){
+read_fread_new <- function(x, varname){
   
   fread_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards", "lefttimestamps", "righttimestamps", "rewardstimestamps"),
                                  statement = c("awk '/L:/{flag=1;next}/R:/{flag=0}flag' ",
@@ -88,8 +70,7 @@ read_fread <- function(x, varname){
   rawdata <- fread(paste0(statement, "'", x, "'"), fill = T)
   data_indices <- grep("^0:$", rawdata$V1)
   split_data <- split(rawdata, cumsum(1:nrow(rawdata) %in% data_indices))
-  # return(split_data)
-  
+
   keepzeroes <- c("leftresponses", "rightresponses", "rewards") # preserve bin sequences
   
   if(varname %in% keepzeroes){
@@ -119,21 +100,14 @@ read_fread <- function(x, varname){
     }) 
   }
   
-  # names(processeddata) <- grep("C01LGA01", names_append, value = T)
-  
+
   return(processeddata)
 }
+
+# FOR ~OLD~ DIRECTORIES
+
 ## know how many subjects to expect in each filename
 ## find . -name "SHA" -exec grep -ira1 "NumberOfSubjects" {} +
-
-# read_subject_old <- function(x){
-#     subject_old <- fread(paste0("grep -iEo \"[F|M][0-9]+\" ", "'", x, "'"), header = F)
-#   subject_old$filename <- x 
-#   return(subject_old)
-# }
-
-
-
 
 process_subjects_old <- function(x){
   
@@ -156,7 +130,7 @@ process_subjects_old <- function(x){
   return(subjects_old_use)
 }
 
-
+# FOR ~OLD~ DIRECTORIES
 read_fread_old <- function(x, varname){
   fread_old_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards"),
                                  statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/endl/{flag=0}flag' ",
@@ -167,15 +141,6 @@ read_fread_old <- function(x, varname){
   rawdata$filename <- x
   return(rawdata)
 }
-
-## OLD 
-## read_fread_old
-# function(x){
-#   # binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", " | grep -v \"[list|endl]\""))
-#   binrewards <- fread(paste0("awk '/BinRewards/{flag=1;next}/ResponsesActBins/{flag=0}flag' ", "'", x, "'", "| grep -v \"endl\""), header = F)
-#   binrewards$filename <- x
-#   return(binrewards)
-# }
 
 ## all ts + iri labels (4) are appended w 2000, count labels (3) have just 24
 
@@ -224,13 +189,15 @@ convert_iri_matrix_to_df <- function(x){
   
   return(x)}
   
-## TO VALIDATE ENTRIES
+# FOR ~NEW~ DIRECTORIES
+# NON EXPERIMENT SPECIFIC 
+## TO VALIDATE ENTRIES  
 ## extract date and start time/end time to determine valid sessions
 read_date_time_subject <- system("grep -a7r --no-group-separator \"Start Date: \" . | grep -E \"(Start Date|End|Subject|Box|Start Time|End Time):\"", intern = T)
 read_date_time_subject <- gsub("\\r", "", read_date_time_subject)
 read_date_time_subject <- read_date_time_subject[!grepl("/LGA/:", read_date_time_subject)] # remove the duplicate file
 
-date_time_subject_df <- data.frame(labanimalid = gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)) %>% toupper,
+date_time_subject <- data.frame(labanimalid = gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)) %>% toupper,
                                    cohort = str_match(grep("Subject", read_date_time_subject, value = T), "C\\d{2}") %>% unlist() %>% as.character(),  
                                    exp = toupper(sub('.*HS', '', grep("Subject", read_date_time_subject, value = T) %>% gsub("-Subject.*", "", .))),
                                    start_date = gsub(".*Start Date: ", "", grep("Start Date:", read_date_time_subject, value = T)),
@@ -241,7 +208,7 @@ date_time_subject_df <- data.frame(labanimalid = gsub(".*Subject: ", "", grep("S
                                    directory = str_match(grep("Subject", read_date_time_subject, value = T) %>% gsub("-Subject.*", "", .), "New_medassociates|Old") %>% unlist() %>% as.character()
 )
 
-date_time_subject_df <- date_time_subject_df %>% 
+date_time_subject_df <- date_time_subject %>% 
   mutate(start_date = lubridate::mdy(format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y")),
          start_time = chron::chron(times = start_time),
          end_time = chron::chron(times = end_time), 
@@ -249,13 +216,28 @@ date_time_subject_df <- date_time_subject_df %>%
          experiment_duration = 60 * 24 * as.numeric(chron::times(experiment_duration))
          ) %>% 
   mutate_if(is.factor, as.character) %>% 
-  mutate(labanimalid = replace(labanimalid, labanimalid == "M7678", "M768")) %>% # verified by box
+  mutate(labanimalid = replace(labanimalid, labanimalid == "M7678", "M768"),
+         labanimalid = replace(labanimalid, labanimalid == "X", "F507"),
+         labanimalid = replace(labanimalid, labanimalid == "717", "F717")) %>% # verified by box
   mutate(labanimalid = if_else(grepl("^C0", labanimalid), str_match(labanimalid,"[FM]\\d{1,3}" %>% unlist() %>% as.character()), labanimalid %>% as.character()))
 
 ## problems in being too lax in accepting all forms of subjects 
-# gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)) %>% toupper %>% table()
-date_time_subject_df[str_detect(date_time_subject_df$labanimalid, "^(M|F)\\d{4}", negate = F),]
+# gsub(".*Subject: ", "", grep("Subject", read_date_time_subject, value = T)) %>% toupper %>% table() # before processing
+# date_time_subject_df[str_detect(date_time_subject_df$labanimalid, "^(M|F)\\d{4}", negate = F),]
 date_time_subject_df$labanimalid %>% table()
+
+#trying to fix the subject 0
+subject0 <- date_time_subject_df %>% split(., .$cohort) %>% lapply(., function(x){
+  x <- x %>% arrange(as.numeric(box)) %>% dplyr::filter(labanimalid == "0"|lead(labanimalid == "0")|lag(labanimalid == "0")) %>% 
+    mutate(dbcomment = ifelse(labanimalid == "0", "box info used to fill labanimalid", NA)) %>% 
+    group_by(box) %>% mutate(labanimalid = labanimalid[labanimalid != "0"][1])
+    # mutate(labanimalid = ifelse(row_number() %% 2 == 0, dplyr::lag(labanimalid, 1), labanimalid))
+  return(x)})
+
+%>% group_by(labanimalid, exp) %>% add_count(box) %>% head() 
+#trying to fix the subject 0
+date_time_subject_df %>% subset(labanimalid == "0") %>% group_by(filename) %>% dplyr::filter(n() > 5) %>%  View()
+
 
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
 # allcohorts2 %>% select(matches("date|cohort")) %>% distinct()
