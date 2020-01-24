@@ -237,7 +237,7 @@ subject0 <- date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(
 
 # replace rbindlist... with openxlsx::write.xlsx(., "labanimalid_assign_bybox.xlsx") to create the excel sheets that I sent to their lab 
 
-# remove labanimalid0 subset from original df and then insert the corrected ones (keep the dbcomment variable)
+# remove labanimalid0 or blank subset from original df and then insert the corrected ones (keep the dbcomment variable)
 date_time_subject_df <- date_time_subject_mut %>% 
   dplyr::filter(grepl("[MF]", labanimalid)) %>% 
   plyr::rbind.fill(., subject0) %>% # rbind with the added function of creating an NA column for nonmatching columns bw dfs A and B
