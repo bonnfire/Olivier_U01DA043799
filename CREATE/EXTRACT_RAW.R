@@ -241,11 +241,24 @@ subject0 <- date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(
 date_time_subject_df <- date_time_subject_mut %>% 
   dplyr::filter(grepl("[MF]", labanimalid)) %>% 
   plyr::rbind.fill(., subject0) %>% # rbind with the added function of creating an NA column for nonmatching columns bw dfs A and B
-  arrange(cohort, start_date, as.numeric(box))
+  arrange(cohort, start_date, as.numeric(box)) %>% 
+  distinct() %>%  # needed bc otherwise subject0 will "double count" the "reference" rows
+  mutate(exp = gsub("-.*", "", exp),
+         exp = replace(exp, as.numeric(str_extract(cohort, "\\d+")) > 6, "SHOCK03")) # for all cohorts later than cohort 6, they only use one shock value, but we can change it to shock03 so that we can have uniformity
 
 # waiting on their response for these cases (trying to assign labanimalid [MF]\\d{4,})
 ## date_time_subject_df %>% arrange(cohort, as.numeric(box)) %>% dplyr::filter(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )|lead(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T ))|lag(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )))
-## date_time_subject_df %>% dplyr::filter(grepl("[MF]\\d{4,}", labanimalid, perl = T ))
+## OR  date_time_subject_df %>% dplyr::filter(grepl("[MF]\\d{4,}", labanimalid, perl = T ))
+
+# before merging with excel dates
+# include more dbcomments 
+# fix strange filenames -2, -3
+date_time_subject_df$exp %>% table()
+date_time_subject_df %>% 
+  dplyr::filter(filename %in% c(grep("-", date_time_subject_df$filename, value = T), 
+                                gsub("-.*", "", grep("-", date_time_subject_df$filename, value = T)))) %>% 
+  arrange(labanimalid) %>% group_by(labanimalid, exp) %>% dplyr::filter(n()>1)
+
 
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
 # allcohorts2 %>% select(matches("date|cohort")) %>% distinct()
