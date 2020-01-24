@@ -239,7 +239,7 @@ subject0 <- date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(
 
 # remove labanimalid0 subset from original df and then insert the corrected ones (keep the dbcomment variable)
 date_time_subject_df <- date_time_subject_mut %>% 
-  dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
+  dplyr::filter(grepl("[MF]", labanimalid)) %>% 
   plyr::rbind.fill(., subject0) %>% # rbind with the added function of creating an NA column for nonmatching columns bw dfs A and B
   arrange(cohort, start_date, as.numeric(box))
 
