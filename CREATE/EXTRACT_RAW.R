@@ -243,6 +243,9 @@ date_time_subject_df <- date_time_subject_mut %>%
   plyr::rbind.fill(., subject0) %>% # rbind with the added function of creating an NA column for nonmatching columns bw dfs A and B
   arrange(cohort, start_date, as.numeric(box))
 
+# waiting on their response for these cases (trying to assign labanimalid [MF]\\d{4,})
+## date_time_subject_df %>% arrange(cohort, as.numeric(box)) %>% dplyr::filter(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )|lead(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T ))|lag(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )))
+## date_time_subject_df %>% dplyr::filter(grepl("[MF]\\d{4,}", labanimalid, perl = T ))
 
 # include correct dates as another check (dates extracted from CREATE_DATABASESTRUCTURE allcohorts2 object)
 # allcohorts2 %>% select(matches("date|cohort")) %>% distinct()

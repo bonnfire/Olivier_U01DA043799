@@ -244,7 +244,7 @@ olivierfiles <- function(filename){
   return(list)
 } 
 
-
+setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/DATA Updated")
 cohortfiles <- list.files(pattern = "*.xlsx")
 # cohort 6 is missing
 for(i in 1:length(cohortfiles)){
