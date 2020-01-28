@@ -167,6 +167,9 @@ read_fread_old <- function(x, varname){
   return(rawdata)
 }
 
+### XX 
+## repeating the awk statements with conditions in shell script and trying to fread shell script
+
 ## all ts + iri labels (4) are appended w 2000, count labels (3) have just 24
 
 read_iri_old <- function(x){
@@ -373,6 +376,14 @@ sha_subjects_new <- process_subjects_new(sha_new_files) ## sha_subjects_new %>% 
 rewards_sha_new <- lapply(sha_new_files, read_fread_new, "rewards") %>% unlist(recursive = F)
 length(rewards_sha_new)==nrow(sha_subjects_new) # check if they match in length
 names(rewards_sha_new) <- sha_subjects_new$labanimalid # 2783 matches! 
+
+
+
+### demo 
+sha_subjects_new_demo <- process_subjects_new(sha_new_files[1:3]) ## sha_subjects_new %>% dplyr::filter(!grepl("^[MF]", labanimalid)) %>% head # will need to use the comp df to name sessions
+rewards_sha_new_demo <- lapply(sha_new_files[1:3], read_fread_new, "rewards") %>% unlist(recursive = F)
+
+names(rewards_sha_new_demo) <- sha_subjects_new_demo
 
 rewards_sha_df <- rewards_sha_new %>%
   rbindlist(fill = T, idcol = "labanimalid") %>% 
