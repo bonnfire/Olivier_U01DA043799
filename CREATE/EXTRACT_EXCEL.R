@@ -72,8 +72,11 @@ olivierfiles <- function(filename){
   ### transpose data 
   tselfadmin <- data.table::transpose(selfadmin)
   colnames(tselfadmin) <- as.character(tselfadmin[1,])
+  tselfadmin$labanimalid = c(rep(NA, which(grepl("^\\d", tselfadmin$RFID)==T)[1]- 1) , grep("(F|M)\\d+", names(selfadmin), value = T), 
+                             rep(NA, length(tselfadmin$RFID) - which(grepl("^\\d", tselfadmin$RFID)==T) %>% tail(1)))
+  tselfadmin$labanimalid <- str_match(tselfadmin$labanimalid, "(M|F)\\d+")[,1] 
   tselfadmin <- tselfadmin[-1,] # data.table cannot delete rows by reference with tselfadmin[1 := NULL,]  
-  
+
   # variable name clean
   setnames(tselfadmin, gsub(" ", "_", tolower(names(tselfadmin))))
   
