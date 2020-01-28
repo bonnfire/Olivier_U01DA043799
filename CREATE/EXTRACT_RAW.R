@@ -112,23 +112,25 @@ read_fread_new <- function(x, varname){
 process_subjects_old <- function(x){
   
   read_subjects_old <- function(x){
-    subject_old <- fread(paste0("grep -iEA1 --no-group-separator \"ratnumber|boxnumber\" ", "'", x, "'", "| grep -vE \"Rat|Box\""), header = F)
+    subject_old <- fread(paste0("grep -inEA1 --no-group-separator \"ratnumber|boxnumber\" ", "'", x, "'", "| grep -vE \"Rat|Box\""), header = F)
     subject_old$filename <- x 
     return(subject_old)
   }
   
   subjects_old <- lapply(x, read_subjects_old) %>% rbindlist() %>% 
-    rename("labanimalid" = "V1") %>% 
+    separate(V1, into = c("row", "value"), sep = "-", remove = T) %>% 
     mutate(box_id = ifelse((row_number() %% 2) == 0, "labanimalid", "box"))
   
-  box <- subjects_old %>% dplyr::filter(box_id == "box") %>% select(labanimalid) %>% unlist() %>% as.character()
-  labanimalid <- subjects_old %>% dplyr::filter(box_id == "labanimalid") %>% select(labanimalid) %>% unlist() %>% as.character()
+  box <- subjects_old %>% dplyr::filter(box_id == "box") %>% select(value) %>% unlist() %>% as.character()
+  labanimalid <- subjects_old %>% dplyr::filter(box_id == "labanimalid") %>% select(value) %>% unlist() %>% as.character()
   filename <- subjects_old %>% dplyr::filter(box_id == "box") %>% select(filename) %>% unlist() %>% as.character()
+  row <- subjects_old %>% dplyr::filter(box_id == "box") %>% select(row) %>% unlist() %>% as.numeric()
   
   box_id_bind <- data.frame(box = box, 
                             labanimalid = labanimalid, 
-                            filename = filename) %>% 
-    mutate_all(as.character) %>% 
+                            filename = filename,
+                            row = row) %>% 
+    # mutate_all(as.character) %>% 
     mutate(labanimalid = replace(labanimalid, labanimalid=="999", "F000")) %>% # create placeholder for the problematic cases
     mutate(date = str_extract(filename, "\\d{8}(-\\d+)?") %>% lubridate::ymd(),
            cohort = str_extract(filename, "C\\d+"), 
@@ -143,12 +145,14 @@ process_subjects_old <- function(x){
                                 sub("C.*", "", sub(".*/.*/.*/.*/", "", filename)), "_",
                                 str_extract(filename, "\\d{8}"), "_",
                                 valid)) %>%  # subject id, box, cohort, experiment, computer, date
-    select(one_of("labanimalid", "filename"))
+    select(one_of("labanimalid", "filename", "row"))
   # 
   # %>% dplyr::filter(!grepl("^NA", labanimalid))
   
   return(box_id_bind)
 }
+
+process_subjects_old(sha_old_files[1:3])
 
 # FOR ~OLD~ DIRECTORIES
 read_fread_old <- function(x, varname){
@@ -664,6 +668,31 @@ definedvars <- c("leftresponses", "rightresponses", "rewards", "lefttimestamps",
 # #list2env(definedvars_list, envir = .GlobalEnv)
 # }
 
+
+
+########################## FOR LAUREN 
+#### OLD LGA 
+lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
+# get subjects 
+lga_subjects_old <- process_subjects_old(lga_old_files) #2397
+# extract the sha data
+rewards_lga_old <- lapply(lga_old_files, read_fread_old, "rewards") %>% rbindlist() # 2397 
+nrow(lga_subjects_old) == nrow(rewards_lga_old)
+# bind to data
+rewards_lga_old_df <- rewards_lga_old %>% arrange(filename) %>% 
+  bind_cols(., lga_subjects_old %>% arrange(filename) %>% select(labanimalid)) %>% 
+  rename("rewards" = "V1") %>% 
+         # "labanimalid" =  "V2") %>% 
+  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>%
+  mutate_if(is.character, .funs = gsub, pattern = "[[:space:]]", replacement = "") %>% 
+  mutate(date = lubridate::ymd(date)) %>% 
+  subset(valid == "valid") %>% 
+  select(-valid)
+# only needed if we extract the binned data, but the rewards now only extracts the value after TotalRewards
+# rewards_sha_old <- lapply(rewards_sha_old, function(x){
+#   Index <- which(x[,1]=="list")
+#   if(x[(Index+1),] == 12){
+#     x <- x[-(Index+1),]
 
 
 

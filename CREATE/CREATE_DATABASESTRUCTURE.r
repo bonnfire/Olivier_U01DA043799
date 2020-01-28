@@ -19,7 +19,8 @@ list <- list("cohort1" = cohort1$tselfadmin,
 # })
 
 # allcohorts <- bind_rows(list, .id = "cohort") # creates blank inaccessible columns
-allcohorts2 <- rbindlist(list, idcol = "cohort", fill= T)
+allcohorts2 <- rbindlist(list, idcol = "cohort", fill= T) %>% 
+  select(-date_labanimalid)
 
 # make dataframe 
 test <- names(allcohorts)
