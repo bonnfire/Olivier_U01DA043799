@@ -101,12 +101,9 @@ specificcomments_list_df %>% dplyr::filter(labanimalid %in% missingdataspleenext
 ############################## 
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/QC")
 
-## for existing excel, are they consistent with the raw
-
-
-
 # sha NEW and OLD combine 
-sha_rewards <- bind_rows(sha_rewards_new, sha_rewards_old)
+sha_rewards <- rbindlist(list("sha_rewards_new" = sha_rewards_new, 
+                              "sha_rewards_old" = sha_rewards_old), idcol = "directory", fill = T)
 rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(matches("^sha|labanimalid")) %>% distinct() %>% 
                     gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
                   by = c("labanimalid", "exp")) %>% 
@@ -120,7 +117,7 @@ rewards_sha_tograph <- rewards_sha_tograph %>%
 pdf("olivier_sha.pdf", onefile = T)
 for (i in 1:(length(olivier_sha_measures)/2)){
   g <-  ggplot(rewards_sha_tograph, aes_string(x = olivier_sha_measures[i], y = olivier_sha_measures[i+1])) + 
-    geom_point() + 
+    geom_point(aes(color = directory)) + 
     labs(title = paste0(olivier_sha_measures[i], "_Raw_VS_Excel_U01_Olivier", "\n")) + 
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
   
@@ -138,7 +135,9 @@ dev.off()
 rewards_sha_tograph %>% dim
 rewards_sha_tograph %>% subset(rewards_raw != rewards_excel) %>% dim
 rewards_sha_tograph %>% subset(rewards_raw == rewards_excel) %>% dim
-
+rewards_sha_tograph %>% subset(rewards_raw != rewards_excel) %>% 
+  select(labanimalid, exp, filename, rewards_raw, rewards_excel) %>% 
+  openxlsx::write.xlsx("sha_compare.xlsx")
 
 
 
@@ -161,7 +160,45 @@ rewards_sha_df_graph[duplicated(rewards_sha_df_graph[,c("labanimalid", "file_exp
 
 ######## ######## 
 ### lga ######## 
-######## ######## 
+######## ########
+
+## PICK UP FROM HERE AND CHANGE THE RANGE OF THE GATHER BC THE VARIABLES ARE DIFFERENT
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/QC")
+
+# lga NEW and OLD combine 
+lga_rewards <- rbindlist(list("lga_rewards_new" = lga_rewards_new, 
+                              "lga_rewards_old" = lga_rewards_old), idcol = "directory", fill = T)
+rewards_lga_tograph <- lga_rewards %>% merge(., allcohorts2 %>% select(matches("^lga|labanimalid")) %>% distinct() %>% 
+                                               gather(exp, rewards_excel, lga01:lga10) %>% mutate(exp = toupper(exp)),
+                                             by = c("labanimalid", "exp")) %>% 
+  rename("rewards_raw"= "rewards")
+
+olivier_lga_measures <- grep("rewards", names(rewards_lga_tograph), value = T) 
+rewards_lga_tograph <- rewards_lga_tograph %>% 
+  mutate_at(olivier_lga_measures, as.numeric)
+
+# create plots 
+pdf("olivier_lga.pdf", onefile = T)
+for (i in 1:(length(olivier_lga_measures)/2)){
+  g <-  ggplot(rewards_lga_tograph, aes_string(x = olivier_lga_measures[i], y = olivier_lga_measures[i+1])) + 
+    geom_point(aes(color = directory)) + 
+    labs(title = paste0(olivier_lga_measures[i], "_Raw_VS_Excel_U01_Olivier", "\n")) + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  
+  # g_cohort <-  ggplot(rewards_lga_tograph, aes_string(x = olivier_lga_measures[i], y = olivier_lga_measures[i+3])) + 
+  #   geom_point(aes(color = cohort_number)) + 
+  #   facet_grid(~ cohort_number)
+  #   labs(title = paste0(olivier_lga_measures[i], "_Raw_VS_Excel_U01_Kalivas", "\n")) + 
+  #   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  
+  print(g)
+  # print(g_cohort)
+}
+
+dev.off()
+
+
+############################ 1/28 REMOVE 
 rewards_lga_tograph <- rewards_lga_old_df %>% merge(., allcohorts2 %>% select(matches("^lga|labanimalid")) %>% distinct() %>% 
                                                       select(labanimalid, everything()) %>% 
                                                       gather(exp, rewards_excel, lga01:lga23) %>% mutate(exp = toupper(exp)), 
