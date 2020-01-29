@@ -102,10 +102,14 @@ specificcomments_list_df %>% dplyr::filter(labanimalid %in% missingdataspleenext
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/QC")
 
 ## for existing excel, are they consistent with the raw
-# sha 
-rewards_sha_tograph <- rewards_sha_old_df %>% merge(., allcohorts2 %>% select(matches("^sha|labanimalid")) %>% distinct() %>% 
-                               gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)), 
-                             by = c("labanimalid", "exp")) %>% 
+
+
+
+# sha NEW and OLD combine 
+sha_rewards <- bind_rows(sha_rewards_new, sha_rewards_old)
+rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(matches("^sha|labanimalid")) %>% distinct() %>% 
+                    gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
+                  by = c("labanimalid", "exp")) %>% 
   rename("rewards_raw"= "rewards")
 
 olivier_sha_measures <- grep("rewards", names(rewards_sha_tograph), value = T) 

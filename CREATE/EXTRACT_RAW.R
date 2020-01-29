@@ -104,6 +104,11 @@ read_fread_new <- function(x, varname){
   return(processeddata)
 }
 
+## test 
+# setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)")
+# subjects_test <- process_subjects_new(list.files(full.names = T)[1:2])
+# rewards_test <- lapply(list.files(full.names = T)[2],read_fread_new, "rewards")
+
 # FOR ~OLD~ DIRECTORIES
 
 ## know how many subjects to expect in each filename
@@ -159,12 +164,21 @@ read_fread_old <- function(x, varname){
   fread_old_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards"),
                                  statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/endl/{flag=0}flag' ",
                                                "awk '/^ResponsesActBins/{flag=1;next}/endl/{flag=0}flag' ",
-                                               "awk '/totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ")) 
+                                               "awk '/totalRewards/{flag=1;next}/TotalResponses/{flag=0; print NR}flag' ")) 
                                                # "awk '/BinRewards/{flag=1;next}/endl/{flag=0}flag' "))  #### 	 In=L Act=R  Rew=W InTS=U	ActTS=Y  RewTS=V  RewIRI=Z 	
   statement <- fread_old_statements[which(fread_old_statements$varname == varname),]$statement
   rawdata <- fread(paste0(statement, "'", x, "'"), fill = T, header = F)
   rawdata$filename <- x
-  return(rawdata)
+  
+  rewards <- rawdata %>% dplyr::filter(row_number() %% 2 == 1) %>% select(V1) %>% unlist() %>% as.character()
+  row <- rawdata %>% dplyr::filter(row_number() %% 2 == 0) %>% select(V1) %>% unlist() %>% as.character()
+  filename <- rawdata %>% dplyr::filter(row_number() %% 2 == 1) %>% select(filename) %>% unlist() %>% as.character()
+
+  rewards_bind <- data.frame(rewards = rewards, 
+                             row = row, 
+                            filename = filename) 
+  
+  return(rewards_bind)
 }
 
 ### XX 
@@ -367,6 +381,45 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
 ################################
 
 ###### NEW FILES ##############
+
+sha_subjects_new <- process_subjects_new(sha_new_files)
+read_rewards_new <- function(x){
+  rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print $2}'"))
+  return(rewards)
+}
+sha_rewards_new <- lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% bind_cols(sha_subjects_new) %>% 
+  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
+  mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
+  left_join(., date_time_subject_df_comp %>% 
+              select(cohort, exp, filename, valid, start_date, start_time) %>% 
+              rename("date" = "start_date", "time" = "start_time"), 
+            by = c("cohort", "exp", "filename", "date", "time")) %>% 
+  dplyr::filter(valid == "yes") %>% 
+  rename("rewards" = "V1") %>% 
+  mutate(time = as.character(time))
+
+###### OLD FILES ##############
+
+sha_subjects_old <- process_subjects_old(sha_old_files)
+sha_rewards_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlist() %>% arrange(filename, row) %>% bind_cols(sha_subjects_old %>% arrange(filename, row)) %>% 
+  select(-c("filename1", "row", "row1")) %>% 
+  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
+  mutate(date = lubridate::ymd(date),
+         rewards = rewards %>% unlist() %>% as.character() %>% as.numeric(),
+         filename = filename %>% unlist() %>% as.character()) %>%  
+  dplyr::filter(valid == "valid") 
+
+
+
+
+
+
+
+
+
+
+# 1/28 old version 
+############################################################
 ## get the filename and subject names 
 setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 sha_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 178 files
@@ -376,12 +429,6 @@ sha_subjects_new <- process_subjects_new(sha_new_files) ## sha_subjects_new %>% 
 rewards_sha_new <- lapply(sha_new_files, read_fread_new, "rewards") %>% unlist(recursive = F)
 length(rewards_sha_new)==nrow(sha_subjects_new) # check if they match in length
 names(rewards_sha_new) <- sha_subjects_new$labanimalid # 2783 matches! 
-
-
-
-### demo 
-sha_subjects_new_demo <- process_subjects_new(sha_new_files[1:3]) ## sha_subjects_new %>% dplyr::filter(!grepl("^[MF]", labanimalid)) %>% head # will need to use the comp df to name sessions
-rewards_sha_new_demo <- lapply(sha_new_files[1:3], read_fread_new, "rewards") %>% unlist(recursive = F)
 
 names(rewards_sha_new_demo) <- sha_subjects_new_demo
 
