@@ -109,7 +109,8 @@ sha_rewards <- rbindlist(list("sha_rewards_new" = sha_rewards_new,
 rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(matches("^sha|labanimalid")) %>% distinct() %>% 
                     gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
                   by = c("labanimalid", "exp")) %>% 
-  rename("rewards_raw"= "rewards")
+  rename("rewards_raw"= "rewards") %>% 
+  left_join(., WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = "rfid")
 
 olivier_sha_measures <- grep("rewards", names(rewards_sha_tograph), value = T) 
 rewards_sha_tograph <- rewards_sha_tograph %>% 
@@ -164,15 +165,27 @@ setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/QC
 
 # lga NEW and OLD combine 
 lga_rewards <- rbindlist(list("lga_rewards_new" = lga_rewards_new, 
-                              "lga_rewards_old" = lga_rewards_old), idcol = "directory", fill = T)
-rewards_lga_tograph <- lga_rewards %>% merge(., allcohorts2 %>% select(labanimalid, matches("^lga")) %>% distinct() %>% 
+                              "lga_rewards_old" = lga_rewards_old), idcol = "directory", fill = T) %>% select(-filename1)
+rewards_lga_tograph <- lga_rewards %>% merge(., allcohorts2 %>% select(labanimalid, rfid, matches("^lga")) %>% distinct() %>% 
                                                gather(exp, rewards_excel, lga01:lga23) %>% mutate(exp = toupper(exp)),
                                              by = c("labanimalid", "exp")) %>% 
-  rename("rewards_raw"= "rewards")
+  rename("rewards_raw"= "rewards") %>% 
+  mutate(sex = str_extract(labanimalid, "\\D")) %>% 
+  left_join(., WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = "rfid") %>% 
+  mutate_at(vars(one_of("date", "dob")), lubridate::ymd) %>% 
+  mutate(exp_age = as.integer(difftime(date, dob, unit = "days")))
 
 olivier_lga_measures <- grep("rewards", names(rewards_lga_tograph), value = T) 
 rewards_lga_tograph <- rewards_lga_tograph %>% 
   mutate_at(olivier_lga_measures, as.numeric)
+
+# NOT IN DATABASE 
+# > rewards_lga_tograph %>% subset(is.na(exp_age)) %>% select(labanimalid) %>% unique
+labanimalid
+2250        F724 (died and replace)
+2907        F830 933000320047252
+2923        F837 933000320047268
+
 
 # create plots 
 pdf("olivier_lga.pdf", onefile = T)
