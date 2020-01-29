@@ -195,6 +195,8 @@ for (i in 1:(length(olivier_lga_measures)/2)){
 dev.off()
 
 rewards_lga_tograph %>% dplyr::filter(rewards_raw != rewards_excel) %>% 
-  select(labanimalid, exp, cohort, directory, filename, rewards_raw, rewards_excel)
+  select(labanimalid, exp, cohort, directory, filename, rewards_raw, rewards_excel)%>% 
+  openxlsx::write.xlsx("lga_compare.xlsx")
+
 rewards_lga_tograph %>% subset(rewards_raw != rewards_excel) %>% dim
 

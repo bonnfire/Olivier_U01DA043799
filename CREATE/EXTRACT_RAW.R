@@ -460,7 +460,7 @@ sha_rewards_old <- rewards_bind %>% arrange(filename, as.numeric(as.character(ro
 ###### NEW FILES ##############
 lga_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 328 files
 lga_subjects_new <- process_subjects_new(lga_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
-  arrange(filename, row)
+  arrange(filename, as.numeric(row)) %>% select(-row)
 read_rewards_new <- function(x){
   rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print NR \"_\" $2}'"), header = F, fill = T)
   rewards$filename <- x
@@ -469,7 +469,7 @@ read_rewards_new <- function(x){
 lga_rewards_new <- lapply(lga_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
   bind_cols(lga_subjects_new) %>% 
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
-  mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
+  mutate(date = lubridate::mdy(date), time = chron::chron(times = time), rewards = as.numeric(rewards)) %>%  
   left_join(., date_time_subject_df_comp %>% 
               select(cohort, exp, filename, valid, start_date, start_time) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
