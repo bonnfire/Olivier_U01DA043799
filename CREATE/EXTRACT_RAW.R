@@ -399,32 +399,53 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
 ###### NEW FILES ##############
 
 sha_subjects_new <- process_subjects_new(sha_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
-  arrange(filename, row)
+  arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
 read_rewards_new <- function(x){
-  rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print $2}'"))
+  rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print NR \"_\" $2}'"), header = F, fill = T)
+  rewards$filename <- x
   return(rewards)
 }
+
 ## XX PICK UP HERE AND USE THE ROW NUMBER ASSIGNMENT
-sha_rewards_new <- lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% bind_cols(sha_subjects_new) %>% 
-  separate(labanimalid, into = c("", "labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
+sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+  bind_cols(sha_subjects_new) %>% 
+  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
   left_join(., date_time_subject_df_comp %>% 
               select(cohort, exp, filename, valid, start_date, start_time) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) %>% 
   dplyr::filter(valid == "yes") %>% 
-  rename("rewards" = "V1") %>% 
-  mutate(time = as.character(time)) %>% 
-  distinct()
+  mutate(time = as.character(time)) %>%
+  dplyr::filter(!filename %in% c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")) %>% # update records several lines down from meeting to show other team's confirmation 
+  distinct() # fixes duplicates in filenames %in% c("MED1113C07HSSHA06", "MED1110C05HSSHA08", "MED1110C05HSSHA09") ### there are no dupes for dplyr::filter(!grepl("[MF]\\d+", labanimalid)) 
 
+
+## exclude files (from meeting)
+# c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")
+## exclude cases (from meeting )
+# c("F720") for SHA03 bc both files with her data seem incorrect (MED1112C07HSSHA03 and MED1112C07HSSHA03-2)
+# MED1113C07HSSHA07 is actually LGA data (code that validates the date is filtering out these cases, and in the file, sha07 data and lga data follows)
 
 ## to deal with the missing subjects
-sha_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
-  left_join(., date_time_subject_df_comp %>% 
-              select(labanimalid, cohort, exp, filename, start_date, start_time) %>% 
-              rename("date" = "start_date", "time" = "start_time") %>% 
-              mutate(time = as.character(time)), 
-            by = c("cohort", "exp", "filename", "date", "time")) %>% head()
+# sha_rewards_new_missing <- sha_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
+#   left_join(., date_time_subject_df_comp %>% 
+#               select(labanimalid, cohort, exp, filename, start_date, start_time) %>% 
+#               rename("date" = "start_date", "time" = "start_time") %>% 
+#               mutate(time = as.character(time)), 
+#             by = c("cohort", "exp", "filename", "date", "time")) 
+
+# join and update "df" by reference, i.e. without copy 
+setDT(sha_rewards_new)             # convert to data.table without copy
+# setDT(sha_rewards_new_missing)         # convert to data.table without copy
+sha_rewards_new[setDT(sha_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
+                        left_join(., date_time_subject_df_comp %>% 
+                                    select(labanimalid, cohort, exp, filename, start_date, start_time) %>% 
+                                    rename("date" = "start_date", "time" = "start_time") %>% 
+                                    mutate(time = as.character(time)), 
+                                  by = c("cohort", "exp", "filename", "date", "time")) ), 
+                on = c("rewards", "cohort", "exp", "filename", "date", "time", "valid"), labanimalid := labanimalid.y] # don't want to make another missing object
+setDF(sha_rewards_new)
 
 ###### OLD FILES ##############
 
