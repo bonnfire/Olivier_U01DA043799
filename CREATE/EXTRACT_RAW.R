@@ -406,7 +406,6 @@ read_rewards_new <- function(x){
   return(rewards)
 }
 
-## XX PICK UP HERE AND USE THE ROW NUMBER ASSIGNMENT
 sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
   bind_cols(sha_subjects_new) %>% 
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
@@ -445,7 +444,10 @@ sha_rewards_new[setDT(sha_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimal
                                     mutate(time = as.character(time)), 
                                   by = c("cohort", "exp", "filename", "date", "time")) ), 
                 on = c("rewards", "cohort", "exp", "filename", "date", "time", "valid"), labanimalid := labanimalid.y] # don't want to make another missing object
+
 setDF(sha_rewards_new)
+sha_rewards_new %<>% 
+  mutate_at(vars(rewards), as.numeric)
 
 ###### OLD FILES ##############
 

@@ -103,6 +103,22 @@ specificcomments_list_df %>% dplyr::filter(labanimalid %in% missingdataspleenext
 ##################
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/QC")
 
+### QCing raw data
+
+sha_rewards_new %>% 
+  mutate_at(vars(exp), as.factor) %>% 
+  mutate(sex = str_extract(labanimalid, "[M|F]")) %>% 
+  ggplot(aes(exp, rewards, group = labanimalid, color = sex)) + 
+  geom_line() +
+  facet_grid( ~ cohort) + 
+  labs(title = "SHA Rewards New (Raw Only) Directories, For Each Rat") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+
+
+
+
 # sha NEW and OLD combine 
 sha_rewards <- rbindlist(list("sha_rewards_new" = sha_rewards_new, 
                               "sha_rewards_old" = sha_rewards_old), idcol = "directory", fill = T)
