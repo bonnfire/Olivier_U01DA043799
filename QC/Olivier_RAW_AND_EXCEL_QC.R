@@ -114,7 +114,15 @@ sha_rewards_new %>%
   labs(title = "SHA Rewards New (Raw Only) Directories, For Each Rat") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
-
+# uncomment for sha_rewards_old
+# sha_rewards_new %>% 
+#   mutate_at(vars(exp), as.factor) %>% 
+#   mutate(sex = str_extract(labanimalid, "[M|F]")) %>% 
+#   ggplot(aes(exp, rewards, group = labanimalid, color = sex)) + 
+#   geom_line() +
+#   facet_grid( ~ cohort) + 
+#   labs(title = "SHA Rewards New (Raw Only) Directories, For Each Rat") + 
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
 
 
