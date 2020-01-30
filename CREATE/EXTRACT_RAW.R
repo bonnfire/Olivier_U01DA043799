@@ -218,6 +218,8 @@ convert_iri_matrix_to_df <- function(x){
   
 # FOR ~NEW~ DIRECTORIES
 # NON EXPERIMENT SPECIFIC 
+
+
 ## TO VALIDATE ENTRIES  
 ## extract date and start time/end time to determine valid sessions
 read_date_time_subject <- system("grep -a7r --no-group-separator \"Start Date: \" . | grep -E \"(Start Date|End|Subject|Box|Start Time|End Time):\"", intern = T)
@@ -402,6 +404,7 @@ read_rewards_new <- function(x){
   rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print $2}'"))
   return(rewards)
 }
+## XX PICK UP HERE AND USE THE ROW NUMBER ASSIGNMENT
 sha_rewards_new <- lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% bind_cols(sha_subjects_new) %>% 
   separate(labanimalid, into = c("", "labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
@@ -411,7 +414,17 @@ sha_rewards_new <- lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% b
             by = c("cohort", "exp", "filename", "date", "time")) %>% 
   dplyr::filter(valid == "yes") %>% 
   rename("rewards" = "V1") %>% 
-  mutate(time = as.character(time))
+  mutate(time = as.character(time)) %>% 
+  distinct()
+
+
+## to deal with the missing subjects
+sha_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
+  left_join(., date_time_subject_df_comp %>% 
+              select(labanimalid, cohort, exp, filename, start_date, start_time) %>% 
+              rename("date" = "start_date", "time" = "start_time") %>% 
+              mutate(time = as.character(time)), 
+            by = c("cohort", "exp", "filename", "date", "time")) %>% head()
 
 ###### OLD FILES ##############
 
