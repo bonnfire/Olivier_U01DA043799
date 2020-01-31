@@ -285,6 +285,16 @@ for(i in 1:length(rat_info_xl_filenames)){
   rat_info_allcohort_xl[[i]] <- u01.importxlsx(rat_info_xl_filenames[i])$`Information Sheet`
 }
 
+### EXTRACT THE COMPUTER NOTES FROM THEIR DROPBOX
+setwd("~/Dropbox (Palmer Lab)/GWAS (1)")
+computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>% 
+  gather(exp, comment, SHA01:cohort_notes) %>% 
+  clean_names() %>% 
+  dplyr::filter(grepl("^C", cohort))
+
+
+
+
 
 rm(list=ls(pattern="irr")) # conditionally clean the environment
 rm(list = ls())

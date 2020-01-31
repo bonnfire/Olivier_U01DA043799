@@ -123,27 +123,12 @@ sha_rewards_old %>%
   labs(title = "SHA Rewards Old (Raw Only) Directories, For Each Rat") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  
 
-# uncomment for sha_rewards_old
-# sha_rewards_new %>% 
-#   mutate_at(vars(exp), as.factor) %>% 
-#   mutate(sex = str_extract(labanimalid, "[M|F]")) %>% 
-#   ggplot(aes(exp, rewards, group = labanimalid, color = sex)) + 
-#   geom_line() +
-#   facet_grid( ~ cohort) + 
-#   labs(title = "SHA Rewards New (Raw Only) Directories, For Each Rat") + 
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-
+### QCing raw vs excel data
 
 
 # sha NEW and OLD combine 
-sha_rewards <- rbindlist(list("sha_rewards_new" = sha_rewards_new, 
-                              "sha_rewards_old" = sha_rewards_old), idcol = "directory", fill = T)
-rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>% 
-                    gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
-                  by = c("labanimalid", "exp")) %>% 
-  rename("rewards_raw"= "rewards") %>% 
-  left_join(., WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = "rfid")
+sha_rewards <- rbindlist(list("new" = sha_rewards_new, 
+                              "old" = sha_rewards_old), idcol = "directory", fill = T)
 
 # add notes about missingness (file or dead)
 sha_rewards_new <- sha_rewards_new %>%
@@ -162,6 +147,14 @@ sha_rewards_new <- sha_rewards_new %>%
   ) %>%
   ungroup() # %>%
 # subset(!is.na(comment))
+
+rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>% 
+                    gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
+                  by = c("labanimalid", "exp")) %>% 
+  rename("rewards_raw"= "rewards") %>% 
+  left_join(., WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = "rfid")
+
+
 
 ratinfo_list_deaths_processed %>% dplyr::filter(grepl("Died",reasoning)) %>% dim ## the total number of dead animals should match here
 
