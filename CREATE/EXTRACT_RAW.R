@@ -157,14 +157,15 @@ read_fread_old <- function(x, varname){
   fread_old_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards"),
                                  statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/endl/{flag=0}flag' ",
                                                "awk '/^ResponsesActBins/{flag=1;next}/endl/{flag=0}flag' ",
-                                               "awk '/totalRewards/{flag=1;next}/TotalResponses/{flag=0; print NR}flag' ")) 
+                                               "awk '/totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ")) 
                                                # "awk '/BinRewards/{flag=1;next}/endl/{flag=0}flag' "))  #### 	 In=L Act=R  Rew=W InTS=U	ActTS=Y  RewTS=V  RewIRI=Z 	
   statement <- fread_old_statements[which(fread_old_statements$varname == varname),]$statement
-  rawdata <- fread(paste0(statement, "'", x, "'"), fill = T, header = F)
+  rawdata <- fread(paste0(statement, "'", x, "' | nl -s _ | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
   rawdata$filename <- x
   
   return(rawdata)
 }
+
 
 ### XX 
 ## repeating the awk statements with conditions in shell script and trying to fread shell script
@@ -405,8 +406,7 @@ read_rewards_new <- function(x){
   rewards$filename <- x
   return(rewards)
 }
-# extract data...
-sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+csha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
   bind_cols(sha_subjects_new) %>% 
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
@@ -440,29 +440,19 @@ setDF(sha_rewards_new)
 sha_rewards_new %<>% 
   mutate_at(vars(rewards), as.numeric)
 
-# add notes about missingness (file or dead)
-sha_rewards_new <- sha_rewards_new %>% 
-  
+# deal with replacements
+
+
 
 ###### OLD FILES ##############
-
+# label data with... 
 sha_subjects_old <- process_subjects_old(sha_old_files)
-sha_rewards_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlist() 
-
-rewards <- sha_rewards_old %>% dplyr::filter(row_number() %% 2 == 1) %>% select(V1) %>% unlist() %>% as.character()
-row <- sha_rewards_old %>% dplyr::filter(row_number() %% 2 == 0) %>% select(V1) %>% unlist() %>% as.character()
-filename <- sha_rewards_old %>% dplyr::filter(row_number() %% 2 == 1) %>% select(filename) %>% unlist() %>% as.character()
-
-rewards_bind <- data.frame(rewards = rewards, 
-                           row = row, 
-                           filename = filename) 
-
-sha_rewards_old <- rewards_bind %>% arrange(filename, as.numeric(as.character(row))) %>% bind_cols(sha_subjects_old %>% arrange(filename, row)) %>% 
-  select(-c("filename1", "row", "row1")) %>% 
+# extract data...
+sha_rewards_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+  bind_cols(sha_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
   separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
   mutate(date = lubridate::ymd(date),
-         rewards = rewards %>% unlist() %>% as.character() %>% as.numeric(),
-         filename = filename %>% unlist() %>% as.character()) %>%  
+         rewards = rewards %>% as.numeric()) %>% 
   dplyr::filter(valid == "valid") 
 
 

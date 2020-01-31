@@ -114,6 +114,15 @@ sha_rewards_new %>%
   labs(title = "SHA Rewards New (Raw Only) Directories, For Each Rat") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
+sha_rewards_old %>% 
+  mutate_at(vars(exp), as.factor) %>% 
+  mutate(sex = str_extract(labanimalid, "[M|F]")) %>% 
+  ggplot(aes(exp, rewards, group = labanimalid, color = sex)) + 
+  geom_line() +
+  facet_grid( ~ cohort) + 
+  labs(title = "SHA Rewards Old (Raw Only) Directories, For Each Rat") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
 # uncomment for sha_rewards_old
 # sha_rewards_new %>% 
 #   mutate_at(vars(exp), as.factor) %>% 
@@ -130,11 +139,31 @@ sha_rewards_new %>%
 # sha NEW and OLD combine 
 sha_rewards <- rbindlist(list("sha_rewards_new" = sha_rewards_new, 
                               "sha_rewards_old" = sha_rewards_old), idcol = "directory", fill = T)
-rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(matches("^sha|labanimalid")) %>% distinct() %>% 
+rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>% 
                     gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
                   by = c("labanimalid", "exp")) %>% 
   rename("rewards_raw"= "rewards") %>% 
   left_join(., WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = "rfid")
+
+# add notes about missingness (file or dead)
+sha_rewards_new <- sha_rewards_new %>%
+  left_join(., allcohorts2[, c("labanimalid", "rfid")], by = "labanimalid") %>%
+  left_join(., ratinfo_list_deaths_processed, by = c("rfid", "cohort")) %>%
+  mutate_at(vars(contains("date")), lubridate::ymd) %>%
+  group_by(labanimalid) %>%
+  mutate(
+    comment = case_when(
+      !grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &
+        date == dplyr::first(na.omit(datedropped))
+      ~ "COMP_EXCLUDE",
+      grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &
+        date >= dplyr::first(na.omit(datedropped)) ~ "DEAD_EXCLUDE"
+    )
+  ) %>%
+  ungroup() # %>%
+# subset(!is.na(comment))
+
+ratinfo_list_deaths_processed %>% dplyr::filter(grepl("Died",reasoning)) %>% dim ## the total number of dead animals should match here
 
 olivier_sha_measures <- grep("rewards", names(rewards_sha_tograph), value = T) 
 rewards_sha_tograph <- rewards_sha_tograph %>% 
