@@ -439,7 +439,9 @@ sha_rewards_new[setDT(sha_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimal
 setDF(sha_rewards_new)
 sha_rewards_new %<>% 
   mutate_at(vars(rewards), as.numeric)
-
+## case: deal with mislabelled subject?
+sha_rewards_new %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
+sha_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="SHA01"&time=="09:24:16", "M768"))
 
 
 
@@ -459,6 +461,9 @@ sha_rewards_old %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% dim
 # will remove these cases bc these files have 7 subjects and both misssing subjects have another "session" (matched box)
 sha_rewards_old %<>% dplyr::filter(grepl("[MF]", labanimalid)) 
 
+## case: deal with mislabelled subject?
+sha_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
+sha_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n)
 
 
 

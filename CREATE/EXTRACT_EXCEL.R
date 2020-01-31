@@ -288,7 +288,7 @@ for(i in 1:length(rat_info_xl_filenames)){
 ### EXTRACT THE COMPUTER NOTES FROM THEIR DROPBOX
 setwd("~/Dropbox (Palmer Lab)/GWAS (1)")
 computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>% 
-  gather(exp, comment, SHA01:cohort_notes) %>% 
+  gather(exp, computernote, SHA01:cohort_notes) %>% 
   clean_names() %>% 
   dplyr::filter(grepl("^C", cohort))
 
