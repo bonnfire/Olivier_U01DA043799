@@ -406,7 +406,7 @@ read_rewards_new <- function(x){
   rewards$filename <- x
   return(rewards)
 }
-csha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
   bind_cols(sha_subjects_new) %>% 
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
@@ -440,7 +440,6 @@ setDF(sha_rewards_new)
 sha_rewards_new %<>% 
   mutate_at(vars(rewards), as.numeric)
 
-# deal with replacements
 
 
 
@@ -453,11 +452,12 @@ sha_rewards_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlis
   separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
   mutate(date = lubridate::ymd(date),
          rewards = rewards %>% as.numeric()) %>% 
-  dplyr::filter(valid == "valid") 
+  dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
 
-
-
-
+# deal with the missing subjects...
+sha_rewards_old %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% dim
+# will remove these cases bc these files have 7 subjects and both misssing subjects have another "session" (matched box)
+sha_rewards_old %<>% dplyr::filter(grepl("[MF]", labanimalid)) 
 
 
 
