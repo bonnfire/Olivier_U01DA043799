@@ -274,7 +274,7 @@ subject0 <- date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(
 
 # replace rbindlist... with openxlsx::write.xlsx(., "labanimalid_assign_bybox.xlsx") to create the excel sheets that I sent to their lab 
 subject0[[3]] <- NULL
-subject0 %>% openxlsx::write.xlsx(., "labanimalid_assign_bybox.xlsx")
+# subject0 %>% openxlsx::write.xlsx(., "labanimalid_assign_bybox.xlsx")
 
 # trying to fix subject 0 for shock files 
 date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(x){
@@ -339,7 +339,7 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
     grepl("SHOCK", exp) & experiment_duration > 58 & excel_date == start_date ~ "yes",
     grepl("SHA", exp) & experiment_duration > 115 & excel_date == start_date~ "yes",
     grepl("LGA", exp) & experiment_duration > 355 & excel_date == start_date~ "yes",
-    grepl("PR", exp) & experiment_duration < 60 & excel_date == start_date~ "yes"),
+    grepl("PR", exp) & experiment_duration > 60 & excel_date == start_date~ "yes"),
     valid = replace(valid, is.na(valid), "no")
   ) # 9808 for cohorts C01-C09 (no C06) ## change the minimum times - Olivier (from 1/24 meeting)
 
@@ -583,18 +583,60 @@ lga_rewards_old <- lga_rewards_old %>% group_by(labanimalid, exp) %>%
 ########## PR ##################
 ################################
 
+###### NEW FILES ##############
 pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*PR/", value = T) # 53 files
-pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*PR/", value = T) # 62 files
+# label data with...
+pr_subjects_new <- process_subjects_new(pr_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%
+  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #800
+# extract data with diff function from `read_rewards_new` for sha
+readrewards_pr <- function(x){
+  rewards <- fread(paste0("awk '/B:/{print NR \"_\" $2}' ", "'", x, "'"), header = F, fill = T)
+  rewards$filename <- x
+  return(rewards)
+}
+pr_rewards_new <- lapply(pr_new_files, readrewards_pr) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+  bind_cols(pr_subjects_new) %>%
+  separate(
+    labanimalid,
+    into = c("labanimalid", "cohort", "exp", "filename", "date", "time"),
+    sep = "_"
+  ) %>% mutate(
+    date = lubridate::mdy(date) %>% as.character(),
+    time = chron::chron(times = time) %>% as.character
+  ) 
+# qc with...
+pr_rewards_new %>% count(labanimalid, exp, cohort) %>% subset(n!=1)
+pr_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1)
 
-pr_subjects_new <- process_subjects_new(pr_new_files) #800 
-pr_rewards_new <- lapply(pr_new_files, read_fread, "rewards")  %>% unlist(recursive = F) #785 XX MISSING REWARDS ARRAY
+# deal with the missing subjects...
+# join and update "df" by reference, i.e. without copy 
+setDT(pr_rewards_new)             # convert to data.table without copy
+pr_rewards_new[setDT(pr_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
+                       left_join(., date_time_subject_df_comp %>% 
+                                   dplyr::filter(grepl("PR", exp)) %>% 
+                                   mutate(time = as.character(start_time), 
+                                          date = as.character(start_date)), 
+                                 by = c("exp", "filename", "date", "time"), all.x = T)), 
+                on = c("rewards", "exp", "filename", "date", "time"), labanimalid := labanimalid.y] # don't want to make another missing object
+setDF(pr_rewards_new)
+pr_rewards_new %<>% 
+  mutate_at(vars(rewards), as.numeric)
+# remove invalid point
+pr_rewards_new %<>% dplyr::filter(!(labanimalid == "F717" & exp == "PR01" & time == "07:45:31"))
+pr_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1) # dim of df is dim of distinct(df)
 
+
+
+
+
+#785 XX MISSING REWARDS ARRAY
+## BEFORE MEETING PROGRESS 
 read_pr <- system("grep -iEa1r --no-group-separator  \"(Subject|Start Date|Start Time|H|A|G):\" */New_medassociates/PR* | grep -iE \"(Subject|Start Date|Start Time|A|G| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
 read_pr <- gsub("\r", "", read_pr)
 
-breakpoint = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[[', 2) %>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
+breakpoint = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 2) %>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
 breakpoint = append(breakpoint, rep(NA, 16), after=48)
-extra_presses = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 4)%>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
+extra_presses = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 4) %>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
 extra_presses = append(extra_presses, rep(NA, 16), after=48)
 
 pr_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_pr, value = T)),
@@ -616,4 +658,53 @@ pr_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_pr, v
 #looking for missing 0: arrays 
 # test <- system("grep -iEa1r --no-group-separator  \"(Subject|H):\" */New_medassociates/PR* | grep -iE \"(Subject| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
 # C02HSPR03 trouble file
+
+
+
+
+
+lga_subjects_new <- process_subjects_new(lga_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
+  arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
+# extract data with `read_rewards_new` same for sha
+lga_rewards_new <- lapply(lga_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+  bind_cols(lga_subjects_new) %>% 
+  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
+  mutate(date = lubridate::mdy(date), time = chron::chron(times = time), rewards = as.numeric(rewards)) %>%  
+  left_join(., date_time_subject_df_comp %>% 
+              select(cohort, exp, filename, valid, start_date, start_time) %>% 
+              rename("date" = "start_date", "time" = "start_time"), 
+            by = c("cohort", "exp", "filename", "date", "time")) %>% 
+  dplyr::filter(valid == "yes") %>% 
+  mutate(time = as.character(time)) %>% 
+  distinct()
+
+## notes (not extensive notes from meeting)
+# MED1113C07HSSHA07 has lga data 
+
+# deal with the missing subjects...
+# join and update "df" by reference, i.e. without copy 
+setDT(lga_rewards_new)             # convert to data.table without copy
+lga_rewards_new[setDT(lga_rewards_new %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
+                        left_join(., date_time_subject_df_comp %>% 
+                                    select(labanimalid, cohort, exp, filename, start_date, start_time) %>% 
+                                    rename("date" = "start_date", "time" = "start_time") %>% 
+                                    mutate(time = as.character(time)), 
+                                  by = c("cohort", "exp", "filename", "date", "time")) ), 
+                on = c("rewards", "cohort", "exp", "filename", "date", "time", "valid"), labanimalid := labanimalid.y] # don't want to make another missing object
+setDF(lga_rewards_new)
+lga_rewards_new %<>% 
+  mutate_at(vars(rewards), as.numeric)
+## case: deal with mislabelled subject?
+lga_rewards_new %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
+# lga_rewards_new %>% subset(labanimalid=="M763"&exp %in% c("LGA09", "LGA10"))
+# lga_rewards_new  %>% subset(exp %in% c("LGA09", "LGA10")) %>% select(labanimalid, exp) %>% table() 
+lga_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA09"&time=="09:00:21"&filename=="MED1114C07HSLGA09", "M779"))
+lga_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA10"&time=="09:21:34"&filename=="MED1114C07HSLGA10", "M779"))
+lga_rewards_new %<>% dplyr::filter(!(grepl("MED1114C07HSLGA(09|10)",filename) & labanimalid == "M779"))
+
+
+
+###### OLD FILES ##############
+
+pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*PR/", value = T) # 62 files
 
