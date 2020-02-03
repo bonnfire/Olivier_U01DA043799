@@ -519,11 +519,11 @@ lga_rewards_new %<>%
   mutate_at(vars(rewards), as.numeric)
 ## case: deal with mislabelled subject?
 lga_rewards_new %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
-lga_rewards_new %>% subset(labanimalid=="M763"&exp %in% c("LGA09", "LGA10"))
-lga_rewards_new  %>% subset(exp %in% c("LGA09", "LGA10")) %>% select(labanimalid, exp) %>% table() 
-lga_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="lga01"&time=="09:24:16", "M768"))
-
-
+# lga_rewards_new %>% subset(labanimalid=="M763"&exp %in% c("LGA09", "LGA10"))
+# lga_rewards_new  %>% subset(exp %in% c("LGA09", "LGA10")) %>% select(labanimalid, exp) %>% table() 
+lga_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA09"&time=="09:00:21"&filename=="MED1114C07HSLGA09", "M779"))
+lga_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA10"&time=="09:21:34"&filename=="MED1114C07HSLGA10", "M779"))
+lga_rewards_new %>% subset(time=="09:24:16")
 
 
 ###### OLD FILES ##############
