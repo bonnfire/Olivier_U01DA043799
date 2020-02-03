@@ -152,14 +152,39 @@ WFU_OlivierCocaine_test_df %>%
   mutate_at(vars(contains("date")), lubridate::ymd) %>%
   group_by(labanimalid) %>%
   mutate(
-    flag = case_when(
-      !grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &
-        date == dplyr::first(na.omit(datedropped)) ~ "COMP_EXCLUDE",
-      grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &
+    flag = case_when(grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &
         date >= dplyr::first(na.omit(datedropped)) ~ "DEAD_EXCLUDE"
     )
   ) %>%
   ungroup()
+
+TEST <- WFU_OlivierCocaine_test_df %>%
+  rename("wfu_labanimalid" = "labanimalid") %>%
+  mutate(cohort = paste0("C", cohort)) %>%
+  dplyr::filter(grepl("^\\d", rfid)) %>% #721 (ignore the blanks and annotations in the excel)
+  left_join(allcohorts2[, c("labanimalid", "rfid")], ., by = "rfid") %>% # add labanimalid number
+  left_join(., computernotes_coc, by = "cohort") %>% # 15527 (explains missing files for every session, every rat)
+  # left_join(., ratinfo_list_replacements_processed, by = c("rfid", "cohort")) %>% # replacements XX WAITING FOR THEM TO CONFIRM MISSING RFID
+  left_join(., sha_rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527
+  left_join(.,
+            allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>%
+              gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
+            by = c("labanimalid", "rfid", "exp")
+  ) %>%
+  rename("rewards_raw" = "rewards",
+         "exp_date" = "date",
+         "exp_time" = "time") %>% # 15527 
+  left_join(., ratinfo_list_deaths_processed, by = c("rfid", "cohort")) %>% # deaths/compromises
+  mutate_at(vars(contains("date")), lubridate::ymd) %>% 
+  subset(labanimalid %in% c("M464", "F516", "M360"))
+
+TEST %>%
+  mutate(flag = case_when(exp_date >= datedropped ~ "DEAD_EXCLUDE")) %>% View()
+
+
+##       !grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &
+# date == dplyr::first(na.omit(datedropped)) ~ "COMP_EXCLUDE"
+
 
 ## Error in `==.default`(date, dplyr::first(na.omit(datedropped))) : 
 # comparison (1) is possible only for atomic and list types
