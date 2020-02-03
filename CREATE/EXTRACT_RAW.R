@@ -551,35 +551,19 @@ lga_rewards_old <- lapply(lga_old_files, read_fread_old, "rewards") %>% rbindlis
   dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
 
 # deal with the missing subjects...
-lga_rewards_old %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% dim
-# will remove these cases bc these files have 7 subjects and both misssing subjects have another "session" (matched box)
-lga_rewards_old %<>% dplyr::filter(grepl("[MF]", labanimalid)) 
 
 ## case: deal with mislabelled subject?
 lga_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
-lga_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n)
+# lga_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n) ## don't use this code bc this doesn't allow for any 0's 
+lga_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1) %>% arrange(filename)
+lga_rewards_old <- lga_rewards_old %>% group_by(labanimalid, exp) %>% 
+  dplyr::filter(rewards == max(rewards)) %>%
+  distinct() %>% 
+  dplyr::filter(!(exp=="LGA06" & labanimalid=="M457" & box=="3")) #2347
+# %>% 
+#   add_count(labanimalid, cohort,exp) %>% 
+#   subset(n != 1) 
 
-
-
-lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
-lga_subjects_old <- process_subjects_old(lga_old_files)
-lga_rewards_old <- lapply(lga_old_files, read_fread_old, "rewards") %>% rbindlist() 
-
-rewards <- lga_rewards_old %>% dplyr::filter(row_number() %% 2 == 1) %>% select(V1) %>% unlist() %>% as.character()
-row <- lga_rewards_old %>% dplyr::filter(row_number() %% 2 == 0) %>% select(V1) %>% unlist() %>% as.character()
-filename <- lga_rewards_old %>% dplyr::filter(row_number() %% 2 == 1) %>% select(filename) %>% unlist() %>% as.character()
-
-rewards_bind <- data.frame(rewards = rewards, 
-                           row = row, 
-                           filename = filename) 
-
-lga_rewards_old <- rewards_bind %>% arrange(filename, as.numeric(as.character(row))) %>% bind_cols(lga_subjects_old %>% arrange(filename, row)) %>% 
-  select(-c("filename1", "row", "row1")) %>% 
-  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
-  mutate(date = lubridate::ymd(date),
-         rewards = rewards %>% unlist() %>% as.character() %>% as.numeric(),
-         filename = filename %>% unlist() %>% as.character()) %>%  
-  dplyr::filter(valid == "valid") 
 
 
 ## exclude the following files - Olivier (1/24 meeting)
