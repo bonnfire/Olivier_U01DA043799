@@ -127,8 +127,12 @@ sha_rewards_old %>%
 
 
 # sha NEW and OLD combine 
-sha_rewards <- rbindlist(list("new" = sha_rewards_new, 
-                              "old" = sha_rewards_old), idcol = "directory", fill = T)
+rewards <- rbindlist(list("new_sha" = sha_rewards_new, 
+                              "old_sha" = sha_rewards_old,
+                              "new_lga" = lga_rewards_new, 
+                              "old_lga" = lga_rewards_old), idcol = "directory", fill = T)
+
+
 
 # add notes about missingness (file or dead)
 
@@ -139,7 +143,7 @@ WFU_OlivierCocaine_test_df %>%
   left_join(allcohorts2[, c("labanimalid", "rfid")], ., by = "rfid") %>% # add labanimalid number
   left_join(., computernotes_coc, by = "cohort") %>% # 15527 (explains missing files for every session, every rat)
   # left_join(., ratinfo_list_replacements_processed, by = c("rfid", "cohort")) %>% # replacements XX WAITING FOR THEM TO CONFIRM MISSING RFID
-  left_join(., sha_rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527
+  left_join(., rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527
   left_join(.,
     allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>%
       gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
@@ -152,8 +156,9 @@ WFU_OlivierCocaine_test_df %>%
   mutate_at(vars(contains("date")), lubridate::ymd) %>%
   group_by(labanimalid) %>%
   mutate(
-    flag = case_when(grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &
-        date >= dplyr::first(na.omit(datedropped)) ~ "DEAD_EXCLUDE"
+    flag = case_when(
+      grepl("Died", reasoning) & exp_date >= datedropped ~ "DEAD_EXCLUDE",
+      !grepl("Died", reasoning) & exp_date == datedropped ~ "COMP_EXCLUDE"
     )
   ) %>%
   ungroup()
@@ -165,7 +170,7 @@ TEST <- WFU_OlivierCocaine_test_df %>%
   left_join(allcohorts2[, c("labanimalid", "rfid")], ., by = "rfid") %>% # add labanimalid number
   left_join(., computernotes_coc, by = "cohort") %>% # 15527 (explains missing files for every session, every rat)
   # left_join(., ratinfo_list_replacements_processed, by = c("rfid", "cohort")) %>% # replacements XX WAITING FOR THEM TO CONFIRM MISSING RFID
-  left_join(., sha_rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527
+  left_join(., rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527
   left_join(.,
             allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>%
               gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
@@ -179,7 +184,8 @@ TEST <- WFU_OlivierCocaine_test_df %>%
   subset(labanimalid %in% c("M464", "F516", "M360"))
 
 TEST %>%
-  mutate(flag = case_when(exp_date >= datedropped ~ "DEAD_EXCLUDE")) %>% View()
+  mutate(flag = case_when(grepl("Died", reasoning)&exp_date >= datedropped ~ "DEAD_EXCLUDE",
+                          !grepl("Died", reasoning)&exp_date == datedropped ~ "COMP_EXCLUDE")) %>% View()
 
 
 ##       !grepl("Died", dplyr::first(na.omit(reasoning)), ignore.case = T) &

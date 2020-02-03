@@ -523,7 +523,7 @@ lga_rewards_new %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
 # lga_rewards_new  %>% subset(exp %in% c("LGA09", "LGA10")) %>% select(labanimalid, exp) %>% table() 
 lga_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA09"&time=="09:00:21"&filename=="MED1114C07HSLGA09", "M779"))
 lga_rewards_new %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA10"&time=="09:21:34"&filename=="MED1114C07HSLGA10", "M779"))
-lga_rewards_new %>% subset(time=="09:24:16")
+lga_rewards_new %<>% dplyr::filter(!(grepl("MED1114C07HSLGA(09|10)",filename) & labanimalid == "M779"))
 
 
 ###### OLD FILES ##############
