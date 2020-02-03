@@ -127,10 +127,18 @@ sha_rewards_old %>%
 
 
 # sha NEW and OLD combine 
-rewards <- rbindlist(list("new_sha" = sha_rewards_new, 
-                              "old_sha" = sha_rewards_old,
-                              "new_lga" = lga_rewards_new, 
-                              "old_lga" = lga_rewards_old), idcol = "directory", fill = T)
+rewards <- rbindlist(
+  list(
+    "new_sha" = sha_rewards_new,
+    "old_sha" = sha_rewards_old,
+    "new_lga" = lga_rewards_new,
+    "old_lga" = lga_rewards_old,
+    "new_pr" = pr_rewards_new,
+    "old_pr" = pr_rewards_old
+  ),
+  idcol = "directory",
+  fill = T
+)
 
 
 

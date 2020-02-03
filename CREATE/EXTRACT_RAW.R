@@ -624,7 +624,7 @@ pr_rewards_new %<>%
 # remove invalid point
 pr_rewards_new %<>% dplyr::filter(!(labanimalid == "F717" & exp == "PR01" & time == "07:45:31"))
 pr_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1) # dim of df is dim of distinct(df)
-
+pr_rewards_new <- pr_rewards_new %>% mutate(date = lubridate::ymd(date))
 
 ###### OLD FILES ##############
 
@@ -651,7 +651,8 @@ pr_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
 pr_rewards_old <- pr_rewards_old %>% 
   mutate(labanimalid = replace(labanimalid, box == "2"&filename=="./C01/Old/PR/K3C01HSPR02-20170905.txt", "M21"), 
          labanimalid = replace(labanimalid, box == "3"&filename=="./C01/Old/PR/K2C01HSPR01-20170814.txt", "M3")) %>% 
-  dplyr::filter(!(rewards == 0 & labanimalid == "M3" & filename == "./C01/Old/PR/K2C01HSPR01-20170814.txt"))
+  dplyr::filter(!(rewards == 0 & labanimalid == "M3" & filename == "./C01/Old/PR/K2C01HSPR01-20170814.txt")) %>% 
+  mutate(date = lubridate::ymd(date))
 # %>% 
 #   add_count(labanimalid, cohort,exp) %>% 
 #   subset(n != 1) 
