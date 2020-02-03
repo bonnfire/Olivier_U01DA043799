@@ -631,33 +631,33 @@ pr_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset
 
 #785 XX MISSING REWARDS ARRAY
 ## BEFORE MEETING PROGRESS 
-read_pr <- system("grep -iEa1r --no-group-separator  \"(Subject|Start Date|Start Time|H|A|G):\" */New_medassociates/PR* | grep -iE \"(Subject|Start Date|Start Time|A|G| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
-read_pr <- gsub("\r", "", read_pr)
-
-breakpoint = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 2) %>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
-breakpoint = append(breakpoint, rep(NA, 16), after=48)
-extra_presses = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 4) %>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
-extra_presses = append(extra_presses, rep(NA, 16), after=48)
-
-pr_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_pr, value = T)),
-                    cohort = str_match(grep("Subject", read_pr, value = T), "C\\d{2}") %>% unlist() %>% as.character(),  
-                    exp = toupper(sub('.*HS', '', grep("Subject", read_pr, value = T))) %>% gsub(":SUBJECT.*", "", .),
-                    start_date = gsub(".*Start Date: ", "", grep("Start Date:", read_pr, value = T)),
-                    start_time = gsub(".*Start Time: ", "", grep("Start Time", read_pr, value = T)),
-                    left_inactivepresses = gsub(".*A: ", "", grep("A:", read_pr, value = T)) %>% gsub("[[:space:]]", "", .) %>% as.numeric(),
-                    right_activepresses = gsub(".*G: ", "", grep("G:", read_pr, value = T)) %>% gsub("[[:space:]]", "", .) %>% as.numeric(),
-                    breakpoint = breakpoint,
-                    extra_presses = extra_presses,
-                    filename = sub(".*/.*/.*/", '', grep("Subject", read_pr, value = T)) %>% gsub(":Subject.*", "", .),
-                    directory = str_match(grep("Subject", read_pr, value = T) %>% gsub("-Subject.*", "", .), "New_medassociates|Old") %>% unlist() %>% as.character()
-) %>% arrange(cohort, exp) %>% 
-  mutate(start_date = lubridate::mdy(format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y")),
-         start_time = chron::chron(times = start_time)) %>% 
-  mutate_if(is.factor, as.character)
-
-#looking for missing 0: arrays 
-# test <- system("grep -iEa1r --no-group-separator  \"(Subject|H):\" */New_medassociates/PR* | grep -iE \"(Subject| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
-# C02HSPR03 trouble file
+# read_pr <- system("grep -iEa1r --no-group-separator  \"(Subject|Start Date|Start Time|H|A|G):\" */New_medassociates/PR* | grep -iE \"(Subject|Start Date|Start Time|A|G| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
+# read_pr <- gsub("\r", "", read_pr)
+# 
+# breakpoint = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 2) %>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
+# breakpoint = append(breakpoint, rep(NA, 16), after=48)
+# extra_presses = grep("0:", read_pr, value = T) %>% strsplit("       ") %>% sapply(., '[', 4) %>% gsub("[[:space:]]", "", .) %>% unlist() %>% as.numeric()
+# extra_presses = append(extra_presses, rep(NA, 16), after=48)
+# 
+# pr_df <- data.frame(subject = gsub(".*Subject: ", "", grep("Subject", read_pr, value = T)),
+#                     cohort = str_match(grep("Subject", read_pr, value = T), "C\\d{2}") %>% unlist() %>% as.character(),  
+#                     exp = toupper(sub('.*HS', '', grep("Subject", read_pr, value = T))) %>% gsub(":SUBJECT.*", "", .),
+#                     start_date = gsub(".*Start Date: ", "", grep("Start Date:", read_pr, value = T)),
+#                     start_time = gsub(".*Start Time: ", "", grep("Start Time", read_pr, value = T)),
+#                     left_inactivepresses = gsub(".*A: ", "", grep("A:", read_pr, value = T)) %>% gsub("[[:space:]]", "", .) %>% as.numeric(),
+#                     right_activepresses = gsub(".*G: ", "", grep("G:", read_pr, value = T)) %>% gsub("[[:space:]]", "", .) %>% as.numeric(),
+#                     breakpoint = breakpoint,
+#                     extra_presses = extra_presses,
+#                     filename = sub(".*/.*/.*/", '', grep("Subject", read_pr, value = T)) %>% gsub(":Subject.*", "", .),
+#                     directory = str_match(grep("Subject", read_pr, value = T) %>% gsub("-Subject.*", "", .), "New_medassociates|Old") %>% unlist() %>% as.character()
+# ) %>% arrange(cohort, exp) %>% 
+#   mutate(start_date = lubridate::mdy(format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y")),
+#          start_time = chron::chron(times = start_time)) %>% 
+#   mutate_if(is.factor, as.character)
+# 
+# #looking for missing 0: arrays 
+# # test <- system("grep -iEa1r --no-group-separator  \"(Subject|H):\" */New_medassociates/PR* | grep -iE \"(Subject| 0):\"", intern = T) # THE REASON WHY THIS DOESN'T WORK ON OLD IS BC THE FORMAT IS DIFFERENT
+# # C02HSPR03 trouble file
 
 
 
