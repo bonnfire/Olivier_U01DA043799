@@ -130,7 +130,7 @@ process_subjects_old <- function(x){
                             row = row) %>% 
     # mutate_all(as.character) %>% 
     mutate(labanimalid = replace(labanimalid, labanimalid=="999", "F000")) %>% # create placeholder for the problematic cases
-    mutate(date = str_extract(filename, "\\d{8}(-\\d+)?") %>% lubridate::ymd(),
+    mutate(date = str_extract(filename, "\\d{8}") %>% lubridate::ymd(),
            cohort = str_extract(filename, "C\\d+"), 
            # cohort = gsub(".*C[0]?(\\d)+/.*", "cohort\\1", filename),
            exp = sub("-.*", "", sub(".*HS([^.]+)[-].*", "\\1", toupper(filename)))) %>% 
@@ -527,6 +527,40 @@ lga_rewards_new %>% subset(time=="09:24:16")
 
 
 ###### OLD FILES ##############
+lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
+
+# label data with... 
+lga_subjects_old <- process_subjects_old(lga_old_files) ## quick qc lga_subjects_old %>% dplyr::filter(grepl("NA", labanimalid))
+lga_subjects_old %<>% mutate(filename = as.character(filename), 
+                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==4, "M368_1_C03_LGA01_Q3_20180221_valid"),
+                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==354, "M369_2_C03_LGA01_Q3_20180221_valid"),
+                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==750, "M370_3_C03_LGA01_Q3_20180221_valid"),
+                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==1072, "M371_4_C03_LGA01_Q3_20180221_valid"),
+                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==1406, "M372_5_C03_LGA01_Q3_20180221_valid"),
+                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==1866, "M373_6_C03_LGA01_Q3_20180221_valid"),
+                             labanimalid = replace(labanimalid, filename=="./C04/Old/LGA/K3C04HSLGA12-20180516.txt"&row==344, "M459_4_C04_LGA12_K3_20180516_valid"),
+                             labanimalid = replace(labanimalid, filename=="./C04/Old/LGA/K2C04HSLGA15-20180524.txt"&row==4, "M451_2_C04_LGA15_K2_20180524_valid")
+                             ) 
+
+# extract data...
+lga_rewards_old <- lapply(lga_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+  bind_cols(lga_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
+  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
+  mutate(date = lubridate::ymd(date),
+         rewards = rewards %>% as.numeric()) %>% 
+  dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
+
+# deal with the missing subjects...
+lga_rewards_old %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% dim
+# will remove these cases bc these files have 7 subjects and both misssing subjects have another "session" (matched box)
+lga_rewards_old %<>% dplyr::filter(grepl("[MF]", labanimalid)) 
+
+## case: deal with mislabelled subject?
+lga_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
+lga_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n)
+
+
+
 lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
 lga_subjects_old <- process_subjects_old(lga_old_files)
 lga_rewards_old <- lapply(lga_old_files, read_fread_old, "rewards") %>% rbindlist() 
