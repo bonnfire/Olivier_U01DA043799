@@ -399,6 +399,7 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
 
 ###### NEW FILES ##############
 # label data with... 
+### XX FILL IN sha_new_files <- 
 sha_subjects_new <- process_subjects_new(sha_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
   arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
 read_rewards_new <- function(x){

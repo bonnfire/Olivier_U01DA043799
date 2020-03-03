@@ -285,6 +285,15 @@ for(i in 1:length(rat_info_xl_filenames)){
   rat_info_allcohort_xl[[i]] <- u01.importxlsx(rat_info_xl_filenames[i])$`Information Sheet`
 }
 
+names(rat_info_allcohort_xl) = rat_info_xl_filenames
+rat_info_allcohort_xl_df <- lapply(rat_info_allcohort_xl, function(x){
+  x <- x %>% mutate_all(as.character)
+  return(x)
+}) %>% rbindlist(fill = T, idcol = "cohort") %>% 
+  mutate(cohort = str_extract(cohort, "C\\d{2}")) %>% 
+  clean_names()
+rat_info_allcohort_xl_df %>% subset(grepl("^\\d", rfid)) %>% dim
+
 ### EXTRACT THE COMPUTER NOTES FROM THEIR DROPBOX
 setwd("~/Dropbox (Palmer Lab)/GWAS (1)")
 computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>% 

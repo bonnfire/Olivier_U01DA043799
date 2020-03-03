@@ -198,27 +198,33 @@ sha_rewards_new <- sha_rewards_new %>%
   ungroup() # %>%
 # subset(!is.na(comment))
 
-rewards_sha_tograph <- sha_rewards %>% merge(., allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>% 
+rewards_sha_tograph <- rewards %>% 
+  subset(grepl("SHA", exp)) %>% 
+  merge(., allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>% 
                     gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
                   by = c("labanimalid", "exp")) %>% 
   rename("rewards_raw"= "rewards") %>% 
-  left_join(., WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = "rfid")
-
-
-
-ratinfo_list_deaths_processed %>% dplyr::filter(grepl("Died",reasoning)) %>% dim ## the total number of dead animals should match here
+  mutate(sex = str_extract(labanimalid, "\\D")) %>% 
+  left_join(., WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = "rfid") %>% 
+  mutate_at(vars(one_of("date", "dob")), lubridate::ymd) %>% 
+  mutate(exp_age = as.integer(difftime(date, dob, unit = "days")))
 
 olivier_sha_measures <- grep("rewards", names(rewards_sha_tograph), value = T) 
 rewards_sha_tograph <- rewards_sha_tograph %>% 
   mutate_at(olivier_sha_measures, as.numeric)
 
 # create plots 
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/QC")
+
 pdf("olivier_sha.pdf", onefile = T)
 for (i in 1:(length(olivier_sha_measures)/2)){
-  g <-  ggplot(rewards_sha_tograph, aes_string(x = olivier_sha_measures[i], y = olivier_sha_measures[i+1])) + 
+  g <-  rewards_sha_tograph %>% 
+    mutate(directory = ifelse(grepl("new", directory), "New", "Old")) %>% 
+    ggplot(aes_string(x = olivier_sha_measures[i], y = olivier_sha_measures[i+1])) + 
     geom_point(aes(color = directory)) + 
-    labs(title = paste0(olivier_sha_measures[i], "_Raw_VS_Excel_U01_Olivier", "\n")) + 
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+    labs(title = paste0("Excel vs raw data comparison of ", gsub("_(excel|raw)", "", olivier_sha_measures[i]), "\n")) + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          text = element_text(size = 20)) 
   
   # g_cohort <-  ggplot(rewards_sha_tograph, aes_string(x = olivier_sha_measures[i], y = olivier_sha_measures[i+3])) + 
   #   geom_point(aes(color = cohort_number)) + 
@@ -234,6 +240,7 @@ dev.off()
 rewards_sha_tograph %>% dim
 rewards_sha_tograph %>% subset(rewards_raw != rewards_excel) %>% dim
 rewards_sha_tograph %>% subset(rewards_raw == rewards_excel) %>% dim
+rewards_sha_tograph %>% subset(is.na(rewards_raw)|is.na(rewards_excel)) %>% dim
 rewards_sha_tograph %>% subset(rewards_raw != rewards_excel) %>% 
   select(labanimalid, exp, filename, rewards_raw, rewards_excel) %>% 
   openxlsx::write.xlsx("sha_compare.xlsx")
