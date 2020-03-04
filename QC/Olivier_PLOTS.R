@@ -24,7 +24,7 @@ for (i in 1:(length(olivier_sha_measures))){
     mutate(exp = as.factor(exp)) %>% 
     ggplot(aes(x = exp, group = exp)) + 
     geom_boxplot(aes(y = rewards_raw), outlier.size=0.1) + 
-    ggforce::facet_wrap_paginate(~ cohort, ncol = 2, nrow = 2, page = i, strip.position="top", scales="free_y") +
+    ggforce::facet_wrap_paginate(~ cohort, ncol = 2, nrow = 2, page = i, strip.position="top") +
     # facet_grid(~ cohort) +
     labs(title = paste0("SHA_Rewards", "_Verified_Data_U01_Olivier", "\n", "By cohort"),
          y = "SHA_Rewards") + 
@@ -36,7 +36,7 @@ for (i in 1:(length(olivier_sha_measures))){
     mutate(exp = as.factor(exp)) %>%
     ggplot(aes(x = exp, y = rewards_raw)) +
     geom_boxplot(aes(fill = sex),outlier.size=0.1) +
-    ggforce::facet_wrap_paginate(~ cohort, ncol = 2, nrow = 2, page = i, strip.position="top", scales="free_y") +
+    ggforce::facet_wrap_paginate(~ cohort, ncol = 2, nrow = 2, page = i, strip.position="top") +
     # facet_grid(~ cohort) +
     labs(title = paste0("SHA_Rewards", "_Verified_Data_U01_Olivier", "\n", "By cohort and sex"),
          y = "SHA_Rewards") +
@@ -188,11 +188,26 @@ for (i in 1:(length(olivier_lga_measures))){
     mutate(exp = as.factor(exp)) %>%
     ggplot(aes(x = exp, y = rewards_raw)) +
     geom_boxplot(aes(fill = sex),outlier.size=0.1) +
-    ggforce::facet_wrap_paginate(~ cohort, ncol = 2, nrow = 2, page = i, strip.position="top", scales="free_y") +
+    ggforce::facet_wrap_paginate(~ cohort, ncol = 2, nrow = 2, page = i, strip.position="top") +
     # facet_grid(~ cohort) +
     labs(title = paste0("LGA_Rewards", "_Verified_Data_U01_Olivier", "\n", "By cohort and sex"),
          y = "LGA_Rewards") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+  
+  
+  g_sex_upto14 <- rewards_lga_tograph  %>% subset(!grepl("1[5-9]|2[0-9]", exp)) %>%
+    dplyr::filter(rewards_raw == rewards_excel) %>%
+    # dplyr::filter(resolution != "FLAG_EXPERIMENT"|is.na(resolution) ) %>%
+    mutate(exp = as.factor(exp)) %>%
+    ggplot(aes(x = exp, y = rewards_raw)) +
+    geom_boxplot(aes(fill = sex),outlier.size=0.1) +
+    ggforce::facet_wrap_paginate(~ cohort, ncol = 2, nrow = 2, page = i, strip.position="top") +
+    # facet_grid(~ cohort) +
+    labs(title = paste0("LGA_Rewards (Up to 14 sessions)", "_Verified_Data_U01_Olivier", "\n", "By cohort and sex"),
+         y = "LGA_Rewards") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+  
+  
   
   g_dir <- rewards_lga_tograph %>%
     dplyr::filter(rewards_raw == rewards_excel) %>%
@@ -283,6 +298,7 @@ for (i in 1:(length(olivier_lga_measures))){
   print(g_dir_sex)
   print(g_age)
   print(g_age_cohort)
+  print(g_sex_upto14)
   # print(g_box)
   # print(g_box_x)
   # print(g_rein)
