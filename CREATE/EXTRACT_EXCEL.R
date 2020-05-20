@@ -299,7 +299,8 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)")
 computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>% 
   gather(exp, computernote, SHA01:cohort_notes) %>% 
   clean_names() %>% 
-  dplyr::filter(grepl("^C", cohort))
+  dplyr::filter(grepl("^C", cohort)) %>% 
+  naniar::replace_with_na(replace = list(computernote = "NA"))
 
 
 

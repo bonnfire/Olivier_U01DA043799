@@ -127,13 +127,14 @@ sha_rewards_old %>%
 
 
 # sha NEW and OLD combine 
+## 5/20 XX add valid to sha_rewards_new, remove when not needed
 rewards <- rbindlist(
   list(
-    "new_sha" = sha_rewards_new,
+    "new_sha" = sha_rewards_new_valid,
     "old_sha" = sha_rewards_old,
-    "new_lga" = lga_rewards_new,
+    "new_lga" = lga_rewards_new_valid,
     "old_lga" = lga_rewards_old,
-    "new_pr" = pr_rewards_new,
+    "new_pr" = pr_rewards_new_valid,
     "old_pr" = pr_rewards_old
   ),
   idcol = "directory",
@@ -142,14 +143,18 @@ rewards <- rbindlist(
 
 
 
+######### JOIN TO WFU DATABASE 
+WFU_OlivierCocaine_test_df %>% 
+  select()
+  
 # add notes about missingness (file or dead)
 
 WFU_OlivierCocaine_test_df %>%
   rename("wfu_labanimalid" = "labanimalid") %>%
   mutate(cohort = paste0("C", cohort)) %>%
-  dplyr::filter(grepl("^\\d", rfid)) %>% #721 (ignore the blanks and annotations in the excel)
-  left_join(allcohorts2[, c("labanimalid", "rfid")], ., by = "rfid") %>% # add labanimalid number
-  left_join(., computernotes_coc, by = "cohort") %>% # 15527 (explains missing files for every session, every rat)
+  dplyr::filter(grepl("^\\d", rfid)) %>% #811 (ignore the blanks and annotations in the excel)
+  left_join(., allcohorts2[, c("labanimalid", "rfid")], by = "rfid") %>% # add labanimalid number
+  left_join(., computernotes_coc, by = "cohort") %>% # 27313 (explains missing files for every session, every rat)
   # left_join(., ratinfo_list_replacements_processed, by = c("rfid", "cohort")) %>% # replacements XX WAITING FOR THEM TO CONFIRM MISSING RFID
   left_join(., rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527
   left_join(.,
@@ -170,6 +175,16 @@ WFU_OlivierCocaine_test_df %>%
     )
   ) %>%
   ungroup()
+
+
+##### 
+## XX ask cocaine team why this, especially for the C09+  
+WFU_OlivierCocaine_test_df %>%
+  rename("wfu_labanimalid" = "labanimalid") %>%
+  mutate(cohort = paste0("C", cohort)) %>%
+  dplyr::filter(grepl("^\\d", rfid)) %>% #811 (ignore the blanks and annotations in the excel)
+  left_join(., allcohorts2[, c("labanimalid", "rfid")], by = "rfid") %>% subset(is.na(labanimalid))
+
 
 # tried and troubleshoot TEST %>% subset(labanimalid %in% c("M464", "F516", "M360"))
 
