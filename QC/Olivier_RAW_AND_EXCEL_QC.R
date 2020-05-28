@@ -144,37 +144,56 @@ rewards <- rbindlist(
 
 
 ######### JOIN TO WFU DATABASE 
-WFU_OlivierCocaine_test_df %>% 
-  select()
   
 # add notes about missingness (file or dead)
 
-WFU_OlivierCocaine_test_df %>%
-  rename("wfu_labanimalid" = "labanimalid") %>%
+Olivier_Cocaine_df <- WFU_OlivierCocaine_test_df %>%
+  select(cohort, rfid, comment) %>%
+  # rename("wfu_labanimalid" = "labanimalid") %>%
   mutate(cohort = paste0("C", cohort)) %>%
   dplyr::filter(grepl("^\\d", rfid)) %>% #811 (ignore the blanks and annotations in the excel)
   left_join(., allcohorts2[, c("labanimalid", "rfid")], by = "rfid") %>% # add labanimalid number
+  left_join(., ratinfo_list_deaths_processed %>% select(-c("naive", "datedropped")) %>% subset(grepl("surgery", reasoning, ignore.case = T)) %>% subset(!(rfid == "933000320047576"&reasoning=="Died, during surgery")), by = c("rfid", "cohort")) %>% # 811 # deaths/compromises before any experiments XX ASK TEAM AND FIX THE TWO RFID'S 
+  left_join(., ratinfo_list_replacements_processed %>% subset(grepl("^RENUMBERED", comment, ignore.case = T)) %>% select(cohort, originalrat, replacement), by = c("tailmark"="originalrat", "cohort")) %>% # replacements, when the animal dies labanimalid changes XX WAITING FOR THEM TO CONFIRM MISSING RFID
+  left_join(., ratinfo_list_replacements_processed %>% subset(grepl("Not Renumbered", comment, ignore.case = T)) %>% mutate(comment_replace = paste("Replacing", originalrat, "But", comment)) %>% select(cohort, rfidreplacement, comment_replace), by = c("rfid"="rfidreplacement", "cohort")) %>% 
+  mutate(labanimalid = coalesce(labanimalid, replacement),
+         tailmark = ifelse(!is.na(tailmark), paste(tailmark, "originally but replaced"), tailmark),
+         comment = ifelse(!is.na(reasoning)&is.na(comment), reasoning,
+                          ifelse(!is.na(reasoning)&!is.na(comment), paste0(comment, "; ", reasoning), comment))) %>%
+  select(-c("replacement", "reasoning")) %>% # replacements, when the animal is the replacement labanimalid changes XX WAITING FOR THEM TO CONFIRM MISSING RFID
+  left_join(., computernotes_coc %>% subset(!grepl("cohort_notes", exp)) %>% select(cohort, exp, computernote), by = "cohort") %>% # 21525 (explains missing files for every session, every rat)
+  rename("computernote_exp" = "computernote") %>% 
+  left_join(., computernotes_coc %>% subset(grepl("cohort_notes", exp)) %>% select(cohort, computernote), by = "cohort") %>%
+
+ratinfo_list_replacements_processed %>% subset(grepl("^RENUMBERED", comment, ignore.case = T)) 
+ori F724 933000320046616, replaced with F737 (933000320046143)
+
+
+%>% 
+  
   left_join(., computernotes_coc, by = "cohort") %>% # 27313 (explains missing files for every session, every rat)
-  # left_join(., ratinfo_list_replacements_processed, by = c("rfid", "cohort")) %>% # replacements XX WAITING FOR THEM TO CONFIRM MISSING RFID
-  left_join(., rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527
-  left_join(.,
-    allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>%
-      gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
-    by = c("labanimalid", "rfid", "exp")
-  ) %>%
-  rename("rewards_raw" = "rewards",
-         "exp_date" = "date",
-         "exp_time" = "time") %>% # 15527 
+  left_join(., ratinfo_list_replacements_processed %>% subset(grepl("^RENUMBERED", comment, ignore.case = T)) %>% select(cohort, originalrat, replacement), by = c("tailmark"="originalrat", "cohort")) %>% # replacements, when the animal dies labanimalid changes XX WAITING FOR THEM TO CONFIRM MISSING RFID
+  left_join(., rewards, by = c("labanimalid", "cohort", "exp")) %>% # 15527 ## ADDING THE RAW REWARDS DATA
+  # left_join(.,
+  #   allcohorts2 %>% select(labanimalid, rfid, matches("^sha")) %>% distinct() %>%
+  #     gather(exp, rewards_excel, sha01:sha10) %>% mutate(exp = toupper(exp)),
+  #   by = c("labanimalid", "rfid", "exp")
+  # ) %>% ## 5/20 not sure why added this, perhaps to add excel rewards data
+  # rename("rewards_raw" = "rewards",
+  #        "exp_date" = "date",
+  #        "exp_time" = "time") %>% # 15527
   left_join(., ratinfo_list_deaths_processed, by = c("rfid", "cohort")) %>% # deaths/compromises
   mutate_at(vars(contains("date")), lubridate::ymd) %>%
   group_by(labanimalid) %>%
   mutate(
     flag = case_when(
-      grepl("Died", reasoning) & exp_date >= datedropped ~ "DEAD_EXCLUDE",
-      !grepl("Died", reasoning) & exp_date == datedropped ~ "COMP_EXCLUDE"
+      grepl("Died", reasoning) & date >= datedropped ~ "DEAD_EXCLUDE", ## if the animal has died, remove all data on the data and after
+      !grepl("Died", reasoning) & date == datedropped ~ "COMP_EXCLUDE" ## if the animal was compromised, only flag that day
     )
   ) %>%
   ungroup()
+
+Olivier_Cocaine_df %>% select(cohort, rfid, exp, rewards, datedropped, flag) %>% subset(!is.na(flag))
 
 
 ##### 

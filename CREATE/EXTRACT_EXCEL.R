@@ -300,7 +300,8 @@ computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>%
   gather(exp, computernote, SHA01:cohort_notes) %>% 
   clean_names() %>% 
   dplyr::filter(grepl("^C", cohort)) %>% 
-  naniar::replace_with_na(replace = list(computernote = "NA"))
+  mutate(computernote = replace(computernote, computernote == "NA", "Did not run as part of protocol"))
+  # naniar::replace_with_na(replace = list(computernote = "NA"))
 
 
 

@@ -445,7 +445,7 @@ read_rewards_new <- function(x){
 }
 sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
   bind_cols(sha_subjects_new) %>% 
-  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
+  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
   left_join(., date_time_subject_df_comp %>% 
               select(cohort, exp, filename, valid, start_date, start_time) %>% 
