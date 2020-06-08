@@ -287,26 +287,26 @@ rat_info_allcohort_xl_df <- lapply(rat_info_xl_filenames, function(x){
   names(df) <- path_sheetnames
   info_name <- grep("info", path_sheetnames, ignore.case = T, value = T) # allows for small changes, like info sheet vs info sheets
   df_info <- df[[info_name]]
+  
+  df_info <- df_info %>% mutate_all(as.character) # prevent any mismatched class attributes
+  df_info <- df_info %>%
+    mutate(naive = NA, 
+           naive = replace(naive, is.na(RAT), "Empty"),
+           naive = replace(naive, grepl("Naive", RAT, ignore.case=F), "Naive")) %>% 
+    tidyr::fill(naive) %>% 
+    subset(grepl("^\\d", RFID)) # tackle the naive cases
+
   return(df_info)
 })
 names(rat_info_allcohort_xl_df) <- rat_info_xl_filenames
 rat_info_allcohort_xl_df %<>% rbindlist(fill = T, idcol = "cohort") %<>% 
-  mutate(cohort = str_extract(cohort, "C\\d{2}")) 
-# %>% 
-#   clean_names() 
+  mutate(cohort = str_extract(cohort, "C\\d{2}")) %<>%
+  clean_names()
 
 
-# names(rat_info_allcohort_xl) = rat_info_xl_filenames
-# rat_info_allcohort_xl_df <- lapply(rat_info_allcohort_xl, function(x){
-#   x <- x %>% mutate_all(as.character)
-#   return(x)
-# }) %>% rbindlist(fill = T, idcol = "cohort") %>% 
-#   mutate(cohort = str_extract(cohort, "C\\d{2}")) %>% 
-#   clean_names()
-# M787
-# rat_info_allcohort_xl_df %>% dim
-# rat_info_allcohort_xl_df %>% dplyr::filter(grepl("naive", rfid, ignore.case = T)&lag(grepl("naive", rfid, ignore.case = T)))
-# rat_info_allcohort_xl_df %>% subset(grepl("^\\d", rfid)) %>% dim
+
+
+
 
 ### EXTRACT THE COMPUTER NOTES FROM THEIR DROPBOX
 setwd("~/Dropbox (Palmer Lab)/GWAS (1)")
