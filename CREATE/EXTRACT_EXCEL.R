@@ -294,6 +294,7 @@ rat_info_allcohort_xl_df <- lapply(rat_info_xl_filenames, function(x){
            naive = replace(naive, is.na(RAT), "Empty"),
            naive = replace(naive, grepl("Naive", RAT, ignore.case=F), "Naive")) %>% 
     tidyr::fill(naive) %>% 
+    mutate(naive = replace(naive, !grepl("Naive", naive), NA)) %>% 
     subset(grepl("^\\d", RFID)) # tackle the naive cases
 
   return(df_info)
@@ -304,7 +305,12 @@ rat_info_allcohort_xl_df %<>% rbindlist(fill = T, idcol = "cohort") %<>%
   clean_names()
 
 
-
+# which animals are in the excel sheets but not in the wfu master tables 
+anti_join(rat_info_allcohort_xl_df[, c("cohort","rfid", "rat", "naive")], 
+          WFU_OlivierCocaine_test_df[,c("cohort", "rfid", "sires")],  by = "rfid") %>% View()
+# which animals are in the wfu master tables but not in excel sheets 
+anti_join(rat_info_allcohort_xl_df[, c("cohort","rfid", "rat", "naive")], 
+          WFU_OlivierCocaine_test_df[,c("cohort", "rfid", "sires")],  by = "rfid") %>% View()
 
 
 
