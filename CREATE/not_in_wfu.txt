@@ -25,5 +25,4 @@
 "24" "C09" "933000320047376" "F935"
 "25" "C09" "933000320047165" "F936"
 "26" "C09" "933000320047009" "M980"
-"27" "C11" "3/16-3/19/2020, initial COVID-19 contingency plan established - BSB/MTF office Team AM (BB, MB) 6 AM-12 PM & Team PM (SS, LT, MP, LS) 12 PM-6 PM; Team Skaggs (LC, LeC, AK, SiS, KS); Team Backup (OG, GDG, MK, LM, PS)" "NOTES:"
-"28" "C11" "4/9/2020, all remaining GWAS animals underwent brevital test, animals with failed catheters underwent recatheterization surgery on 4/10/2020" NA
+

@@ -13,6 +13,15 @@ con <- dbConnect(drv, user='postgres', password='postgres', dbname='U01')
 ## to add dataframes (by cohort)
 ## write to a temporary table in the database with dbWriteTable
 # then issue an SQL statement to insert into your table as you would within the db environment
+drv <- dbDriver("PostgreSQL")
+con <- dbConnect(drv, user='postgres', password='postgres', dbname='U01')
+update_sql_db <- function(df, df2){
+  df_to_add <- anti_join(df2, df)
+  
+}
+
+
+
 test1 <- Olivier_Cocaine_df_sql %>% distinct() %>% subset(cohort != "C11") 
 test2 <- Olivier_Cocaine_df_sql %>% distinct() %>% subset(cohort == "C11")
 dbWriteTable(con, c("u01_olivier_george_cocaine","olivier_rewards"), value = test1, row.names = FALSE)
@@ -24,3 +33,5 @@ dbExecute(con,"drop table if exists u01_olivier_george_cocaine.olivier_rewards_t
 # for troubleshooting 
 dbExecute(con,"drop table if exists u01_olivier_george_cocaine.olivier_rewards")
 
+# disconnect
+dbDisconnect(con)
