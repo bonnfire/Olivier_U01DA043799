@@ -148,7 +148,7 @@ rewards <- rbindlist(
 # add notes about missingness (file or dead)
 
 Olivier_Cocaine_df <- WFU_OlivierCocaine_test_df %>%
-  select(cohort, rfid, comment) %>%
+  select(cohort, rfid, comment, dob) %>%
   # rename("wfu_labanimalid" = "labanimalid") %>%
   mutate(cohort = paste0("C", cohort)) %>%
   dplyr::filter(grepl("^\\d", rfid)) %>% #811 (ignore the blanks and annotations in the excel)
@@ -175,9 +175,9 @@ Olivier_Cocaine_df <- WFU_OlivierCocaine_test_df %>%
       !grepl("Died", reasoning) & date == datedropped ~ "COMP_EXCLUDE" ## if the animal was compromised, only flag that day
     )
   ) %>%
-  ungroup() %>% 
+  ungroup() %>%
+  mutate(exp_age = difftime(as.POSIXct(date), as.POSIXct(dob), units = "days") %>% as.numeric(.)) %>% 
   select(cohort, rfid, labanimalid, exp, rewards, date, time, filename, tailmark, computernote_exp, computernote, everything())
-
 
 ## exclude some columns that aren't needed
 Olivier_Cocaine_df_sql <- Olivier_Cocaine_df %>% 

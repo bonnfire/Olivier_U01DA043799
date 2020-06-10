@@ -35,3 +35,11 @@ dbExecute(con,"drop table if exists u01_olivier_george_cocaine.olivier_rewards")
 
 # disconnect
 dbDisconnect(con)
+
+
+
+
+## in terminal
+cd /tmp
+sudo su postgres
+pg_dump -d U01 -t u01_olivier_george_cocaine.olivier_rewards > olivier_rewards.sql
