@@ -181,8 +181,10 @@ Olivier_Cocaine_df <- WFU_OlivierCocaine_test_df %>%
 
 ## exclude some columns that aren't needed
 Olivier_Cocaine_df_sql <- Olivier_Cocaine_df %>% 
-  select(cohort, rfid, labanimalid, exp, rewards)
+  select(cohort, rfid, labanimalid, exp, rewards, exp_age, experiment_duration, comment, reasoning, flag) %>% 
+  mutate(labanimalid = replace(labanimalid, experiment_duration == 360.5000&exp == "LGA16"&labanimalid=="F516", "F507")) ## TEMPORARY FIX, BUT NEED TO GO BACK AND FIX 
 
+## XX Olivier_Cocaine_df_sql %>% dim should be the same as Olivier_Cocaine_df_sql %>% distinct() %>% dim
 
 ratinfo_list_replacements_processed %>% subset(grepl("^RENUMBERED", comment, ignore.case = T)) 
 ori F724 933000320046616, replaced with F737 (933000320046143)

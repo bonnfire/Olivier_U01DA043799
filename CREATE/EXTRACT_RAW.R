@@ -368,7 +368,8 @@ gather(v, value, date_sha01:date_lga23) %>%
   rename("excel_date" = "value")
 
 date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, by = c("cohort", "exp")) %>%
-  mutate(start_date = as.Date(start)) %>% 
+  mutate(start_date = as.Date(start),
+         start_time = format(start, "%H:%M:%S") %>% chron::chron(times = .)) %>% 
   mutate(valid = case_when(
     grepl("SHOCK", exp) & experiment_duration > 58 & excel_date == start_date ~ "yes",
     grepl("SHA", exp) & experiment_duration > 115 & excel_date == start_date~ "yes",
@@ -448,7 +449,7 @@ sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% 
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
   left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time, experiment_duration) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) 
 
@@ -474,7 +475,7 @@ sha_rewards_new_valid <- sha_rewards_new %>%
 setDT(sha_rewards_new_valid)             # convert to data.table without copy
 sha_rewards_new_valid[setDT(sha_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
                         left_join(., date_time_subject_df_comp %>% 
-                                    select(labanimalid, cohort, exp, filename, start_date, start_time) %>% 
+                                    select(labanimalid, cohort, exp, filename, start_date, start_time, experiment_duration) %>% 
                                     rename("date" = "start_date", "time" = "start_time") %>% 
                                     mutate(time = as.character(time)), 
                                   by = c("cohort", "exp", "filename", "date", "time")) ), 
@@ -539,10 +540,15 @@ lga_rewards_new <- lapply(lga_new_files, read_rewards_new) %>% rbindlist() %>% s
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time), rewards = as.numeric(rewards)) %>%  
   left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time, experiment_duration) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) ## 6348 
-  
+
+
+## XX 06/10/2020 MIGHT NEED TO ADD BOX BC OF 
+# subset(labanimalid == "F516"&exp=="LGA16") ## YES, THIS AND F507 START AT THE SAME TIME 
+## SHOULD BE DISTINCT, BUT THIS MIGHT BE CAUSING THE ISSUE 
+
 ## XX  5/20 ADDED _valid TO lga_rewards_new
 lga_rewards_new_valid <- lga_rewards_new %>%  
   dplyr::filter(valid == "yes") %>% 
@@ -556,7 +562,7 @@ lga_rewards_new_valid %>% get_dupes(labanimalid, exp) %>% dim
 setDT(lga_rewards_new_valid)             # convert to data.table without copy
 lga_rewards_new_valid[setDT(lga_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
                         left_join(., date_time_subject_df_comp %>% 
-                                    select(labanimalid, cohort, exp, filename, start_date, start_time) %>% 
+                                    select(labanimalid, cohort, exp, filename, start_date, start_time, experiment_duration) %>% 
                                     rename("date" = "start_date", "time" = "start_time") %>% 
                                     mutate(time = as.character(time)), 
                                   by = c("cohort", "exp", "filename", "date", "time")) ), 
@@ -658,7 +664,7 @@ pr_rewards_new <- lapply(pr_new_files, readrewards_pr) %>% rbindlist() %>% separ
   ) %>% 
   left_join(., date_time_subject_df_comp %>% 
               mutate(start_time = format(ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
-              select(cohort, exp, filename, valid, start_date, start_time) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time, experiment_duration) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) ## 1041
 
