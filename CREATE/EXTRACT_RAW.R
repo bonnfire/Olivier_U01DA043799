@@ -264,13 +264,13 @@ date_time_subject <- data.frame(labanimalid = gsub(".*Subject: ", "", grep("Subj
                                 end_time = gsub(".*End Time: ", "", grep("End Time", read_date_time_subject, value = T)),
                                 filename = sub(".*/.*/.*/", '', grep("Subject", read_date_time_subject, value = T)) %>% gsub("-Subject.*", "", .),
                                 directory = str_match(grep("Subject", read_date_time_subject, value = T) %>% gsub("-Subject.*", "", .), "New_medassociates|Old") %>% unlist() %>% as.character()
-)
+) # 13548 
 
 date_time_subject_mut <- date_time_subject %>% 
   mutate_if(is.factor, as.character) %>% 
   mutate(start = lubridate::mdy_hms(paste0(format(as.Date(start_date, "%m/%d/%y"), "%m/%d/20%y"), start_time)),
          end = lubridate::mdy_hms(paste0(format(as.Date(end_date, "%m/%d/%y"), "%m/%d/20%y"), end_time))) %>% 
-  mutate(experiment_duration = difftime(end, start, units= "mins") %>% as.numeric) %>% 
+  mutate(exp_dur_min = difftime(end, start, units= "mins") %>% as.numeric) %>% 
   select(-matches("date|time")) %>% 
   mutate(labanimalid = replace(labanimalid, labanimalid == "M7678", "M768"),
          labanimalid = replace(labanimalid, labanimalid == "X", "F507"),
@@ -281,7 +281,7 @@ date_time_subject_mut <- date_time_subject %>%
 ## 3/4/2020 plotting the durations 
 date_time_subject_mut %>% 
   mutate(exp_abv = sub("^([[:alpha:]]*).*", "\\1", exp)) %>% 
-  ggplot(aes(x = experiment_duration, color = exp_abv)) + geom_density() + facet_grid( ~ cohort)
+  ggplot(aes(x = exp_dur_min, color = exp_abv)) + geom_density() + facet_grid( ~ cohort)
 
 
 ## problems in being too lax in accepting all forms of subjects 
@@ -326,10 +326,16 @@ date_time_subject_df <- date_time_subject_mut %>%
   arrange(cohort, start, as.numeric(box)) %>% 
   distinct() %>%  # needed bc otherwise subject0 will "double count" the "reference" rows
   mutate(exp = gsub("-.*", "", exp),
-         exp = replace(exp, as.numeric(str_extract(cohort, "\\d+")) > 6&grepl("SHOCK", exp), "SHOCK03")) # for all cohorts later than cohort 6, they only use one shock value, but we can change it to shock03 so that we can have uniformity 
+         exp = replace(exp, as.numeric(str_extract(cohort, "\\d+")) > 6&grepl("SHOCK", exp), "SHOCK03"),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename), NA)) # for all cohorts later than cohort 6, they only use one shock value, but we can change it to shock03 so that we can have uniformity 
 ## XX Note: remove all but SHOCK03 and Pre Shock - Olivier (from meeting 1/24)
 
-
+# fix these subjects because their labanimalids should not be this long
+date_time_subject_df %>% subset(!cohort %in% c("C10", "C11")&nchar(labanimalid)>4)
+date_time_subject_df <- date_time_subject_df %>% 
+  mutate(labanimalid = replace(labanimalid, labanimalid == "F8256", "F826"),
+         labanimalid = replace(labanimalid, labanimalid == "M5556", "M556"))
+  
 # waiting on their response for these cases (trying to assign labanimalid [MF]\\d{4,})
 ## date_time_subject_df %>% arrange(cohort, as.numeric(box)) %>% dplyr::filter(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )|lead(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T ))|lag(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )))
 ## OR  date_time_subject_df %>% dplyr::filter(grepl("[MF]\\d{4,}", labanimalid, perl = T ))
@@ -371,10 +377,10 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
   mutate(start_date = as.Date(start),
          start_time = format(start, "%H:%M:%S") %>% chron::chron(times = .)) %>% 
   mutate(valid = case_when(
-    grepl("SHOCK", exp) & experiment_duration > 58 & excel_date == start_date ~ "yes",
-    grepl("SHA", exp) & experiment_duration > 115 & excel_date == start_date~ "yes",
-    grepl("LGA", exp) & experiment_duration > 355 & excel_date == start_date~ "yes",
-    grepl("PR", exp) & experiment_duration > 60 & excel_date == start_date~ "yes"),
+    grepl("SHOCK", exp) & exp_dur_min > 58 & excel_date == start_date ~ "yes",
+    grepl("SHA", exp) & exp_dur_min > 115 & excel_date == start_date~ "yes",
+    grepl("LGA", exp) & exp_dur_min > 355 & excel_date == start_date~ "yes",
+    grepl("PR", exp) & exp_dur_min > 60 & excel_date == start_date~ "yes"),
     valid = replace(valid, is.na(valid), "no")
   ) # 9808 for cohorts C01-C09 (no C06) ## change the minimum times - Olivier (from 1/24 meeting)
 
@@ -449,7 +455,7 @@ sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% 
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
   left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, experiment_duration) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) 
 
@@ -475,7 +481,7 @@ sha_rewards_new_valid <- sha_rewards_new %>%
 setDT(sha_rewards_new_valid)             # convert to data.table without copy
 sha_rewards_new_valid[setDT(sha_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
                         left_join(., date_time_subject_df_comp %>% 
-                                    select(labanimalid, cohort, exp, filename, start_date, start_time, experiment_duration) %>% 
+                                    select(labanimalid, cohort, exp, filename, start_date, start_time, exp_dur_min) %>% 
                                     rename("date" = "start_date", "time" = "start_time") %>% 
                                     mutate(time = as.character(time)), 
                                   by = c("cohort", "exp", "filename", "date", "time")) ), 
@@ -540,7 +546,7 @@ lga_rewards_new <- lapply(lga_new_files, read_rewards_new) %>% rbindlist() %>% s
   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time), rewards = as.numeric(rewards)) %>%  
   left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, experiment_duration) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) ## 6348 
 
@@ -562,7 +568,7 @@ lga_rewards_new_valid %>% get_dupes(labanimalid, exp) %>% dim
 setDT(lga_rewards_new_valid)             # convert to data.table without copy
 lga_rewards_new_valid[setDT(lga_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
                         left_join(., date_time_subject_df_comp %>% 
-                                    select(labanimalid, cohort, exp, filename, start_date, start_time, experiment_duration) %>% 
+                                    select(labanimalid, cohort, exp, filename, start_date, start_time, exp_dur_min) %>% 
                                     rename("date" = "start_date", "time" = "start_time") %>% 
                                     mutate(time = as.character(time)), 
                                   by = c("cohort", "exp", "filename", "date", "time")) ), 
@@ -664,7 +670,7 @@ pr_rewards_new <- lapply(pr_new_files, readrewards_pr) %>% rbindlist() %>% separ
   ) %>% 
   left_join(., date_time_subject_df_comp %>% 
               mutate(start_time = format(ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, experiment_duration) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) ## 1041
 

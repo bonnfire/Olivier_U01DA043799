@@ -1,0 +1,75 @@
+---
+title: "Database Round Up"
+author: 'Palmer Lab: Bonnie Lin'
+output: pdf_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+# setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/QC")
+# olivier_cocaine_genotyping <- flowcell_df %>% left_join(., WFU_OlivierCocaine_test_df[, c("cohort", "rfid")], by = "rfid") %>% subset(!is.na(cohort)) ## add source, consider reorganization source("~/Palmer\ Lab/Bonnie\ Lin/github/PalmerLab_genotyping/CREATE/EXTRACT_SAMPLEBARCODELIBRARY.R") # should work... might not bc it doesn't have dropbox in path
+# save(WFU_OlivierCocaine_test_df, date_time_subject_df, rat_info_allcohort_xl_df, allcohorts2, olivier_spleens_df, olivier_cocaine_genotyping, file = "Olivier_cocaine_data.RData")
+load(file = "Olivier_cocaine_data.RData")
+```
+
+## For Olivier George
+
+Below, you will find the number of records that I have for your experiments, broken down by cohorts.
+
+
+### \# of IDs from Wake Forest shipment sheets
+
+```{r wfu-master, echo = F}
+WFU_OlivierCocaine_test_df %>% select(cohort) %>% table()
+```
+
+### \# of subjects in raw data
+
+These were extracted from the text files in *GWAS (1)/Cocaine/Cocaine GWAS*
+
+```{r raw-data, echo = F}
+date_time_subject_df %>% 
+  distinct(labanimalid, cohort) %>% 
+  select(cohort) %>% table()
+```
+
+### \# of subjects in excel data
+
+These were extracted from the Excel sheets in *Olivier_George_U01/DATA Updated*
+
+```{r xl-data, echo = F}
+allcohorts2 %>% 
+  mutate(cohort = paste0("C", as.character(parse_number(cohort)) %>% str_pad(2, "left", "0"))) %>% 
+  distinct(cohort, labanimalid) %>% select(cohort) %>% table()
+```
+
+### \# of subjects with weight data
+
+These were extracted from the Excel sheets in *Olivier_George_U01/Rat Information/Cocaine*
+
+```{r weights, echo = F}
+rat_info_allcohort_xl_df %>% distinct(cohort, rat) %>% 
+  select(cohort) %>% table()
+```
+
+### \# of IDs from tissue shipments
+
+Spleens
+```{r, echo = F}
+olivier_spleens_df %>% 
+  subset(experiment == "Cocaine") %>% 
+  select(cohort) %>% table()
+```
+
+
+### \# of subjects in genotyping pipeline
+
+This is the number of animals we are currently genotyping. 
+
+```{r genotyped, echo = F}
+olivier_cocaine_genotyping %>% distinct(rfid, cohort) %>% 
+  mutate(cohort = paste0("C", cohort)) %>% 
+  select(cohort) %>% table()
+```
