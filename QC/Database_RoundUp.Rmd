@@ -1,5 +1,5 @@
 ---
-title: "Database Round Up"
+title: "Database Round Up Cocaine"
 author: 'Palmer Lab: Bonnie Lin'
 output: pdf_document
 date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -56,13 +56,22 @@ rat_info_allcohort_xl_df %>% distinct(cohort, rat) %>%
 
 ### \# of IDs from tissue shipments
 
-Spleens
+Expected Spleens
 ```{r, echo = F}
 olivier_spleens_df %>% 
   subset(experiment == "Cocaine") %>% 
   select(cohort) %>% table()
 ```
 
+Extracted Spleens 
+```{r, echo = F}
+khai_tissueextraction_df %>%
+  left_join(olivier_spleens_df[, c("rfid", "experiment", "cohort")], by = "rfid") %>% 
+  rename("cohort_olivier" = "cohort_wfu") %>% 
+  left_join(WFU_OlivierCocaine_test_df[, c("rfid", "cohort")]) %>% 
+  subset(experiment == "Cocaine") %>% 
+  select(cohort) %>% table()
+```
 
 ### \# of subjects in genotyping pipeline
 
