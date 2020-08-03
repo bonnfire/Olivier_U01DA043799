@@ -326,6 +326,11 @@ computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>%
 
 
 
+## EXTRACT THE RAT WEIGHTS 
+
+
+
+
 
 rm(list=ls(pattern="irr")) # conditionally clean the environment
 rm(list = ls())

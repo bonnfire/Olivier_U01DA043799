@@ -154,6 +154,7 @@ Olivier_Cocaine_df <- WFU_OlivierCocaine_test_df %>%
   dplyr::filter(grepl("^\\d", rfid)) %>% #811 (ignore the blanks and annotations in the excel)
   left_join(., rat_info_allcohort_xl_df[, c("rat", "rfid")], by = "rfid") %>% # add labanimalid number ## 06/08 use rat_info_allcohort_xl_df rather than allcohorts2
   rename("labanimalid" = "rat") %>% 
+  mutate(labanimalid = gsub("HS", "", labanimalid)) %>%
   left_join(., ratinfo_list_deaths_processed %>% select(-c("naive", "datedropped")) %>% subset(grepl("surgery", reasoning, ignore.case = T)) %>% subset(!(rfid == "933000320047576"&reasoning=="Died, during surgery")), by = c("rfid", "cohort")) %>% # 811 # deaths/compromises before any experiments XX ASK TEAM AND FIX THE TWO RFID'S 
   left_join(., ratinfo_list_replacements_processed %>% subset(grepl("^RENUMBERED", comment, ignore.case = T)) %>% select(cohort, originalrat, replacement), by = c("tailmark"="originalrat", "cohort")) %>% # replacements, when the animal dies labanimalid changes XX WAITING FOR THEM TO CONFIRM MISSING RFID
   left_join(., ratinfo_list_replacements_processed %>% subset(grepl("Not Renumbered", comment, ignore.case = T)) %>% mutate(comment_replace = paste("Replacing", originalrat, "But", comment)) %>% select(cohort, rfidreplacement, comment_replace), by = c("rfid"="rfidreplacement", "cohort")) %>% 
@@ -215,6 +216,23 @@ ori F724 933000320046616, replaced with F737 (933000320046143)
   ungroup()
 
 Olivier_Cocaine_df %>% select(cohort, rfid, exp, rewards, datedropped, flag) %>% subset(!is.na(flag))
+
+
+
+## 08/03/2020
+genotyped_ids_1 <- read.csv("genotyped_cocaine_ids_n357.csv")
+genotyped_ids_1 <- genotyped_ids_1 %>% 
+  mutate_all(as.character) %>% 
+  select(-X) # change data type and remove row number column
+## WFU_OlivierCocaine_test_df %>% left_join(genotyped_ids_1, by = "rfid") %>% subset(!is.na(project_name)) %>% dim matches the number we expect = 357
+
+
+
+
+
+
+
+
 
 
 ##### 
