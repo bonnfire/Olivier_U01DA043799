@@ -148,7 +148,7 @@ rewards <- rbindlist(
 # add notes about missingness (file or dead)
 
 Olivier_Cocaine_df <- WFU_OlivierCocaine_test_df %>%
-  select(cohort, rfid, comment, dob) %>%
+  select(cohort, rfid, sex, comment, dob) %>%
   # rename("wfu_labanimalid" = "labanimalid") %>%
   mutate(cohort = paste0("C", cohort)) %>%
   dplyr::filter(grepl("^\\d", rfid)) %>% #811 (ignore the blanks and annotations in the excel)
@@ -178,7 +178,7 @@ Olivier_Cocaine_df <- WFU_OlivierCocaine_test_df %>%
   ) %>%
   ungroup() %>%
   mutate(exp_age = difftime(as.POSIXct(date), as.POSIXct(dob), units = "days") %>% as.numeric(.)) %>% 
-  select(cohort, rfid, labanimalid, exp, rewards, date, time, filename, tailmark, computernote_exp, computernote, everything())
+  select(cohort, rfid, labanimalid, sex, exp, rewards, date, time, filename, tailmark, computernote_exp, computernote, everything())
 
 ## exclude some columns that aren't needed
 Olivier_Cocaine_df_sql <- Olivier_Cocaine_df %>% 
@@ -226,10 +226,107 @@ genotyped_ids_1 <- genotyped_ids_1 %>%
   select(-X) # change data type and remove row number column
 ## WFU_OlivierCocaine_test_df %>% left_join(genotyped_ids_1, by = "rfid") %>% subset(!is.na(project_name)) %>% dim matches the number we expect = 357
 
+## Olivier_Cocaine_df %>% left_join(genotyped_ids_1, by = "rfid") %>% subset(!is.na(project_name)) %>% distinct(rfid) %>% dim 
+
+
+calc_sa_phenotype <- function(x){
+  Olivier_Cocaine_df %>% subset(cohort == x) %>% 
+    mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+    select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+    distinct() %>% 
+    spread(exp, rewards) %>%
+    select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR\\d+|SHA\\d+")) %>%
+    group_by(sex) %>% 
+    mutate(LGA01_mean = mean(LGA01, na.rm = T),
+           LGA01_sd = sd(LGA01, na.rm = T)) %>% 
+    mutate_at(vars(matches("LGA1[234]")), list(esc = ~.-LGA01_mean)) %>%
+    mutate_at(vars(ends_with("_esc")), ~./LGA01_sd) %>%
+    ungroup() %>% 
+    # rowwise() %>% 
+    mutate(ind_esc_mean = rowMeans(select(., matches("LGA1[234]_esc")), na.rm = TRUE)) %>% 
+    group_by(sex) %>% 
+    mutate(esc_mean = mean(ind_esc_mean, na.rm = T),
+           esc_sd = sd(LGA01, na.rm = T)) %>%  
+    ungroup() %>% 
+    mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
+    select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR\\d+|esc_index")) 
+}
+
+# cohort 1
+cohort1_sa_phenotype_df <- calc_sa_phenotype("C01") 
+cohort1_sa_phenotype_df %>% subset(is.na(labanimalid))
+# cohort1_sa_phenotype_df %<>% mutate(labanimalid = replace(labanimalid, rfid == "933000120124702", "F17")) # have a dead table, instead of fixing here
+cohort1_sa_phenotype_df <- cohort1_sa_phenotype_df[gtools::mixedorder(cohort1_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort1_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort1_sa_phenotype_df, file = "cohort1_sa_phenotype.csv", row.names = F)  
+
+# cohort 2
+cohort2_sa_phenotype_df <- calc_sa_phenotype("C02")
+cohort2_sa_phenotype_df %>% subset(is.na(labanimalid))
+cohort2_sa_phenotype_df <- cohort2_sa_phenotype_df[gtools::mixedorder(cohort2_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort2_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort2_sa_phenotype_df, file = "cohort2_sa_phenotype.csv", row.names = F)  
+
+# cohort 3
+cohort3_sa_phenotype_df <- calc_sa_phenotype("C03")
+cohort3_sa_phenotype_df %>% subset(is.na(labanimalid)|!grepl("^[MF]\\d+$", labanimalid))
+cohort3_sa_phenotype_df <- cohort3_sa_phenotype_df[gtools::mixedorder(cohort3_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort3_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort3_sa_phenotype_df, file = "cohort3_sa_phenotype.csv", row.names = F) 
+
+# cohort 4
+cohort4_sa_phenotype_df <- calc_sa_phenotype("C04")
+cohort4_sa_phenotype_df %>% subset(is.na(labanimalid)|!grepl("^[MF]\\d+$", labanimalid))
+cohort4_sa_phenotype_df <- cohort4_sa_phenotype_df[gtools::mixedorder(cohort4_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort4_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort4_sa_phenotype_df, file = "cohort4_sa_phenotype.csv", row.names = F) 
+
+# cohort 5
+cohort5_sa_phenotype_df <- calc_sa_phenotype("C05")
+cohort5_sa_phenotype_df %>% subset(is.na(labanimalid)|!grepl("^[MF]\\d+$", labanimalid))
+cohort5_sa_phenotype_df <- cohort5_sa_phenotype_df[gtools::mixedorder(cohort5_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort5_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort5_sa_phenotype_df, file = "cohort5_sa_phenotype.csv", row.names = F) 
+
+# cohort 6 # ABORTED
+cohort6_sa_phenotype_df <- calc_sa_phenotype("C06")
+cohort6_sa_phenotype_df %>% subset(is.na(labanimalid)|!grepl("^[MF]\\d+$", labanimalid))
+cohort6_sa_phenotype_df <- cohort6_sa_phenotype_df[gtools::mixedorder(cohort6_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort6_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort6_sa_phenotype_df, file = "cohort6_sa_phenotype.csv", row.names = F) 
+
+# cohort 7
+cohort7_sa_phenotype_df <- calc_sa_phenotype("C07")
+cohort7_sa_phenotype_df %>% subset(is.na(labanimalid)|!grepl("^[MF]\\d+$", labanimalid))
+cohort7_sa_phenotype_df <- cohort7_sa_phenotype_df[gtools::mixedorder(cohort7_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort7_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort7_sa_phenotype_df, file = "cohort7_sa_phenotype.csv", row.names = F) 
+
+# cohort 8
+cohort8_sa_phenotype_df <- calc_sa_phenotype("C08")
+cohort8_sa_phenotype_df %>% subset(is.na(labanimalid)|!grepl("^[MF]\\d+$", labanimalid))
+cohort8_sa_phenotype_df <- cohort8_sa_phenotype_df[gtools::mixedorder(cohort8_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort8_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort8_sa_phenotype_df, file = "cohort8_sa_phenotype.csv", row.names = F) 
 
 
 
-
+## Olivier_Cocaine_df doesn't have cohort 9 and on yet 
+# cohort 9
+cohort9_sa_phenotype_df <- calc_sa_phenotype("C09")
+cohort9_sa_phenotype_df %>% subset(is.na(labanimalid)|!grepl("^[MF]\\d+$", labanimalid))
+cohort9_sa_phenotype_df <- cohort9_sa_phenotype_df[gtools::mixedorder(cohort9_sa_phenotype_df$labanimalid),]
+# check for no duplicates
+cohort9_sa_phenotype_df %>% get_dupes(rfid)
+write.csv(cohort9_sa_phenotype_df, file = "cohort9_sa_phenotype.csv", row.names = F) 
 
 
 
