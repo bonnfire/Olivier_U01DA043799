@@ -326,10 +326,40 @@ computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>%
 
 
 
+
 ## EXTRACT THE RAT WEIGHTS 
+rats_allcohorts_weights <- rat_info_allcohort_xl_df %>% select(cohort, rat, rfid, d_o_b, matches("surgery_date$|weight")) %>% 
+                                                                 split(., rats_allcohorts_weights$cohort) %>% 
+                                                                 lapply(function(x){
+                                                                   df <- x %>% select_if(~sum(!is.na(.)) > 0) %>% 
+                                                                     mutate(surgery_date = openxlsx::convertToDate(surgery_date))
+                                                                   names(df) <- gsub("sugery", "surgery", names(df)) # fix the surgery name typo
+                                                                   names(df) <- gsub("d_o_b", "dob", names(df)) # fix the surgery name typo
+                                                                   
+                                                                   weights_dates <- gsub("weight_\\d+_", "", names(df)) %>% grep("\\d+_\\d+_\\d+", ., value = T) %>% t() %>% data.frame()
+                                                                   names(weights_dates) <- paste0("date_weight_", 1:length(weights_dates))
+                                                                   
+                                                                   names(df) <- gsub("(weight(_\\d+_surgery)?)_\\d+_\\d+_.*", "\\1", names(df))
+                                                                   names(df) <- gsub("weight_\\d+_surgery", "weight_surgery", names(df))
+                                                                   df <- df %>% clean_names
+                                                                   names(df) <- gsub("weight$", "weight_1", names(df))
+                                                                   
+                                                                   bound_df <- cbind(df, weights_dates)
+                                                                   bound_df <- bound_df %>% 
+                                                                     mutate_at(vars(matches("date")), ~gsub("_", "-",.)) %>%
+                                                                     mutate_at(vars(starts_with("date")), ~as.Date(., "%m-%d-%Y") %>% as.character) %>% 
+                                                                     mutate_all(as.character) %>% 
+                                                                     naniar::replace_with_na_all(~.x %in% c("n/a", "na", "NA"))
+                                                                   
+                                                                   return(bound_df)
+                                                                   
+                                                                 }) %>% rbindlist(fill = T, use.names = T)
+                                                               
+rats_allcohorts_weights %>% subset(is.na(surgery_date)&!is.na(weight_surgery)) %>% str
 
-
-
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
+# run this code once confirmed preshipment weights
+# write.csv(rats_allcohorts_weights, file = "rats_cohorts01_11_weights.csv")
 
 
 rm(list=ls(pattern="irr")) # conditionally clean the environment

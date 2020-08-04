@@ -252,6 +252,9 @@ calc_sa_phenotype <- function(x){
     select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR\\d+|esc_index")) 
 }
 
+
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
+
 # cohort 1
 cohort1_sa_phenotype_df <- calc_sa_phenotype("C01") 
 cohort1_sa_phenotype_df %>% subset(is.na(labanimalid))
