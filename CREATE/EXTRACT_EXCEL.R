@@ -329,7 +329,7 @@ computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>%
 
 ## EXTRACT THE RAT WEIGHTS 
 rats_allcohorts_weights <- rat_info_allcohort_xl_df %>% select(cohort, rat, rfid, d_o_b, matches("surgery_date$|weight")) %>% 
-                                                                 split(., rats_allcohorts_weights$cohort) %>% 
+                                                                 split(., .$cohort) %>% 
                                                                  lapply(function(x){
                                                                    df <- x %>% select_if(~sum(!is.na(.)) > 0) %>% 
                                                                      mutate(surgery_date = openxlsx::convertToDate(surgery_date))
@@ -349,17 +349,46 @@ rats_allcohorts_weights <- rat_info_allcohort_xl_df %>% select(cohort, rat, rfid
                                                                      mutate_at(vars(matches("date")), ~gsub("_", "-",.)) %>%
                                                                      mutate_at(vars(starts_with("date")), ~as.Date(., "%m-%d-%Y") %>% as.character) %>% 
                                                                      mutate_all(as.character) %>% 
-                                                                     naniar::replace_with_na_all(~.x %in% c("n/a", "na", "NA"))
-                                                                   
+                                                                     naniar::replace_with_na_all(~.x %in% c("n/a", "na", "NA"))  
+                                                                   # %>% 
+                                                                     # mutate_at(vars(matches("date|dob")), as.Date) %>% 
+                                                                     # mutate(age_surgery = difftime(surgery_date, dob, units = c("days")))
+                                                                   # %>% 
+                                                                     # mutate_at(vars(matches("date")), list(age = ~difftime(., dob, units = c("days"))))
+                                                                                                           # %>% as.numeric %>% as.character))
+
                                                                    return(bound_df)
                                                                    
-                                                                 }) %>% rbindlist(fill = T, use.names = T)
-                                                               
+                                                                 }) %>% rbindlist(fill = T, use.names = T)%>% 
+  mutate_at(vars(matches("date|dob")), as.Date) %>% 
+  mutate_at(vars(matches("date")), list(age = ~difftime(., dob, units = c("days")) %>% as.numeric)) %>% 
+  mutate_all(as.character)
+
+names(rats_allcohorts_weights) <- gsub("date_(.*_age$)", "\\1", names(rats_allcohorts_weights)) 
+names(rats_allcohorts_weights) <- gsub("surgery_date_age", "surgery_age", names(rats_allcohorts_weights)) 
+
+# quick qc before uploading
+# checking min and max 
+rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %>% 
+  summary
+
+rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %>% 
+  subset(weight_2 < 30)
+
+
+
 rats_allcohorts_weights %>% subset(is.na(surgery_date)&!is.na(weight_surgery)) %>% str
 
 setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
 # run this code once confirmed preshipment weights
 # write.csv(rats_allcohorts_weights, file = "rats_cohorts01_11_weights.csv")
+
+
+
+
+
+
+
 
 
 rm(list=ls(pattern="irr")) # conditionally clean the environment
