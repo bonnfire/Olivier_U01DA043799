@@ -651,7 +651,7 @@ lga_rewards_old <- lga_rewards_old %>% group_by(labanimalid, exp) %>%
 ################################
 
 ###### NEW FILES ##############
-pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*PR/", value = T) # 69 files
+pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*PR/", value = T) # 77 files
 # label data with...
 pr_subjects_new <- process_subjects_new(pr_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%
   arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #800
@@ -682,7 +682,7 @@ pr_rewards_new <- lapply(pr_new_files, readrewards_pr) %>% rbindlist() %>% separ
 pr_rewards_new_valid <- pr_rewards_new %>%  
   dplyr::filter(valid == "yes") %>% 
   mutate(time = as.character(time)) %>% 
-  distinct() # 603
+  distinct() # 603 ## look into why Cohorts 9-11 are being invalidated XX 08/03/2020
 
 # qc with...
 pr_rewards_new %>% count(labanimalid, exp, cohort) %>% subset(n!=1)
@@ -742,6 +742,101 @@ pr_rewards_old <- pr_rewards_old %>%
 
 
 
+
+################################
+########## SHOCK ###############
+################################
+
+###### NEW FILES ##############
+shock_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*SHOCK/", value = T) # 54 files
+# label data with...
+shock_subjects_new <- process_subjects_new(shock_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%
+  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #800
+# extract data with same function from `readrewards_pr` for pr
+shock_rewards_new <- lapply(shock_new_files, readrewards_pr) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+  bind_cols(shock_subjects_new) %>%
+  separate(
+    labanimalid,
+    into = c("labanimalid", "cohort", "exp", "filename", "date", "time"),
+    sep = "_"
+  ) %>% mutate(
+    date = lubridate::mdy(date),
+    time = chron::chron(times = time),
+    rewards = as.numeric(rewards)
+  ) %>% 
+  left_join(., date_time_subject_df_comp %>% 
+              mutate(start_time = format(lubridate::ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
+              rename("date" = "start_date", "time" = "start_time"), 
+            by = c("cohort", "exp", "filename", "date", "time")) ## 1474
+
+shock_rewards_new_valid <- shock_rewards_new %>%  
+  dplyr::filter(valid == "yes") %>% 
+  mutate(time = as.character(time)) %>% 
+  distinct() # 754 ## look into why Cohorts 5-11 are being invalidated XX 08/03/2020
+
+# qc with...
+shock_rewards_new %>% count(labanimalid, exp, cohort) %>% subset(n!=1)
+shock_rewards_new_valid %>% get_dupes(labanimalid, exp, cohort) 
+shock_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1)
+
+# deal with the missing subjects...
+# join and update "df" by reference, i.e. without copy 
+
+
+## XX 08/03/2020
+## add _valid
+setDT(pr_rewards_new_valid)             # convert to data.table without copy
+pr_rewards_new_valid[setDT(pr_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
+                             left_join(., date_time_subject_df_comp %>% 
+                                         dplyr::filter(grepl("PR", exp)) %>% 
+                                         mutate(time = as.character(start_time), 
+                                                date = as.character(start_date)), 
+                                       by = c("exp", "filename", "date", "time"), all.x = T)), 
+                     on = c("rewards", "exp", "filename", "date", "time"), labanimalid := labanimalid.y] # don't want to make another missing object
+setDF(pr_rewards_new_valid)
+pr_rewards_new_valid %<>% 
+  mutate_at(vars(rewards), as.numeric)
+# remove invalid point
+pr_rewards_new_valid %<>% dplyr::filter(!(labanimalid == "F717" & exp == "PR01" & time == "07:45:31"))
+pr_rewards_new_valid %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1) # dim of df is dim of distinct(df)
+pr_rewards_new_valid <- pr_rewards_new_valid %>% mutate(date = lubridate::ymd(date))
+
+###### OLD FILES ##############
+
+pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*PR/", value = T) # 62 files
+
+# label data with... 
+pr_subjects_old <- process_subjects_old(pr_old_files) ## quick qc pr_subjects_old %>% dplyr::filter(grepl("NA", labanimalid))
+pr_subjects_old %<>% mutate(filename = as.character(filename), 
+                            labanimalid = replace(labanimalid, filename=="./C04/Old/PR/K2C04HSPR02-20180522.txt"&row==4, "F423_1_C04_PR02_K2_20180522_invalid")) 
+
+# extract data...
+pr_rewards_old <- lapply(pr_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+  bind_cols(pr_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
+  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
+  mutate(date = lubridate::ymd(date),
+         rewards = rewards %>% as.numeric()) %>% 
+  dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
+
+# deal with the missing subjects...
+
+## case: deal with mislabelled subjects?
+pr_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
+# pr_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n) ## don't use this code bc this doesn't allow for any 0's 
+pr_rewards_old <- pr_rewards_old %>% 
+  mutate(labanimalid = replace(labanimalid, box == "2"&filename=="./C01/Old/PR/K3C01HSPR02-20170905.txt", "M21"), 
+         labanimalid = replace(labanimalid, box == "3"&filename=="./C01/Old/PR/K2C01HSPR01-20170814.txt", "M3")) %>% 
+  dplyr::filter(!(rewards == 0 & labanimalid == "M3" & filename == "./C01/Old/PR/K2C01HSPR01-20170814.txt")) %>% 
+  mutate(date = lubridate::ymd(date))
+# %>% 
+#   add_count(labanimalid, cohort,exp) %>% 
+#   subset(n != 1) 
+
+
+
+
+
 ###############################################################################################################################################
 ###############################################################################################################################################
 ###############################################################################################################################################
@@ -754,104 +849,104 @@ pr_rewards_old <- pr_rewards_old %>%
 ###############################################################################################################################################
 
 ## new code setup -- run by cohort
-
-setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
-# olivier_directory_names <- grep("C\\d+/.*/", list.dirs(), value = T)
-
-# make function for the entire cohort
-# if new directories, if old directories
-# and specify the exp
-read_exp_by_cohort <- function(x){
-  # read the new dir (sha)
-  # pattern = 
-  sha_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*C01.*New.*SHA", value = T) 
-  
-  # read the old dir (sha)
-  # pattern = 
-    
-}
-
-
-  
-  
-sha_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 254 files
-sha_subjects_new <- process_subjects_new(sha_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
-  arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
-read_rewards_new <- function(x){
-  rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print NR \"_\" $2}'"), header = F, fill = T)
-  rewards$filename <- x
-  return(rewards)
-}
-sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(sha_subjects_new) %>% 
-  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
-  mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
-  left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
-              rename("date" = "start_date", "time" = "start_time"), 
-            by = c("cohort", "exp", "filename", "date", "time")) 
-
-## reconsider since the data may not be updated from the date_time_subject_df_comp object
-sha_rewards_new_valid <- sha_rewards_new %>% 
-  dplyr::filter(valid == "yes") %>%
-  # dplyr::filter(valid == "yes"|is.na(valid)) %>% ## XX ALLOW INTO THE CODE ONCE WE HAVE THE EXCEL SHEETS FOR C10 AND C11
-  mutate(time = as.character(time)) %>%
-  dplyr::filter(!filename %in% c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")) %>% # update records several lines down from meeting to show other team's confirmation 
-  distinct() # fixes duplicates in filenames %in% c("MED1113C07HSSHA06", "MED1110C05HSSHA08", "MED1110C05HSSHA09") ### there are no dupes for dplyr::filter(!grepl("[MF]\\d+", labanimalid)) 
-
-## notes 
-## exclude files (from meeting)
-# c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")
-## exclude cases (from meeting )
-# c("F720") for SHA03 bc both files with her data seem incorrect (MED1112C07HSSHA03 and MED1112C07HSSHA03-2)
-# MED1113C07HSSHA07 is actually LGA data (code that validates the date is filtering out these cases, and in the file, sha07 data and pr data follows)
-
-# deal with the missing subjects...
-# join and update "df" by reference, i.e. without copy 
-
-## ADDED _valid 5/20 -- remove once unneeded 
-setDT(sha_rewards_new_valid)             # convert to data.table without copy
-sha_rewards_new_valid[setDT(sha_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
-                              left_join(., date_time_subject_df_comp %>% 
-                                          select(labanimalid, cohort, exp, filename, start_date, start_time, exp_dur_min) %>% 
-                                          rename("date" = "start_date", "time" = "start_time") %>% 
-                                          mutate(time = as.character(time)), 
-                                        by = c("cohort", "exp", "filename", "date", "time")) ), 
-                      on = c("rewards", "cohort", "exp", "filename", "date", "time", "valid"), labanimalid := labanimalid.y] # don't want to make another missing object
-setDF(sha_rewards_new_valid)
-sha_rewards_new_valid %<>% 
-  mutate_at(vars(rewards), as.numeric)
-## case: deal with mislabelled subject?
-sha_rewards_new_valid %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
-sha_rewards_new_valid %<>% mutate(labanimalid = replace(labanimalid, exp=="SHA01"&time=="09:24:16", "M768")) ## extracted as M7678 from file, but verified to have the same box (box 16)
-
-
-
-###### OLD FILES ##############
-# label data with... 
-sha_subjects_old <- process_subjects_old(sha_old_files)
-# extract data...
-sha_rewards_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(sha_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
-  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
-  mutate(date = lubridate::ymd(date),
-         rewards = rewards %>% as.numeric()) %>% 
-  dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
-
-# deal with the missing subjects...
-sha_rewards_old %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% dim
-# will remove these cases bc these files have 7 subjects and both misssing subjects have another "session" (matched box)
-sha_rewards_old %<>% dplyr::filter(grepl("[MF]", labanimalid)) 
-
-## case: deal with mislabelled subject?
-sha_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
-sha_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n)
-
-sha_rewards_old %>% get_dupes(labanimalid, cohort,exp)
-
-
-
-
+# 
+# setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+# # olivier_directory_names <- grep("C\\d+/.*/", list.dirs(), value = T)
+# 
+# # make function for the entire cohort
+# # if new directories, if old directories
+# # and specify the exp
+# read_exp_by_cohort <- function(x){
+#   # read the new dir (sha)
+#   # pattern = 
+#   sha_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*C01.*New.*SHA", value = T) 
+#   
+#   # read the old dir (sha)
+#   # pattern = 
+#     
+# }
+# 
+# 
+#   
+#   
+# sha_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 254 files
+# sha_subjects_new <- process_subjects_new(sha_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
+#   arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
+# read_rewards_new <- function(x){
+#   rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print NR \"_\" $2}'"), header = F, fill = T)
+#   rewards$filename <- x
+#   return(rewards)
+# }
+# sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+#   bind_cols(sha_subjects_new) %>% 
+#   separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
+#   mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
+#   left_join(., date_time_subject_df_comp %>% 
+#               select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
+#               rename("date" = "start_date", "time" = "start_time"), 
+#             by = c("cohort", "exp", "filename", "date", "time")) 
+# 
+# ## reconsider since the data may not be updated from the date_time_subject_df_comp object
+# sha_rewards_new_valid <- sha_rewards_new %>% 
+#   dplyr::filter(valid == "yes") %>%
+#   # dplyr::filter(valid == "yes"|is.na(valid)) %>% ## XX ALLOW INTO THE CODE ONCE WE HAVE THE EXCEL SHEETS FOR C10 AND C11
+#   mutate(time = as.character(time)) %>%
+#   dplyr::filter(!filename %in% c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")) %>% # update records several lines down from meeting to show other team's confirmation 
+#   distinct() # fixes duplicates in filenames %in% c("MED1113C07HSSHA06", "MED1110C05HSSHA08", "MED1110C05HSSHA09") ### there are no dupes for dplyr::filter(!grepl("[MF]\\d+", labanimalid)) 
+# 
+# ## notes 
+# ## exclude files (from meeting)
+# # c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")
+# ## exclude cases (from meeting )
+# # c("F720") for SHA03 bc both files with her data seem incorrect (MED1112C07HSSHA03 and MED1112C07HSSHA03-2)
+# # MED1113C07HSSHA07 is actually LGA data (code that validates the date is filtering out these cases, and in the file, sha07 data and pr data follows)
+# 
+# # deal with the missing subjects...
+# # join and update "df" by reference, i.e. without copy 
+# 
+# ## ADDED _valid 5/20 -- remove once unneeded 
+# setDT(sha_rewards_new_valid)             # convert to data.table without copy
+# sha_rewards_new_valid[setDT(sha_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
+#                               left_join(., date_time_subject_df_comp %>% 
+#                                           select(labanimalid, cohort, exp, filename, start_date, start_time, exp_dur_min) %>% 
+#                                           rename("date" = "start_date", "time" = "start_time") %>% 
+#                                           mutate(time = as.character(time)), 
+#                                         by = c("cohort", "exp", "filename", "date", "time")) ), 
+#                       on = c("rewards", "cohort", "exp", "filename", "date", "time", "valid"), labanimalid := labanimalid.y] # don't want to make another missing object
+# setDF(sha_rewards_new_valid)
+# sha_rewards_new_valid %<>% 
+#   mutate_at(vars(rewards), as.numeric)
+# ## case: deal with mislabelled subject?
+# sha_rewards_new_valid %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
+# sha_rewards_new_valid %<>% mutate(labanimalid = replace(labanimalid, exp=="SHA01"&time=="09:24:16", "M768")) ## extracted as M7678 from file, but verified to have the same box (box 16)
+# 
+# 
+# 
+# ###### OLD FILES ##############
+# # label data with... 
+# sha_subjects_old <- process_subjects_old(sha_old_files)
+# # extract data...
+# sha_rewards_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
+#   bind_cols(sha_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
+#   separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
+#   mutate(date = lubridate::ymd(date),
+#          rewards = rewards %>% as.numeric()) %>% 
+#   dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
+# 
+# # deal with the missing subjects...
+# sha_rewards_old %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% dim
+# # will remove these cases bc these files have 7 subjects and both misssing subjects have another "session" (matched box)
+# sha_rewards_old %<>% dplyr::filter(grepl("[MF]", labanimalid)) 
+# 
+# ## case: deal with mislabelled subject?
+# sha_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
+# sha_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n)
+# 
+# sha_rewards_old %>% get_dupes(labanimalid, cohort,exp)
+# 
+# 
+# 
+# 
 
 
 

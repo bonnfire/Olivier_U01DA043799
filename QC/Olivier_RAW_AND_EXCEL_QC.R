@@ -235,13 +235,17 @@ calc_sa_phenotype <- function(x){
     select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
     distinct() %>% 
     spread(exp, rewards) %>%
-    select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR\\d+|SHA\\d+")) %>%
+    select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+")) %>%
+    mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
     group_by(sex) %>% 
     mutate(LGA01_mean = mean(LGA01, na.rm = T),
-           LGA01_sd = sd(LGA01, na.rm = T)) %>% 
+           LGA01_sd = sd(LGA01, na.rm = T),
+           PR_max_mean = mean(PR_max, na.rm = T),
+           PR_max_sd = sd(PR_max, na.rm = T)) %>% 
+    ungroup() %>% 
     mutate_at(vars(matches("LGA1[234]")), list(esc = ~.-LGA01_mean)) %>%
     mutate_at(vars(ends_with("_esc")), ~./LGA01_sd) %>%
-    ungroup() %>% 
+    mutate(PR_index = (PR_max - PR_max_mean)/PR_max_sd) %>%
     # rowwise() %>% 
     mutate(ind_esc_mean = rowMeans(select(., matches("LGA1[234]_esc")), na.rm = TRUE)) %>% 
     group_by(sex) %>% 
@@ -249,7 +253,7 @@ calc_sa_phenotype <- function(x){
            esc_sd = sd(LGA01, na.rm = T)) %>%  
     ungroup() %>% 
     mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
-    select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR\\d+|esc_index")) 
+    select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR_index|esc_index")) 
 }
 
 
