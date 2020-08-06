@@ -247,15 +247,29 @@ olivierfiles <- function(filename){
   return(list)
 } 
 
+
+## Before 08/05/2020
 setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/DATA Updated")
 cohortfiles <- list.files(pattern = "*.xlsx")
-# cohort 6 is missing
+# cohort 6 is missing 
 for(i in 1:length(cohortfiles)){
   # if(i == 4) next 
   if(i > 5){
     assign(paste0("cohort", i + 1), olivierfiles(cohortfiles[i]))
   } else
     assign(paste0("cohort", i), olivierfiles(cohortfiles[i]))
+}
+
+## After 08/05/2020
+setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data")
+cohortfiles_sa_2 <- list.files(pattern = "*.xls[xm]")
+# cohort 6 is missing 
+for(i in 1:length(cohortfiles_sa_2)){
+  # if(i == 4) next 
+  if(i > 5){ # bc cohort 6 is skipped
+    assign(paste0("cohort_sa", i + 1), olivierfiles(cohortfiles[i]))
+  } else
+    assign(paste0("cohort_sa", i), olivierfiles(cohortfiles[i]))
 }
 
 ## XXXXXXXXXX go back to fix cohort8, the [[7]] bc of the formatting, it resuts in a find for  grep("^\\D", selfadmin_df$rfid, value = T)
@@ -373,7 +387,9 @@ rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %
   summary
 
 rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %>% 
-  subset(weight_2 < 30)
+  subset(weight_3 < 30)
+rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %>% 
+  subset(weight_1_age < 20)
 
 
 

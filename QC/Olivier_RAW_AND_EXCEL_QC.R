@@ -135,7 +135,9 @@ rewards <- rbindlist(
     "new_lga" = lga_rewards_new_valid,
     "old_lga" = lga_rewards_old,
     "new_pr" = pr_rewards_new_valid,
-    "old_pr" = pr_rewards_old
+    "old_pr" = pr_rewards_old,
+    "new_shocks" = shock_rewards_new_valid
+    
   ),
   idcol = "directory",
   fill = T
@@ -235,17 +237,20 @@ calc_sa_phenotype <- function(x){
     select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
     distinct() %>% 
     spread(exp, rewards) %>%
-    select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+")) %>%
+    select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
     mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
     group_by(sex) %>% 
     mutate(LGA01_mean = mean(LGA01, na.rm = T),
            LGA01_sd = sd(LGA01, na.rm = T),
            PR_max_mean = mean(PR_max, na.rm = T),
-           PR_max_sd = sd(PR_max, na.rm = T)) %>% 
+           PR_max_sd = sd(PR_max, na.rm = T),
+           SHOCK_mean = mean(SHOCK03, na.rm = T),
+           SHOCK_sd = sd(SHOCK03, na.rm = T)) %>% 
     ungroup() %>% 
     mutate_at(vars(matches("LGA1[234]")), list(esc = ~.-LGA01_mean)) %>%
     mutate_at(vars(ends_with("_esc")), ~./LGA01_sd) %>%
-    mutate(PR_index = (PR_max - PR_max_mean)/PR_max_sd) %>%
+    mutate(PR_index = (PR_max - PR_max_mean)/PR_max_sd,
+           SHOCK_index = (SHOCK03 - SHOCK_mean)/SHOCK_sd) %>%
     # rowwise() %>% 
     mutate(ind_esc_mean = rowMeans(select(., matches("LGA1[234]_esc")), na.rm = TRUE)) %>% 
     group_by(sex) %>% 
@@ -253,7 +258,8 @@ calc_sa_phenotype <- function(x){
            esc_sd = sd(LGA01, na.rm = T)) %>%  
     ungroup() %>% 
     mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
-    select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR_index|esc_index")) 
+    mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
+    select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR_index|esc_index|SHOCK_index|addiction_index")) 
 }
 
 
@@ -334,6 +340,43 @@ cohort9_sa_phenotype_df <- cohort9_sa_phenotype_df[gtools::mixedorder(cohort9_sa
 # check for no duplicates
 cohort9_sa_phenotype_df %>% get_dupes(rfid)
 write.csv(cohort9_sa_phenotype_df, file = "cohort9_sa_phenotype.csv", row.names = F) 
+
+
+
+
+
+
+
+## 08/05/2020 use this to plot all cohorts
+Olivier_Cocaine_C01_09 <-  Olivier_Cocaine_df %>% 
+  mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+  distinct() %>% 
+  spread(exp, rewards) %>%
+  select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
+  mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
+  group_by(cohort, sex) %>% 
+  mutate(LGA01_mean = mean(LGA01, na.rm = T),
+         LGA01_sd = sd(LGA01, na.rm = T),
+         PR_max_mean = mean(PR_max, na.rm = T),
+         PR_max_sd = sd(PR_max, na.rm = T),
+         SHOCK_mean = mean(SHOCK03, na.rm = T),
+         SHOCK_sd = sd(SHOCK03, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("LGA1[234]")), list(esc = ~.-LGA01_mean)) %>%
+  mutate_at(vars(ends_with("_esc")), ~./LGA01_sd) %>%
+  mutate(PR_index = (PR_max - PR_max_mean)/PR_max_sd,
+         SHOCK_index = (SHOCK03 - SHOCK_mean)/SHOCK_sd) %>%
+  # rowwise() %>% 
+  mutate(ind_esc_mean = rowMeans(select(., matches("LGA1[234]_esc")), na.rm = TRUE)) %>% 
+  group_by(cohort, sex) %>% 
+  mutate(esc_mean = mean(ind_esc_mean, na.rm = T),
+         esc_sd = sd(LGA01, na.rm = T)) %>%  
+  ungroup() %>% 
+  mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
+  mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
+  select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR_index|esc_index|SHOCK_index|addiction_index")) 
+
 
 
 

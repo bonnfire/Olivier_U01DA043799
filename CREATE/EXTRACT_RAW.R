@@ -751,19 +751,22 @@ pr_rewards_old <- pr_rewards_old %>%
 shock_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*SHOCK/", value = T) # 54 files
 # label data with...
 shock_subjects_new <- process_subjects_new(shock_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%
-  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #800
+  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #1474
 # extract data with same function from `readrewards_pr` for pr
 shock_rewards_new <- lapply(shock_new_files, readrewards_pr) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
   bind_cols(shock_subjects_new) %>%
   separate(
     labanimalid,
-    into = c("labanimalid", "cohort", "exp", "filename", "date", "time"),
+    into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"),
     sep = "_"
   ) %>% mutate(
     date = lubridate::mdy(date),
     time = chron::chron(times = time),
     rewards = as.numeric(rewards)
-  ) %>% 
+  ) %>%
+  mutate(exp = replace(exp, exp == "SHOCK01-2" & cohort=="C03", "SHOCK01"), # clean up the exp name shocks 
+    exp = replace(exp, parse_number(cohort) > 6 & !grepl("PRE", exp), "SHOCK03"),
+    exp = replace(exp, parse_number(cohort) > 6 & grepl("PRE", exp), "PRESHOCK")) %>% # if after cohort 6, change to shock03 
   left_join(., date_time_subject_df_comp %>% 
               mutate(start_time = format(lubridate::ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
               select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
@@ -773,7 +776,7 @@ shock_rewards_new <- lapply(shock_new_files, readrewards_pr) %>% rbindlist() %>%
 shock_rewards_new_valid <- shock_rewards_new %>%  
   dplyr::filter(valid == "yes") %>% 
   mutate(time = as.character(time)) %>% 
-  distinct() # 754 ## look into why Cohorts 5-11 are being invalidated XX 08/03/2020
+  distinct() # 904 ## includes C01-C08 XX 08/05/2020, needs to update the date_time_comp cohort object to be more than 8 cohorts 
 
 # qc with...
 shock_rewards_new %>% count(labanimalid, exp, cohort) %>% subset(n!=1)
@@ -783,58 +786,25 @@ shock_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% sub
 # deal with the missing subjects...
 # join and update "df" by reference, i.e. without copy 
 
-
-## XX 08/03/2020
 ## add _valid
-setDT(pr_rewards_new_valid)             # convert to data.table without copy
-pr_rewards_new_valid[setDT(pr_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
+setDT(shock_rewards_new_valid)             # convert to data.table without copy
+shock_rewards_new_valid[setDT(shock_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
                              left_join(., date_time_subject_df_comp %>% 
                                          dplyr::filter(grepl("PR", exp)) %>% 
                                          mutate(time = as.character(start_time), 
                                                 date = as.character(start_date)), 
                                        by = c("exp", "filename", "date", "time"), all.x = T)), 
                      on = c("rewards", "exp", "filename", "date", "time"), labanimalid := labanimalid.y] # don't want to make another missing object
-setDF(pr_rewards_new_valid)
-pr_rewards_new_valid %<>% 
+setDF(shock_rewards_new_valid)
+shock_rewards_new_valid %<>% 
   mutate_at(vars(rewards), as.numeric)
 # remove invalid point
-pr_rewards_new_valid %<>% dplyr::filter(!(labanimalid == "F717" & exp == "PR01" & time == "07:45:31"))
-pr_rewards_new_valid %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1) # dim of df is dim of distinct(df)
-pr_rewards_new_valid <- pr_rewards_new_valid %>% mutate(date = lubridate::ymd(date))
+shock_rewards_new_valid %<>% dplyr::filter(!(labanimalid == "F717" & exp == "PR01" & time == "07:45:31"))
+shock_rewards_new_valid %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1) # dim of df is dim of distinct(df)
+shock_rewards_new_valid <- shock_rewards_new_valid %>% mutate(date = lubridate::ymd(date))
 
 ###### OLD FILES ##############
-
-pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*PR/", value = T) # 62 files
-
-# label data with... 
-pr_subjects_old <- process_subjects_old(pr_old_files) ## quick qc pr_subjects_old %>% dplyr::filter(grepl("NA", labanimalid))
-pr_subjects_old %<>% mutate(filename = as.character(filename), 
-                            labanimalid = replace(labanimalid, filename=="./C04/Old/PR/K2C04HSPR02-20180522.txt"&row==4, "F423_1_C04_PR02_K2_20180522_invalid")) 
-
-# extract data...
-pr_rewards_old <- lapply(pr_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(pr_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
-  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
-  mutate(date = lubridate::ymd(date),
-         rewards = rewards %>% as.numeric()) %>% 
-  dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
-
-# deal with the missing subjects...
-
-## case: deal with mislabelled subjects?
-pr_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
-# pr_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n) ## don't use this code bc this doesn't allow for any 0's 
-pr_rewards_old <- pr_rewards_old %>% 
-  mutate(labanimalid = replace(labanimalid, box == "2"&filename=="./C01/Old/PR/K3C01HSPR02-20170905.txt", "M21"), 
-         labanimalid = replace(labanimalid, box == "3"&filename=="./C01/Old/PR/K2C01HSPR01-20170814.txt", "M3")) %>% 
-  dplyr::filter(!(rewards == 0 & labanimalid == "M3" & filename == "./C01/Old/PR/K2C01HSPR01-20170814.txt")) %>% 
-  mutate(date = lubridate::ymd(date))
-# %>% 
-#   add_count(labanimalid, cohort,exp) %>% 
-#   subset(n != 1) 
-
-
-
+## no old files for SHOCK
 
 
 ###############################################################################################################################################
