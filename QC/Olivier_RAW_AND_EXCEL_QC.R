@@ -350,10 +350,10 @@ write.csv(cohort9_sa_phenotype_df, file = "cohort9_sa_phenotype.csv", row.names 
 ## 08/05/2020 use this to plot all cohorts
 Olivier_Cocaine_C01_09 <-  Olivier_Cocaine_df %>% 
   mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
-  select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+  select(cohort, rfid, labanimalid, sex, box, exp, rewards) %>% 
   distinct() %>% 
   spread(exp, rewards) %>%
-  select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
+  select(matches("cohort|rfid|labanimalid|sex|box|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
   mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
   group_by(cohort, sex) %>% 
   mutate(LGA01_mean = mean(LGA01, na.rm = T),
@@ -375,7 +375,7 @@ Olivier_Cocaine_C01_09 <-  Olivier_Cocaine_df %>%
   ungroup() %>% 
   mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
   mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
-  select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR_index|esc_index|SHOCK_index|addiction_index")) 
+  select(matches("cohort|rfid|labanimalid|sex|box|SHA\\d+|PR_index|esc_index|SHOCK_index|addiction_index")) 
 
 
 

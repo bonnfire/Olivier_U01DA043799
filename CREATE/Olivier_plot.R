@@ -143,3 +143,28 @@ Olivier_Cocaine_C01_09 %>% subset(!grepl("C0[69]|1[012]", cohort)) %>%
   geom_point(aes(color = sex)) +
   geom_line(aes(color = sex, group = sex)) +
   facet_grid(rows = "cohort")
+
+
+
+
+pdf("olivier_raw_selfadmin_bybox.pdf",onefile = T)
+
+plot_list = list()
+
+selfadminmeasures <- grep(pattern = "^(?!rfid|box|labanimalid|sex)", names(Olivier_Cocaine_C01_09), perl = T, value = T)
+for (i in seq_along(selfadminmeasures)){
+  
+  plot_list[[i]] <- Olivier_Cocaine_C01_09 %>% subset(!grepl("C0[69]|1[012]", box)) %>% # subset because the data are not loaded yet 
+    ggplot(aes(x = box)) + 
+    geom_boxplot(aes_string(y = selfadminmeasures[i]))
+  plot_list2[[i]] <- Olivier_Cocaine_C01_09 %>% subset(!grepl("C0[69]|1[012]", box)) %>% 
+    ggplot(aes(color = box)) + 
+    geom_density(aes_string(selfadminmeasures[i])) 
+  
+  print(plot_list[[i]])
+  print(plot_list2[[i]])
+  
+}
+
+
+dev.off()
