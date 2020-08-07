@@ -259,7 +259,9 @@ calc_sa_phenotype <- function(x){
     ungroup() %>% 
     mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
     mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
-    select(matches("cohort|rfid|labanimalid|sex|SHA\\d+|PR_index|esc_index|SHOCK_index|addiction_index")) 
+    mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F),
+           SHA_daysto5 = ) %>% 
+    select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) 
 }
 
 
