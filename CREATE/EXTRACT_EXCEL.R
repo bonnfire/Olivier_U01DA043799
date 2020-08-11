@@ -342,21 +342,29 @@ computernotes_coc <- u01.importxlsx("computer notes.xlsx")[[1]] %>%
 
 
 ## EXTRACT THE RAT WEIGHTS 
-rats_allcohorts_weights <- rat_info_allcohort_xl_df %>% select(cohort, rat, rfid, d_o_b, matches("surgery_date$|weight")) %>% 
+# remove the weights associated before the shipping dates 
+rats_allcohorts_weights <- rat_info_allcohort_xl_df %>% select(cohort, rat, rfid, d_o_b, matches("arrival_date$|surgery_date$|weight")) %>% 
                                                                  split(., .$cohort) %>% 
                                                                  lapply(function(x){
                                                                    df <- x %>% select_if(~sum(!is.na(.)) > 0) %>% 
-                                                                     mutate(surgery_date = openxlsx::convertToDate(surgery_date))
+                                                                     mutate(surgery_date = openxlsx::convertToDate(surgery_date)) %>% 
+                                                                            # ,
+                                                                            # arrival_date = as.Date(arrival_date)) %>% 
+                                                                     select(-matches("pre_shipment")) ## remove if varname explicitly includes the preshipment label
                                                                    names(df) <- gsub("sugery", "surgery", names(df)) # fix the surgery name typo
                                                                    names(df) <- gsub("d_o_b", "dob", names(df)) # fix the surgery name typo
                                                                    
+                                                                   # separate the dates from the variable names 
                                                                    weights_dates <- gsub("weight_\\d+_", "", names(df)) %>% grep("\\d+_\\d+_\\d+", ., value = T) %>% t() %>% data.frame()
-                                                                   names(weights_dates) <- paste0("date_weight_", 1:length(weights_dates))
+                                                                   names(weights_dates) <- paste0("dateweight_", 1:length(weights_dates))
                                                                    
-                                                                   names(df) <- gsub("(weight(_\\d+_surgery)?)_\\d+_\\d+_.*", "\\1", names(df))
-                                                                   names(df) <- gsub("weight_\\d+_surgery", "weight_surgery", names(df))
-                                                                   df <- df %>% clean_names
-                                                                   names(df) <- gsub("weight$", "weight_1", names(df))
+                                                                   
+                                                                   # make the variable names contain only numbers
+                                                                   names(df) <- gsub("(weight(_\\d+_surgery)?)_\\d+_\\d+_.*", "\\1", names(df)) # leave only weight and weight_surgery as varnames 
+                                                                   names(df) <- gsub("weight_\\d+_surgery", "surgery_weight", names(df))
+                                                                   # names(df) <- gsub("weight_\\d+_surgery", "weight_surgery", names(df))
+                                                                   df <- df %>% clean_names # append numbers after weight
+                                                                   names(df) <- gsub("^weight$", "weight_1", names(df))
                                                                    
                                                                    bound_df <- cbind(df, weights_dates)
                                                                    bound_df <- bound_df %>% 
@@ -375,8 +383,13 @@ rats_allcohorts_weights <- rat_info_allcohort_xl_df %>% select(cohort, rat, rfid
                                                                    
                                                                  }) %>% rbindlist(fill = T, use.names = T)%>% 
   mutate_at(vars(matches("date|dob")), as.Date) %>% 
-  mutate_at(vars(matches("date")), list(age = ~difftime(., dob, units = c("days")) %>% as.numeric)) %>% 
+  
+# %>% 
+  # mutate_at(vars(matches("date")), list(age = ~difftime(., dob, units = c("days")) %>% as.numeric)) %>% 
   mutate_all(as.character)
+# %>% 
+#   mutate(weight_3 = replace(weight_3, rfid == "933000320045777", "180"),
+#          ) %>% ## confirmed with Brent 08/05/2020
 
 names(rats_allcohorts_weights) <- gsub("date_(.*_age$)", "\\1", names(rats_allcohorts_weights)) 
 names(rats_allcohorts_weights) <- gsub("surgery_date_age", "surgery_age", names(rats_allcohorts_weights)) 
@@ -384,6 +397,8 @@ names(rats_allcohorts_weights) <- gsub("surgery_date_age", "surgery_age", names(
 # quick qc before uploading
 # checking min and max 
 rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %>% 
+  summary
+rats_allcohorts_weights %>% mutate_at(vars(ends_with("age")), as.numeric) %>% 
   summary
 
 rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %>% 
@@ -394,6 +409,20 @@ rats_allcohorts_weights %>% mutate_at(vars(starts_with("weight")), as.numeric) %
 
 
 rats_allcohorts_weights %>% subset(is.na(surgery_date)&!is.na(weight_surgery)) %>% str
+
+
+
+
+# trying to get rid of the preshipment weights 
+rats_allcohorts_weights_long <- rats_allcohorts_weights %>% 
+  gather(key = "datename", value = "date", starts_with("date")) %>% 
+  subset(!is.na(date)) %>% 
+  gather("weightname", "weight", starts_with("weight")) %>% 
+  mutate(datename = gsub('[^0-9]', "", datename), weightname = gsub('[^0-9]', "", weightname)) %>% 
+  dplyr::filter(datename == weightname) %>%  select(-ends_with("name")) %>% arrange(rat)
+
+## fix dateweight_1 and no arrival date info
+
 
 setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
 # run this code once confirmed preshipment weights

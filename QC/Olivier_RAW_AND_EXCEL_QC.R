@@ -232,7 +232,7 @@ genotyped_ids_1 <- genotyped_ids_1 %>%
 
 
 calc_sa_phenotype <- function(x){
-  Olivier_Cocaine_df %>% subset(cohort == x) %>% 
+  x <- Olivier_Cocaine_df %>% subset(cohort == x) %>% 
     mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
     select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
     distinct() %>% 
@@ -259,9 +259,22 @@ calc_sa_phenotype <- function(x){
     ungroup() %>% 
     mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
     mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
-    mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F),
-           SHA_daysto5 = ) %>% 
+    mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F)) %>% 
     select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) 
+  
+  # "How long does it take the animal to hit 5 rewards in SHA?"
+  y <- Olivier_Cocaine_df %>% subset(cohort == "C01") %>% 
+    mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+    select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+    distinct() %>% 
+    subset(grepl("SHA", exp)) %>% 
+    group_by(rfid) %>% 
+    mutate(SHA_daysto5 = cumsum(case_when(rewards >= 5 ~ 1, TRUE ~ 0))) %>% 
+    dplyr::filter(rewards >= 5|SHA_daysto5 == 0) %>% slice(1) %>% 
+    ungroup() %>% 
+    select(SHA_daysto5)
+    
+  final_phenotypes <- cbind(x, y)
 }
 
 
@@ -352,12 +365,12 @@ write.csv(cohort9_sa_phenotype_df, file = "cohort9_sa_phenotype.csv", row.names 
 ## 08/05/2020 use this to plot all cohorts
 Olivier_Cocaine_C01_09 <-  Olivier_Cocaine_df %>% 
   mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
-  select(cohort, rfid, labanimalid, sex, box, exp, rewards) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
   distinct() %>% 
   spread(exp, rewards) %>%
-  select(matches("cohort|rfid|labanimalid|sex|box|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
+  select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
   mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
-  group_by(cohort, sex) %>% 
+  group_by(sex) %>% 
   mutate(LGA01_mean = mean(LGA01, na.rm = T),
          LGA01_sd = sd(LGA01, na.rm = T),
          PR_max_mean = mean(PR_max, na.rm = T),
@@ -371,13 +384,80 @@ Olivier_Cocaine_C01_09 <-  Olivier_Cocaine_df %>%
          SHOCK_index = (SHOCK03 - SHOCK_mean)/SHOCK_sd) %>%
   # rowwise() %>% 
   mutate(ind_esc_mean = rowMeans(select(., matches("LGA1[234]_esc")), na.rm = TRUE)) %>% 
-  group_by(cohort, sex) %>% 
+  group_by(sex) %>% 
   mutate(esc_mean = mean(ind_esc_mean, na.rm = T),
          esc_sd = sd(LGA01, na.rm = T)) %>%  
   ungroup() %>% 
   mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
   mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
-  select(matches("cohort|rfid|labanimalid|sex|box|SHA\\d+|PR_index|esc_index|SHOCK_index|addiction_index")) 
+  mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F)) %>% 
+  select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) %>% 
+  left_join(Olivier_Cocaine_df %>% # "How long does it take the animal to hit 5 rewards in SHA?"
+      mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+      select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+      distinct() %>% 
+      subset(grepl("SHA", exp)) %>% 
+      group_by(rfid) %>% 
+      mutate(SHA_daysto5 = cumsum(case_when(rewards >= 5 ~ 1, TRUE ~ 0))) %>% 
+      dplyr::filter(rewards >= 5|SHA_daysto5 == 0) %>% slice(1) %>% 
+      ungroup() %>% 
+      select(rfid, SHA_daysto5), by = "rfid") %>%  # left_join instead of cbind, bc cbind has cohort12, from wfu but no data
+  clean_names()
+
+## troubleshoot cohort 4
+Olivier_Cocaine_df %>% 
+  subset(cohort == "C04") %>% 
+  mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+  distinct() %>% 
+  spread(exp, rewards) %>%
+  select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])")) %>%
+  group_by(sex) %>% 
+  mutate(LGA01_mean = mean(LGA01, na.rm = T),
+         LGA01_sd = sd(LGA01, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("LGA1[234]")), list(esc = ~.-LGA01_mean)) %>%
+  mutate_at(vars(ends_with("_esc")), ~./LGA01_sd) %>%
+  mutate(PR_index = (PR_max - PR_max_mean)/PR_max_sd,
+         SHOCK_index = (SHOCK03 - SHOCK_mean)/SHOCK_sd) %>%
+  # rowwise() %>% 
+  mutate(ind_esc_mean = rowMeans(select(., matches("LGA1[234]_esc")), na.rm = TRUE)) %>% 
+  group_by(sex) %>% 
+  mutate(esc_mean = mean(ind_esc_mean, na.rm = T),
+         esc_sd = sd(LGA01, na.rm = T)) %>%  
+  ungroup() %>% 
+  mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
+  mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
+  mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F)) %>% 
+  select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index"))
+
+
+## Extract the Excel data for the indices
+# 08/07/2020
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+
+Olivier_phenotype_xl <- openxlsx::read.xlsx("Cocaine_GWAS_ADDIND.xlsx") %>% 
+  clean_names() %>% 
+  select_if(~sum(!is.na(.)) > 0) %>% 
+  select(-matches("x\\d+$")) %>%  # manually removing, after looking at column contents on 08/07/2020
+  rename("labanimalid" = "rat")
+
+Olivier_Cocaine_C01_09 %>% 
+  left_join(Olivier_phenotype_xl %>% 
+              select(-cohort), by = "rfid") %>% 
+  subset(!is.na(labanimalid.y)) %>% 
+  subset(cohort == "C03")
+
+Olivier_Cocaine_C01_09 %>% 
+  left_join(Olivier_phenotype_xl %>% 
+              select(-cohort), by = "rfid") %>% 
+  subset(cohort == "C04")
+
+
+
+
+
+
 
 
 
