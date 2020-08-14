@@ -94,7 +94,7 @@ read_fread_new <- function(x, varname){
   rawdata <- fread(paste0(statement, "'", x, "'"), fill = T)
   data_indices <- grep("^0:$", rawdata$V1)
   split_data <- split(rawdata, cumsum(1:nrow(rawdata) %in% data_indices))
-
+  
   keepzeroes <- c("leftresponses", "rightresponses", "rewards") # preserve bin sequences
   
   if(varname %in% keepzeroes){
@@ -118,15 +118,23 @@ read_fread_new <- function(x, varname){
       else{
         processeddata_df %<>% 
           mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% 
-          dplyr::filter(timestamps != 0)
+          dplyr::filter(timestamps != 0) 
       }
+      
+      processeddata_df <- processeddata_df %>%
+        mutate(intertrial_time = lead(timestamps) - timestamps,
+               bin = as.character(bin))
+      
       return(processeddata_df)
     }) 
   }
   
-
+  
   return(processeddata)
 }
+
+## 08/12/2020
+lapply(sha_new_files[1:2], read_fread_new, "rewardstimestamps")
 
 ## 08/02/2020
 # sha_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*C01.*New.*SHA", value = T) 
@@ -228,6 +236,9 @@ convert_iri_matrix_to_df <- function(x){
              iritime = iritime/100)
   }
   
+  x <- x %>% 
+    mutate(iritime = as.numeric(iritime),
+           iritime = iritime/100)
   timer = x$iritime[1]
   
   for(i in 1:nrow(x)){
@@ -235,7 +246,7 @@ convert_iri_matrix_to_df <- function(x){
     if(x$iricode[i] %in% c(1,4)){
       x$activeTS[i] = timer
     } else x$activeTS[i] = NA 
-      
+    
     if(x$iricode[i] %in% c(3,5)){
       x$inactiveTS[i] = timer
     } else x$inactiveTS[i] = NA 
@@ -246,9 +257,14 @@ convert_iri_matrix_to_df <- function(x){
     } else x$rewardTS[i] = NA 
     
   }
+  return(x)
+}
   
-  return(x)}
-  
+
+
+## 08/12/2020
+lapply(sha_old_files[1], read_iri_old) %>% lapply(convert_iri_matrix_to_df)
+
 # FOR ~NEW~ DIRECTORIES
 # NON EXPERIMENT SPECIFIC 
 
@@ -525,7 +541,7 @@ sha_rewards_old %>% get_dupes(labanimalid, cohort,exp)
 
 
 
-
+###### INTERTRIAL TIME ##############
 
 
 

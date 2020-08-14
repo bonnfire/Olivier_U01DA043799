@@ -168,3 +168,53 @@ for (i in seq_along(selfadminmeasures)){
 
 
 dev.off()
+
+
+### PLOTTING EXCEL INDICES
+
+
+pdf("olivier_xl_selfadmin.pdf",onefile = T)
+
+plot_list = list()
+
+selfadminmeasures <- grep(pattern = "^(?!rfid|cohort|labanimalid|sex)", names(cocaine_gwas_xl_df), perl = T, value = T)
+for (i in seq_along(selfadminmeasures)){
+  
+  plot_list[[i]] <- cocaine_gwas_xl_df %>% subset(!grepl("C0[69]|1[012]", cohort)) %>% # subset because the data are not loaded yet 
+    ggplot(aes(x = cohort)) + 
+    geom_boxplot(aes_string(y = selfadminmeasures[i]))
+  plot_list2[[i]] <- cocaine_gwas_xl_df %>% subset(!grepl("C0[69]|1[012]", cohort)) %>% 
+    ggplot(aes(color = cohort)) + 
+    geom_density(aes_string(selfadminmeasures[i])) 
+  
+  print(plot_list[[i]])
+  print(plot_list2[[i]])
+  
+}
+
+
+dev.off()
+
+
+
+pdf("olivier_xl_selfadmin.pdf",onefile = T)
+
+plot_list = list()
+
+selfadminmeasures <- grep(pattern = "^(?!rfid|cohort|labanimalid|sex)", names(cocaine_gwas_xl_df), perl = T, value = T)
+for (i in seq_along(selfadminmeasures)){
+  
+  plot_list[[i]] <- cocaine_gwas_xl_df %>% subset(!grepl("C0[69]|1[012]", cohort)) %>% # subset because the data are not loaded yet 
+    ggplot(aes(x = cohort)) + 
+    geom_boxplot(aes_string(y = selfadminmeasures[i]))
+  plot_list2[[i]] <- cocaine_gwas_xl_df %>% subset(!grepl("C0[69]|1[012]", cohort)) %>% 
+    ggplot(aes(color = cohort)) + 
+    geom_density(aes_string(selfadminmeasures[i])) 
+  
+  print(plot_list[[i]])
+  print(plot_list2[[i]])
+  
+}
+
+
+dev.off()

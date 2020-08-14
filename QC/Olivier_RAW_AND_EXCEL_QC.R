@@ -237,7 +237,8 @@ calc_sa_phenotype <- function(x){
     select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
     distinct() %>% 
     spread(exp, rewards) %>%
-    select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
+    select(matches("cohort|rfid|labanimalid|sex|LGA|PR0[23]|SHA\\d+|SHOCK03")) %>%
+    # select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
     mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
     group_by(sex) %>% 
     mutate(LGA01_mean = mean(LGA01, na.rm = T),
@@ -259,8 +260,9 @@ calc_sa_phenotype <- function(x){
     ungroup() %>% 
     mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
     mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
-    mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F)) %>% 
-    select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) 
+    mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F)) 
+  # %>% 
+    # select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) 
   
   # "How long does it take the animal to hit 5 rewards in SHA?"
   y <- Olivier_Cocaine_df %>% subset(cohort == "C01") %>% 
@@ -365,10 +367,10 @@ write.csv(cohort9_sa_phenotype_df, file = "cohort9_sa_phenotype.csv", row.names 
 ## 08/05/2020 use this to plot all cohorts
 Olivier_Cocaine_C01_09 <-  Olivier_Cocaine_df %>% 
   mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
-  select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+  select(cohort, rfid, labanimalid, sex, box, exp, rewards) %>% 
   distinct() %>% 
   spread(exp, rewards) %>%
-  select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
+  select(matches("cohort|rfid|labanimalid|sex|box|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
   mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
   group_by(sex) %>% 
   mutate(LGA01_mean = mean(LGA01, na.rm = T),
@@ -391,7 +393,7 @@ Olivier_Cocaine_C01_09 <-  Olivier_Cocaine_df %>%
   mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
   mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = TRUE)) %>% 
   mutate(SHA_last3_mean = rowMeans(select(., matches("SHA(0[89]|10)")), na.rm = F)) %>% 
-  select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) %>% 
+  select(matches("cohort|rfid|labanimalid|sex|box|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) %>% 
   left_join(Olivier_Cocaine_df %>% # "How long does it take the animal to hit 5 rewards in SHA?"
       mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
       select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
@@ -456,10 +458,108 @@ Olivier_Cocaine_C01_09 %>%
 
 
 
+### EXTRACT THE EXCEL INDICES (AND INTERMEDIATE VALUES FOR COHORTS 01-07)
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_gwas_xl <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+  lapply(function(x){
+    if(grepl("F701", x[1,1])){ # if cohort 7 table
+      names(x)[1] <- "rats"
+    }
+    x <- x %>% clean_names
+    i <- 1
+    if(names(x)[1] == "x1"){
+      names(x) <- x[i,]
+      x <- x %>% clean_names
+      x <- x[-i, ]
+      i = i + 1 # go down the rows until the test expression is false
+    }
+    
+    x <- x %>%
+      select(starts_with("rat"), starts_with("fr"), starts_with("z"), starts_with("add"))    
+    return(x)
+  }) 
+
+# extract the columns for each cohort, rather than coding the rename, and extract the columns at the end of the summary end of the sheet # change to the first occurence for c03
+cocaine_gwas_xl$C01<- cocaine_gwas_xl$C01[, c("rats", "fr_zscore_2", "z_score_pr_2", "z_score_shock_2", "addiction_index")]
+cocaine_gwas_xl$C02<- cocaine_gwas_xl$C02[, c("rats", "fr_zscore", "z_score_pr_2", "z_score_shock_2", "addiction_index")]
+cocaine_gwas_xl$C03<- cocaine_gwas_xl$C03[, c("rats_1", "z_intake_32", "z_pr_37", "z_shock_43", "addiction_index")]
+cocaine_gwas_xl$C04<- cocaine_gwas_xl$C04[, c("rat", "z_intake_2", "z_pr_2", "z_shock_2", "addiction_index")]
+cocaine_gwas_xl$C05<- cocaine_gwas_xl$C05[, c("rats_1", "z_intake_48", "z_pr_49", "z_shock_50", "addiction_index")]
+cocaine_gwas_xl$C07<- cocaine_gwas_xl$C07[, c("rats", "z_esc_45", "zpr_46", "z_shock_47", "add_ind")]
+
+
+cocaine_gwas_xl_df <- cocaine_gwas_xl %>% 
+  lapply(function(x){
+    # names(x) <- c("labanimalid", "z_esc", "z_pr", "z_shock", "add_ind")
+    names(x) <- c("labanimalid", "escalation_zscore", "pr_zscore", "shock_zscore", "addiction_index")
+    return(x)
+  }) %>% 
+  rbindlist(idcol = "cohort", fill = T) %>%  
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  mutate_at(vars(-matches("cohort|labanimal")), as.numeric) %>% 
+  subset(!is.na(labanimalid)) %>% 
+  left_join(rat_info_allcohort_xl_df[, c("rfid", "labanimalid")], by = "labanimalid") %>%  # extract rfid from mapping files
+  left_join(Olivier_Cocaine_C01_09[, c("rfid", "labanimalid", "box")])
+
+## # extract the columns for each cohort, rather than coding the rename, and extract the columns at the end of the summary end of the sheet # change to the first occurence for c03
+cocaine_gwas_xl$C01<- cocaine_gwas_xl$C01[, c("rats", "fr_zscore_2", "z_score_pr_2", "z_score_shock_2", "addiction_index")]
+cocaine_gwas_xl$C02<- cocaine_gwas_xl$C02[, c("rats", "fr_zscore", "z_score_pr_2", "z_score_shock_2", "addiction_index")]
+cocaine_gwas_xl$C03<- cocaine_gwas_xl$C03[, c("rats_1", "z_intake_32", "z_pr_37", "z_shock_43", "addiction_index")]
+cocaine_gwas_xl$C04<- cocaine_gwas_xl$C04[, c("rat", "z_intake_2", "z_pr_2", "z_shock_2", "addiction_index")]
+cocaine_gwas_xl$C05<- cocaine_gwas_xl$C05[, c("rats_1", "z_intake_48", "z_pr_49", "z_shock_50", "addiction_index")]
+cocaine_gwas_xl$C07<- cocaine_gwas_xl$C07[, c("rats", "z_esc_45", "zpr_46", "z_shock_47", "add_ind")]
+
+
+  
+
+#### CREATE RAW VS EXCEL SHEETS
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_intermediates_xl <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+  lapply(function(x){
+    if(grepl("F701", x[1,1])){ # if cohort 7 table
+      names(x)[1] <- "rats"
+    }
+    x <- x %>% clean_names
+    i <- 1
+    if(names(x)[1] == "x1"){
+      names(x) <- x[i,]
+      x <- x %>% clean_names
+      x <- x[-i, ]
+      i = i + 1 # go down the rows until the test expression is false
+    }
+    
+    x <- x %>%
+      select(starts_with("rat"), starts_with("lg"), starts_with("day"))
+    return(x)
+  }) 
+cocaine_intermediates_xl$C01<- cocaine_intermediates_xl$C01 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl$C02<- cocaine_intermediates_xl$C02 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl$C03<- cocaine_intermediates_xl$C03[, c("rats_1", "z_intake_32", "z_pr_37", "z_shock_43", "addiction_index")] ## XX 
+cocaine_intermediates_xl$C04<- cocaine_intermediates_xl$C04 %>% select(matches("rat$"), matches("^lg_a_\\d+$"), -matches("^lg_a_\\d+_2"))
+cocaine_intermediates_xl$C05<- cocaine_intermediates_xl$C05 %>% select(matches("rats_1$"), matches("^day_\\d+$"), -matches("^lg_a_\\d+_2")) ## XX 
+cocaine_intermediates_xl$C07<- cocaine_intermediates_xl$C07[, c("rats", "z_esc_45", "zpr_46", "z_shock_47", "add_ind")] ## XX 
 
 
 
+# copy for Palmer Lab, long
+library(openxlsx)
 
+wb <- createWorkbook()
+addWorksheet(wb, "cellIs")
+
+## rule applies to all each cell in range
+writeData(wb, "cellIs", -5:5)
+writeData(wb, "cellIs", LETTERS[1:11], startCol=2)
+
+negStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
+posStyle <- createStyle(fontColour = "#006100", bgFill = "#C6EFCE")
+
+conditionalFormatting(wb, "cellIs", cols=1, rows=1:11, rule="!=0", style = negStyle)
+conditionalFormatting(wb, "cellIs", cols=1, rows=1:11, rule="==0", style = posStyle)
+
+saveWorkbook(wb, "conditionalFormattingExample.xlsx", TRUE)
+
+# copy for Olivier lab, wide 
 
 
 
