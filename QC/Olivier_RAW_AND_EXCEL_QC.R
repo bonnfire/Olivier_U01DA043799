@@ -568,30 +568,37 @@ cocaine_qc_long <- cocaine_intermediates_xl_df %>% subset(rewards_QC == "fail") 
 
 # copy for Olivier lab, wide 
 
-cocaine_qc_wide <- cocaine_intermediates_xl_df %>% subset(rewards_QC == "fail") %>% 
-  left_join(Olivier_Cocaine_df %>% 
+cocaine_qc_wide <- cocaine_intermediates_xl_df %>% 
+  subset(rewards_QC == "fail") %>% 
+    left_join(Olivier_Cocaine_df %>% 
               mutate(exp = gsub("LGA", "lga_", exp)) %>% 
               select(cohort, labanimalid, rfid, exp, sex, filename), 
             by = c("cohort", "labanimalid", "rfid", "exp", "sex")) %>% 
-  spread(exp, rewards)
+  spread(exp, rewards_xl) %>% 
+  mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num)
 
 library(openxlsx)
 
+## Split data apart by a grouping variable;
+##   makes a named list of tables
+cocaine_qc_wide_bycohort <- split(cocaine_qc_wide, cocaine_qc_wide$cohort)
+
+## Create a blank workbook
 wb <- createWorkbook()
-addWorksheet(wb, "cellIs")
 
-## rule applies to all each cell in range
-writeData(wb, "cellIs", -5:5)
-writeData(wb, "cellIs", LETTERS[1:11], startCol=2)
+## Loop through the list of split tables as well as their names
+##   and add each one as a sheet to the workbook
+Map(function(data, name){
+  
+  addWorksheet(wb, name)
+  writeData(wb, name, data)
+  
+}, cocaine_qc_wide_bycohort, names(cocaine_qc_wide_bycohort))
 
-negStyle <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
-posStyle <- createStyle(fontColour = "#006100", bgFill = "#C6EFCE")
 
-conditionalFormatting(wb, "cellIs", cols=1, rows=1:11, rule="!=0", style = negStyle)
-conditionalFormatting(wb, "cellIs", cols=1, rows=1:11, rule="==0", style = posStyle)
-
-saveWorkbook(wb, ".xlsx", TRUE)
-
+## Save workbook to working directory
+saveWorkbook(wb, file = "cocaine_qc_bycohort.xlsx", overwrite = TRUE)
 
 
 ##### 
