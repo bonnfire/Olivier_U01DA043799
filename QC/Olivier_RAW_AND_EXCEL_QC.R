@@ -501,14 +501,6 @@ cocaine_gwas_xl_df <- cocaine_gwas_xl %>%
   left_join(rat_info_allcohort_xl_df[, c("rfid", "labanimalid")], by = "labanimalid") %>%  # extract rfid from mapping files
   left_join(Olivier_Cocaine_C01_09[, c("rfid", "labanimalid", "box")])
 
-## # extract the columns for each cohort, rather than coding the rename, and extract the columns at the end of the summary end of the sheet # change to the first occurence for c03
-cocaine_gwas_xl$C01<- cocaine_gwas_xl$C01[, c("rats", "fr_zscore_2", "z_score_pr_2", "z_score_shock_2", "addiction_index")]
-cocaine_gwas_xl$C02<- cocaine_gwas_xl$C02[, c("rats", "fr_zscore", "z_score_pr_2", "z_score_shock_2", "addiction_index")]
-cocaine_gwas_xl$C03<- cocaine_gwas_xl$C03[, c("rats_1", "z_intake_32", "z_pr_37", "z_shock_43", "addiction_index")]
-cocaine_gwas_xl$C04<- cocaine_gwas_xl$C04[, c("rat", "z_intake_2", "z_pr_2", "z_shock_2", "addiction_index")]
-cocaine_gwas_xl$C05<- cocaine_gwas_xl$C05[, c("rats_1", "z_intake_48", "z_pr_49", "z_shock_50", "addiction_index")]
-cocaine_gwas_xl$C07<- cocaine_gwas_xl$C07[, c("rats", "z_esc_45", "zpr_46", "z_shock_47", "add_ind")]
-
 
   
 
@@ -534,14 +526,55 @@ cocaine_intermediates_xl <- u01.importxlsx("Addiction indices for C01-C07 Cocain
   }) 
 cocaine_intermediates_xl$C01<- cocaine_intermediates_xl$C01 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
 cocaine_intermediates_xl$C02<- cocaine_intermediates_xl$C02 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
-cocaine_intermediates_xl$C03<- cocaine_intermediates_xl$C03[, c("rats_1", "z_intake_32", "z_pr_37", "z_shock_43", "addiction_index")] ## XX 
-cocaine_intermediates_xl$C04<- cocaine_intermediates_xl$C04 %>% select(matches("rat$"), matches("^lg_a_\\d+$"), -matches("^lg_a_\\d+_2"))
-cocaine_intermediates_xl$C05<- cocaine_intermediates_xl$C05 %>% select(matches("rats_1$"), matches("^day_\\d+$"), -matches("^lg_a_\\d+_2")) ## XX 
-cocaine_intermediates_xl$C07<- cocaine_intermediates_xl$C07[, c("rats", "z_esc_45", "zpr_46", "z_shock_47", "add_ind")] ## XX 
+cocaine_intermediates_xl$C03<- cocaine_intermediates_xl$C03 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl$C04<- cocaine_intermediates_xl$C04 %>% select(matches("rat$"), matches("^lg_a\\d+$"), -matches("^lg_a\\d+_2"))
+cocaine_intermediates_xl$C05<- cocaine_intermediates_xl$C05 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl$C07<- cocaine_intermediates_xl$C07 %>% select(matches("rats$"), matches("^lg_a\\d_\\d$"), matches("^lg_a([9]|1\\d)_[1]\\d")) 
+
+
+cocaine_intermediates_xl_df <- cocaine_intermediates_xl %>% 
+  lapply(function(x){
+    names(x) <- c("labanimalid", paste0("lga_", str_pad(1:14, "2", "left", "0"))) 
+    return(x)
+  }) %>% 
+  rbindlist(idcol = "cohort", fill = T) %>%  
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  mutate_at(vars(-matches("cohort|labanimal")), as.numeric) %>% 
+  subset(!is.na(labanimalid)) %>% 
+  left_join(rat_info_allcohort_xl_df[, c("rfid", "labanimalid")], by = "labanimalid") %>% 
+  gather("exp", "rewards_xl", -cohort, -labanimalid, -rfid) %>% 
+  left_join(Olivier_Cocaine_df %>% 
+              mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+              select(cohort, rfid, labanimalid, sex, exp, rewards) %>% distinct() %>% 
+              spread(exp, rewards) %>% select(cohort, rfid, labanimalid, sex, matches("LGA(0[1-9]|1[0-4])")) %>% 
+              gather("exp", "rewards_raw", -cohort, -rfid, -labanimalid, -sex) %>% 
+              mutate(exp = gsub("LGA", "lga_", exp)),
+            by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  mutate(rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
+
+# %>%  # extract rfid from mapping files
+  # left_join(Olivier_Cocaine_C01_09[, c("rfid", "labanimalid", "box")])
 
 
 
 # copy for Palmer Lab, long
+
+cocaine_qc_long <- cocaine_intermediates_xl_df %>% subset(rewards_QC == "fail") %>% 
+  left_join(Olivier_Cocaine_df %>% 
+              mutate(exp = gsub("LGA", "lga_", exp)) %>% 
+              select(cohort, labanimalid, rfid, exp, sex, filename), 
+            by = c("cohort", "labanimalid", "rfid", "exp", "sex"))
+
+# copy for Olivier lab, wide 
+
+cocaine_qc_wide <- cocaine_intermediates_xl_df %>% subset(rewards_QC == "fail") %>% 
+  left_join(Olivier_Cocaine_df %>% 
+              mutate(exp = gsub("LGA", "lga_", exp)) %>% 
+              select(cohort, labanimalid, rfid, exp, sex, filename), 
+            by = c("cohort", "labanimalid", "rfid", "exp", "sex")) %>% 
+  spread(exp, rewards)
+
 library(openxlsx)
 
 wb <- createWorkbook()
@@ -557,10 +590,7 @@ posStyle <- createStyle(fontColour = "#006100", bgFill = "#C6EFCE")
 conditionalFormatting(wb, "cellIs", cols=1, rows=1:11, rule="!=0", style = negStyle)
 conditionalFormatting(wb, "cellIs", cols=1, rows=1:11, rule="==0", style = posStyle)
 
-saveWorkbook(wb, "conditionalFormattingExample.xlsx", TRUE)
-
-# copy for Olivier lab, wide 
-
+saveWorkbook(wb, ".xlsx", TRUE)
 
 
 
