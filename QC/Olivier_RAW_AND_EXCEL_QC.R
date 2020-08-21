@@ -668,6 +668,59 @@ plot(density(cohort1_lga$fr_zscore))
 setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
 write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
 
+# =================================================
+## PR
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_intermediates_xl <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+  lapply(function(x){
+    if(grepl("F701", x[1,1])){ # if cohort 7 table
+      names(x)[1] <- "rats"
+    }
+    x <- x %>% clean_names
+    i <- 1
+    if(names(x)[1] == "x1"){
+      names(x) <- x[i,]
+      x <- x %>% clean_names
+      x <- x[-i, ]
+      i = i + 1 # go down the rows until the test expression is false
+    }
+    
+    x <- x %>%
+      select(starts_with("rat"), starts_with("pr"), starts_with("day"))
+    return(x)
+  }) 
+cocaine_intermediates_xl$C01<- cocaine_intermediates_xl$C01 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl$C02<- cocaine_intermediates_xl$C02 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl$C03<- cocaine_intermediates_xl$C03 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl$C04<- cocaine_intermediates_xl$C04 %>% select(matches("rat$"), matches("^lg_a\\d+$"), -matches("^lg_a\\d+_2"))
+cocaine_intermediates_xl$C05<- cocaine_intermediates_xl$C05 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl$C07<- cocaine_intermediates_xl$C07 %>% select(matches("rats$"), matches("^lg_a\\d_\\d$"), matches("^lg_a([9]|1\\d)_[1]\\d")) 
+
+
+cocaine_intermediates_xl_df <- cocaine_intermediates_xl %>% 
+  lapply(function(x){
+    names(x) <- c("labanimalid", paste0("lga_", str_pad(1:14, "2", "left", "0"))) 
+    return(x)
+  }) %>% 
+  rbindlist(idcol = "cohort", fill = T) %>%  
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  mutate_at(vars(-matches("cohort|labanimal")), as.numeric) %>% 
+  subset(!is.na(labanimalid)) %>% 
+  left_join(rat_info_allcohort_xl_df[, c("rfid", "labanimalid")], by = "labanimalid") %>% 
+  gather("exp", "rewards_xl", -cohort, -labanimalid, -rfid) %>% 
+  left_join(Olivier_Cocaine_df %>% 
+              mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+              select(cohort, rfid, labanimalid, sex, exp, rewards) %>% distinct() %>% 
+              spread(exp, rewards) %>% select(cohort, rfid, labanimalid, sex, matches("LGA(0[1-9]|1[0-4])")) %>% 
+              gather("exp", "rewards_raw", -cohort, -rfid, -labanimalid, -sex) %>% 
+              mutate(exp = gsub("LGA", "lga_", exp)),
+            by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  mutate(rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
+
+
+
+
 
 ##### 
 ## XX ask cocaine team why this, especially for the C09+  
