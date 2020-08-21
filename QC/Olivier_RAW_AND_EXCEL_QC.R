@@ -558,6 +558,8 @@ cocaine_intermediates_xl_df <- cocaine_intermediates_xl %>%
 
 
 
+
+### QC'ING AND SHOWING THE ONES THAT FAIL QC
 # copy for Palmer Lab, long
 
 cocaine_qc_long <- cocaine_intermediates_xl_df %>% subset(rewards_QC == "fail") %>% 
@@ -599,6 +601,72 @@ Map(function(data, name){
 
 ## Save workbook to working directory
 saveWorkbook(wb, file = "cocaine_qc_bycohort.xlsx", overwrite = TRUE)
+
+## fix the data using the lab's response 08/20/2020
+cocaine_qc_decisions <- u01.importxlsx("decision_cocaine_qc_bycohort (updated).xlsx")[-1] %>% 
+  rbindlist()
+cocaine_qc_decisions %>% select(source) %>% table()
+
+### find the QC NA cases
+# cocaine_qc_wide_na <- cocaine_intermediates_xl_df %>% 
+#   subset(is.na(rewards_QC)) %>% 
+#   left_join(Olivier_Cocaine_df %>% 
+#               mutate(exp = gsub("LGA", "lga_", exp)) %>% 
+#               select(cohort, labanimalid, rfid, exp, sex, filename), 
+#             by = c("cohort", "labanimalid", "rfid", "exp", "sex")) %>% 
+#   spread(exp, rewards_xl) %>% 
+#   mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+#   arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num)
+# 
+# library(openxlsx)
+# 
+# ## Split data apart by a grouping variable;
+# ##   makes a named list of tables
+# cocaine_qc_wide_bycohort <- split(cocaine_qc_wide, cocaine_qc_wide$cohort)
+# 
+# ## Create a blank workbook
+# wb <- createWorkbook()
+# 
+# ## Loop through the list of split tables as well as their names
+# ##   and add each one as a sheet to the workbook
+# Map(function(data, name){
+#   
+#   addWorksheet(wb, name)
+#   writeData(wb, name, data)
+#   
+# }, cocaine_qc_wide_bycohort, names(cocaine_qc_wide_bycohort))
+# 
+# 
+# ## Save workbook to working directory
+# saveWorkbook(wb, file = "cocaine_qc_bycohort.xlsx", overwrite = TRUE)
+
+
+### join and correct the raw values
+cocaine_intermediates_xl_df_corrected <- cocaine_intermediates_xl_df %>% left_join(cocaine_qc_decisions %>% 
+                                            select(cohort, labanimalid, rfid, source, starts_with("lga")) %>% 
+                                            gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% 
+                                            subset(!is.na(rewards)),by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  mutate(rewards = ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl),
+         source = ifelse(is.na(source), "raw", source)) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards, source) # keep the source for data
+
+## once the values have been corrected, now calculate the indices 
+cohort1_lga <- cocaine_intermediates_xl_df_corrected %>% 
+  subset(cohort == "C01") %>% 
+  spread(exp, rewards) %>% 
+  group_by(sex) %>% 
+  mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
+  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) %>% 
+  mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+  group_by(sex) %>% 
+  mutate(fr_zscore = scale(ind_esc_mean)) %>% 
+  select(-source)
+plot(density(cohort1_lga$fr_zscore))
+
+setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
+write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
 
 
 ##### 
