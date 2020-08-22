@@ -642,13 +642,17 @@ cocaine_qc_decisions %>% select(source) %>% table()
 
 
 ### join and correct the raw values
-cocaine_intermediates_xl_df_corrected <- cocaine_intermediates_xl_df %>% left_join(cocaine_qc_decisions %>% 
-                                            select(cohort, labanimalid, rfid, source, starts_with("lga")) %>% 
-                                            gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% 
-                                            subset(!is.na(rewards)),by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
-  mutate(rewards = ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl),
-         source = ifelse(is.na(source), "raw", source)) %>% 
-  select(cohort, rfid, labanimalid, sex, exp, rewards, source) # keep the source for data
+cocaine_intermediates_xl_df_corrected <- cocaine_intermediates_xl_df %>% 
+  left_join(cocaine_qc_decisions %>% 
+              select(cohort, labanimalid, rfid, source, starts_with("lga")) %>% 
+              gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% 
+              subset(!is.na(rewards)), 
+            by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  naniar::replace_with_na_all(condition = ~.x %in% c("NA", "NaN")) %>% 
+  mutate(rewards = ifelse(is.na(rewards_QC)&!is.na(rewards_xl), rewards_xl,  
+                          ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl))) %>% ## make sure that there are no gaps 
+         # source = ifelse(is.na(source), "raw", source)) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards) # remove source from data
 
 ## once the values have been corrected, now calculate the indices 
 cohort1_lga <- cocaine_intermediates_xl_df_corrected %>% 
@@ -658,15 +662,108 @@ cohort1_lga <- cocaine_intermediates_xl_df_corrected %>%
   mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
   ungroup() %>% 
   mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
-  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) %>% 
+  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) 
+# check for row id dupes before calculating means 
+cohort1_lga %>% get_dupes(rfid)
+cohort1_lga <- cohort1_lga %>% 
   mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
   group_by(sex) %>% 
   mutate(fr_zscore = scale(ind_esc_mean)) %>% 
-  select(-source)
-plot(density(cohort1_lga$fr_zscore))
+  ungroup() %>% 
+  mutate_all(as.character)
+plot(density(as.numeric(cohort1_lga$fr_zscore)))
 
-setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
+# setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
+# write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
+# writing onto desktop folder bc Dropbox does not work
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
 write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
+
+
+
+## COHORT 2  
+cohort2_lga <- cocaine_intermediates_xl_df_corrected %>% 
+  subset(cohort == "C02") %>% 
+  spread(exp, rewards) %>% 
+  group_by(sex) %>% 
+  mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
+  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) 
+# check for row id dupes before calculating means 
+cohort2_lga %>% get_dupes(rfid)
+
+cohort2_lga <- cohort2_lga %>% 
+  mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+  group_by(sex) %>% 
+  mutate(fr_zscore = scale(ind_esc_mean)) %>% 
+  ungroup() %>% 
+  mutate_all(as.character)
+plot(density(as.numeric(cohort2_lga$fr_zscore)))
+
+# setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
+# write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
+# writing onto desktop folder bc Dropbox does not work
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
+write.csv(cohort2_lga, file = "cohort2_lga.csv", row.names = F)
+
+
+## COHORT 3  
+cohort3_lga <- cocaine_intermediates_xl_df_corrected %>% 
+  subset(cohort == "C03") %>% 
+  spread(exp, rewards) %>% 
+  group_by(sex) %>% 
+  mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
+  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) 
+# check for row id dupes before calculating means 
+cohort3_lga %>% get_dupes(rfid)
+cohort3_lga %>% naniar::vis_miss()
+
+cohort3_lga <- cohort3_lga %>% 
+  mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+  group_by(sex) %>% 
+  mutate(fr_zscore = scale(ind_esc_mean)) %>% 
+  ungroup() %>% 
+  mutate_all(as.character)
+plot(density(as.numeric(cohort3_lga$fr_zscore)))
+
+# setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
+# write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
+# writing onto desktop folder bc Dropbox does not work
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
+write.csv(cohort3_lga, file = "cohort3_lga.csv", row.names = F)
+
+
+
+## COHORT 4  
+## XX uniform variables??? 
+cohort4_lga <- cocaine_intermediates_xl_df_corrected %>% 
+  subset(cohort == "C04") %>% 
+  spread(exp, rewards) %>% 
+  group_by(sex) %>% 
+  mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
+  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) ## XX ONLY USE LAST FOUR LGA VALUES 
+# check for row id dupes before calculating means 
+cohort4_lga %>% get_dupes(rfid)
+cohort4_lga %>% naniar::vis_miss()
+
+cohort4_lga <- cohort4_lga %>% 
+  mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+  group_by(sex) %>% 
+  mutate(fr_zscore = scale(ind_esc_mean)) %>% 
+  ungroup() %>% 
+  mutate_all(as.character)
+plot(density(as.numeric(cohort4_lga$fr_zscore)))
+
+# setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
+# write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
+# writing onto desktop folder bc Dropbox does not work
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
+write.csv(cohort4_lga, file = "cohort4_lga.csv", row.names = F)
 
 # =================================================
 ## PR

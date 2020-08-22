@@ -317,7 +317,7 @@ names(rat_info_allcohort_xl_df) <- rat_info_xl_filenames
 rat_info_allcohort_xl_df %<>% rbindlist(fill = T, idcol = "cohort") %<>% 
   mutate(cohort = str_extract(cohort, "C\\d{2}")) %<>%
   clean_names() %<>%
-  mutate(labanimalid = str_extract(rat, "[MF]\\d+"))
+  mutate(labanimalid = str_extract(rat, "[MF]\\d+.*"))
 
 
 # which animals are in the excel sheets but not in the wfu master tables 
