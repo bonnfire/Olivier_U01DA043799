@@ -4,6 +4,76 @@
 ## plotting excel self admin data
 ##############################################
 
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_indices_xl <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+  lapply(function(x){
+    if(grepl("F701", x[1,1])){ # if cohort 7 table
+      names(x)[1] <- "rats"
+      names(x)[44] <- "rats"
+    }
+    x <- x %>% clean_names
+    i <- 1
+    if(names(x)[1] == "x1"){
+      names(x) <- x[i,]
+      x <- x %>% clean_names
+      x <- x[-i, ]
+      i = i + 1 # go down the rows until the test expression is false
+    }
+    
+    # extract the last section of data
+    last_rats_section_index <- grep("rat", names(x), ignore.case = T) %>% tail(1) # find the last section
+    x <- x[, last_rats_section_index:ncol(x)]
+
+    # rename the variables for uniformity
+    names(x) <- c("labanimalid", "escalation_index", "pr_index", "shock_index", "addiction_index")
+    
+    # clean up the data
+    x <- x %>% 
+      mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+      subset(grepl("[MF]\\d+", labanimalid)) %>% 
+      mutate_at(vars(ends_with("index")), as.numeric) %>% 
+      mutate(sex = str_extract(labanimalid, "[MF]"))
+    
+    return(x)
+  }) %>% rbindlist(idcol = "cohort") 
+
+## XX figure out how to join box information
+
+pdf("olivier_cocaine_indices_xl.pdf",onefile = T)
+
+plot_list_main = list()
+plot_list = list()
+plot_list2 = list()
+
+phenotypes_xl_vars <- grep("index$", names(cocaine_indices_xl), value = T)
+for (i in seq_along(phenotypes_xl_vars)){
+  
+  plot_list_main[[i]] <- cocaine_indices_xl %>% 
+    ggplot() + 
+    geom_density(aes_string(phenotypes_xl_vars[i])) +
+    theme(axis.text=element_text(size=12))
+  plot_list[[i]] <- cocaine_indices_xl %>% 
+    ggplot(aes(x = cohort)) + 
+    geom_boxplot(aes_string(y = phenotypes_xl_vars[i])) + 
+    theme(axis.text=element_text(size=12), axis.text.x = element_text(angle = 45))
+  plot_list2[[i]] <- cocaine_indices_xl %>% 
+    ggplot() + 
+    geom_density(aes_string(phenotypes_xl_vars[i])) + 
+    facet_grid(rows = vars(cohort)) + 
+    theme(axis.text=element_text(size=12), axis.text.x = element_text(angle = 45))
+  
+  print(plot_list_main[[i]])
+  print(plot_list[[i]])
+  print(plot_list2[[i]])
+  
+}
+dev.off()
+
+
+##############################################
+## plotting excel self admin data
+##############################################
+
 pdf("cohort1_olivier_selfadmin.pdf",onefile = T)
 
 plot_list = list()

@@ -746,13 +746,13 @@ cohort4_lga <- cocaine_intermediates_xl_df_corrected %>%
   mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
   ungroup() %>% 
   mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
-  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) ## XX ONLY USE LAST FOUR LGA VALUES 
+  mutate_at(vars(ends_with("_esc")), ~./lga01_sd)
 # check for row id dupes before calculating means 
 cohort4_lga %>% get_dupes(rfid)
 cohort4_lga %>% naniar::vis_miss()
 
 cohort4_lga <- cohort4_lga %>% 
-  mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+  mutate(ind_esc_mean = rowMeans(select(., matches("1[1-4]_esc$")), na.rm = TRUE)) %>%  ## ONLY USE LAST FOUR LGA VALUES 
   group_by(sex) %>% 
   mutate(fr_zscore = scale(ind_esc_mean)) %>% 
   ungroup() %>% 
@@ -764,6 +764,36 @@ plot(density(as.numeric(cohort4_lga$fr_zscore)))
 # writing onto desktop folder bc Dropbox does not work
 setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
 write.csv(cohort4_lga, file = "cohort4_lga.csv", row.names = F)
+
+
+## COHORT 5  
+## XX uniform variables??? 
+cohort5_lga <- cocaine_intermediates_xl_df_corrected %>% 
+  subset(cohort == "C05") %>% 
+  spread(exp, rewards) %>% 
+  group_by(sex) %>% 
+  mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
+  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) 
+# check for row id dupes before calculating means 
+cohort5_lga %>% get_dupes(rfid)
+cohort5_lga %>% naniar::vis_miss()
+
+cohort5_lga <- cohort5_lga %>% 
+  mutate(ind_esc_mean = rowMeans(select(., matches("1[1-5]_esc$")), na.rm = TRUE)) %>% ## ONLY USE LAST THREE LGA VALUES 
+  group_by(sex) %>% 
+  mutate(fr_zscore = scale(ind_esc_mean)) %>% 
+  ungroup() %>% 
+  mutate_all(as.character)
+plot(density(as.numeric(cohort5_lga$fr_zscore)))
+
+# setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
+# write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)
+# writing onto desktop folder bc Dropbox does not work
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
+write.csv(cohort5_lga, file = "cohort5_lga.csv", row.names = F)
+
 
 # =================================================
 ## PR
