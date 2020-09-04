@@ -505,8 +505,9 @@ cocaine_gwas_xl_df <- cocaine_gwas_xl %>%
   
 
 #### CREATE RAW VS EXCEL SHEETS
+
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
-cocaine_intermediates_xl <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+cocaine_intermediates_xl_lga <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
   lapply(function(x){
     if(grepl("F701", x[1,1])){ # if cohort 7 table
       names(x)[1] <- "rats"
@@ -524,15 +525,15 @@ cocaine_intermediates_xl <- u01.importxlsx("Addiction indices for C01-C07 Cocain
       select(starts_with("rat"), starts_with("lg"), starts_with("day"))
     return(x)
   }) 
-cocaine_intermediates_xl$C01<- cocaine_intermediates_xl$C01 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
-cocaine_intermediates_xl$C02<- cocaine_intermediates_xl$C02 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
-cocaine_intermediates_xl$C03<- cocaine_intermediates_xl$C03 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
-cocaine_intermediates_xl$C04<- cocaine_intermediates_xl$C04 %>% select(matches("rat$"), matches("^lg_a\\d+$"), -matches("^lg_a\\d+_2"))
-cocaine_intermediates_xl$C05<- cocaine_intermediates_xl$C05 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
-cocaine_intermediates_xl$C07<- cocaine_intermediates_xl$C07 %>% select(matches("rats$"), matches("^lg_a\\d_\\d$"), matches("^lg_a([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl_lga$C01<- cocaine_intermediates_xl_lga$C01 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl_lga$C02<- cocaine_intermediates_xl_lga$C02 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl_lga$C03<- cocaine_intermediates_xl_lga$C03 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl_lga$C04<- cocaine_intermediates_xl_lga$C04 %>% select(matches("rat$"), matches("^lg_a\\d+$"), -matches("^lg_a\\d+_2"))
+cocaine_intermediates_xl_lga$C05<- cocaine_intermediates_xl_lga$C05 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl_lga$C07<- cocaine_intermediates_xl_lga$C07 %>% select(matches("rats$"), matches("^lg_a\\d_\\d$"), matches("^lg_a([9]|1\\d)_[1]\\d")) 
 
-
-cocaine_intermediates_xl_df <- cocaine_intermediates_xl %>% 
+# join to raw, wait for fixes, and then join to corrected values
+cocaine_intermediates_xl_lga_df <- cocaine_intermediates_xl_lga %>% 
   lapply(function(x){
     names(x) <- c("labanimalid", paste0("lga_", str_pad(1:14, "2", "left", "0"))) 
     return(x)
@@ -552,12 +553,6 @@ cocaine_intermediates_xl_df <- cocaine_intermediates_xl %>%
             by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
   mutate(rewards_QC_diff = rewards_xl - rewards_raw,
          rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
-
-# %>%  # extract rfid from mapping files
-  # left_join(Olivier_Cocaine_C01_09[, c("rfid", "labanimalid", "box")])
-
-
-
 
 ### QC'ING AND SHOWING THE ONES THAT FAIL QC
 # copy for Palmer Lab, long
@@ -603,9 +598,10 @@ Map(function(data, name){
 saveWorkbook(wb, file = "cocaine_qc_bycohort.xlsx", overwrite = TRUE)
 
 ## fix the data using the lab's response 08/20/2020
-cocaine_qc_decisions <- u01.importxlsx("decision_cocaine_qc_bycohort (updated).xlsx")[-1] %>% 
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_qc_decisions_lga <- u01.importxlsx("decision_cocaine_qc_bycohort (updated).xlsx")[-1] %>% 
   rbindlist()
-cocaine_qc_decisions %>% select(source) %>% table()
+cocaine_qc_decisions_lga %>% select(source) %>% table()
 
 ### find the QC NA cases
 # cocaine_qc_wide_na <- cocaine_intermediates_xl_df %>% 
@@ -642,8 +638,8 @@ cocaine_qc_decisions %>% select(source) %>% table()
 
 
 ### join and correct the raw values
-cocaine_intermediates_xl_df_corrected <- cocaine_intermediates_xl_df %>% 
-  left_join(cocaine_qc_decisions %>% 
+cocaine_intermediates_xl_lga_corrected <- cocaine_intermediates_xl_lga_df %>% 
+  left_join(cocaine_qc_decisions_lga %>% 
               select(cohort, labanimalid, rfid, source, starts_with("lga")) %>% 
               gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% 
               subset(!is.na(rewards)), 
@@ -654,24 +650,52 @@ cocaine_intermediates_xl_df_corrected <- cocaine_intermediates_xl_df %>%
          # source = ifelse(is.na(source), "raw", source)) %>% 
   select(cohort, rfid, labanimalid, sex, exp, rewards) # remove source from data
 
+
+
+# cohorts 01-07
+cohort01_07_cocaine_lga <- cocaine_intermediates_xl_lga_corrected %>% 
+  mutate(exp = paste0(exp, "_rewards")) %>% 
+  spread(exp, rewards) %>% 
+  mutate_at(vars(matches("lga_(0[2-9]|1[0-4])_rewards$")), list(esc = ~.-lga_01_rewards)) %>% 
+  mutate(esc11_14_mean = rowMeans(select(., ends_with("1[1-4]_esc")), na.rm = TRUE)) %>% 
+  select(cohort, rfid, sex, labanimalid, everything())
+# quick qc before upload 
+cohort01_07_cocaine_lga %>% get_dupes(rfid)
+cohort01_07_cocaine_lga %>% ggplot() + geom_density(aes(x = esc11_14_mean)) + facet_grid(rows = "cohort")
+# writing onto desktop folder bc Dropbox does not work
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
+write.csv(cohort01_07_cocaine_lga, file = "cohort01_07_lga_phenotypes.csv", row.names = F)
+
+
+
+
+
+
+
+
+
+
+# will return to cohorts for the expert opinion values 
 ## once the values have been corrected, now calculate the indices 
-cohort1_lga <- cocaine_intermediates_xl_df_corrected %>% 
+cohort1_lga <- cocaine_intermediates_xl_lga_corrected %>% 
   subset(cohort == "C01") %>% 
   spread(exp, rewards) %>% 
-  group_by(sex) %>% 
-  mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
-  ungroup() %>% 
-  mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% 
-  mutate_at(vars(ends_with("_esc")), ~./lga01_sd) 
+  # mutate(lga01_mean = mean(lga_01, na.rm = T), lga01_sd = sd(lga_01, na.rm = T)) %>% 
+  # ungroup() %>% 
+  mutate_at(vars(matches("lga_1[1-4]$")), list(esc = ~.-lga_01)) %>% 
+  mutate(esc11_14_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+  select(cohort, rfid, sex, labanimalid, matches("_esc$"), matches("_mean$"))
+  # mutate_at(vars(matches("lga_\\d+$")), list(esc = ~.-lga01_mean)) %>% ## XX SAVE CODE FOR GENERATING THE EXPERT OPINION DATA
+  # mutate_at(vars(ends_with("_esc")), ~./lga01_sd) 
 # check for row id dupes before calculating means 
-cohort1_lga %>% get_dupes(rfid)
-cohort1_lga <- cohort1_lga %>% 
-  mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
-  group_by(sex) %>% 
-  mutate(fr_zscore = scale(ind_esc_mean)) %>% 
-  ungroup() %>% 
-  mutate_all(as.character)
-plot(density(as.numeric(cohort1_lga$fr_zscore)))
+# cohort1_lga %>% get_dupes(rfid)
+# cohort1_lga <- cohort1_lga %>% 
+#   mutate(ind_esc_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+#   group_by(sex) %>% 
+#   mutate(fr_zscore = scale(ind_esc_mean)) %>% 
+#   ungroup() %>% 
+#   mutate_all(as.character)
+# plot(density(as.numeric(cohort1_lga$fr_zscore)))
 
 # setwd("~/Dropbox (Palmer Lab)/PalmerLab_Datasets/u01_george_oliviercocaine/database/C01")
 # write.csv(cohort1_lga, file = "cohort1_lga.csv", row.names = F)

@@ -440,8 +440,127 @@ setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
 
 
 
+## extract the intermediate values
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_intermediates_xl_lga <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+  lapply(function(x){
+    if(grepl("F701", x[1,1])){ # if cohort 7 table
+      names(x)[1] <- "rats"
+    }
+    x <- x %>% clean_names
+    i <- 1
+    if(names(x)[1] == "x1"){
+      names(x) <- x[i,]
+      x <- x %>% clean_names
+      x <- x[-i, ]
+      i = i + 1 # go down the rows until the test expression is false
+    }
+    
+    x <- x %>%
+      select(starts_with("rat"), starts_with("lg"), starts_with("day"))
+    return(x)
+  }) 
+cocaine_intermediates_xl_lga$C01<- cocaine_intermediates_xl_lga$C01 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl_lga$C02<- cocaine_intermediates_xl_lga$C02 %>% select(matches("rats$"), matches("^day_\\d+$"), -matches("^day_\\d+_\\d+"))
+cocaine_intermediates_xl_lga$C03<- cocaine_intermediates_xl_lga$C03 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl_lga$C04<- cocaine_intermediates_xl_lga$C04 %>% select(matches("rat$"), matches("^lg_a\\d+$"), -matches("^lg_a\\d+_2"))
+cocaine_intermediates_xl_lga$C05<- cocaine_intermediates_xl_lga$C05 %>% select(matches("rats_1$"), matches("^day_\\d_\\d$"), matches("^day_([9]|1\\d)_[1]\\d")) 
+cocaine_intermediates_xl_lga$C07<- cocaine_intermediates_xl_lga$C07 %>% select(matches("rats$"), matches("^lg_a\\d_\\d$"), matches("^lg_a([9]|1\\d)_[1]\\d")) 
+
+cocaine_intermediates_xl_lga_df <- cocaine_intermediates_xl_lga %>% 
+  lapply(function(x){
+    names(x) <- c("labanimalid", paste0("lga_", str_pad(1:14, "2", "left", "0"))) 
+    return(x)
+  }) %>% 
+  rbindlist(idcol = "cohort", fill = T) %>%  
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  mutate_at(vars(-matches("cohort|labanimal")), as.numeric) %>% 
+  subset(!is.na(labanimalid)) %>% 
+  mutate_at(vars(matches("lga_1[1-4]$")), list(esc = ~.-lga_01)) %>% 
+  mutate(esc11_14_mean = rowMeans(select(., ends_with("_esc")), na.rm = TRUE)) %>% 
+  select(cohort, labanimalid, matches("_esc$"), matches("_mean$"))
 
 
+## pr 
+
+cocaine_intermediates_xl_pr <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+  lapply(function(x){
+    if(grepl("F701", x[1,1])){ # if cohort 7 table
+      names(x)[1] <- "rats"
+    }
+    x <- x %>% clean_names
+    i <- 1
+    if(names(x)[1] == "x1"){
+      names(x) <- x[i,]
+      x <- x %>% clean_names
+      x <- x[-i, ]
+      i = i + 1 # go down the rows until the test expression is false
+    }
+    
+    x <- x %>%
+      select(starts_with("rat"), starts_with("pr"), starts_with("day"))
+    return(x)
+  }) 
+cocaine_intermediates_xl_pr$C01<- cocaine_intermediates_xl_pr$C01 %>% select(matches("rats$"), matches("^day_\\d_3$"))
+cocaine_intermediates_xl_pr$C02<- cocaine_intermediates_xl_pr$C02 %>% select(matches("rats$"), matches("^day_\\d_3$"))
+cocaine_intermediates_xl_pr$C03<- cocaine_intermediates_xl_pr$C03 %>% select(matches("rats_1$"), matches("^pr")) 
+cocaine_intermediates_xl_pr$C04<- cocaine_intermediates_xl_pr$C04 %>% select(matches("rat$"), matches("^pr")) 
+cocaine_intermediates_xl_pr$C05<- cocaine_intermediates_xl_pr$C05 %>% select(matches("rats_1$"), matches("^pr"))
+cocaine_intermediates_xl_pr$C07<- cocaine_intermediates_xl_pr$C07 # no change necessary
+
+cocaine_intermediates_xl_pr_df <- cocaine_intermediates_xl_pr %>% 
+  lapply(function(x){
+    names(x) <- c("labanimalid", paste0("pr_", str_pad(1:2, "2", "left", "0"))) 
+    return(x)
+  }) %>% 
+  rbindlist(idcol = "cohort", fill = T) %>%  
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  mutate_at(vars(-matches("cohort|labanimal")), as.numeric) %>% 
+  subset(!is.na(labanimalid)) %>% 
+  mutate(pr_max = pmax(pr_01, pr_02)) %>% 
+  mutate(pr_mean = rowMeans(select(., starts_with("pr")), na.rm = TRUE)) %>% 
+  select(labanimalid, pr_max, pr_mean)
+
+## shock 
+cocaine_intermediates_xl_shock <- u01.importxlsx("Addiction indices for C01-C07 Cocaine.xlsx") %>% 
+  lapply(function(x){
+    if(grepl("F701", x[1,1])){ # if cohort 7 table
+      names(x)[1] <- "rats"
+    }
+    x <- x %>% clean_names
+    i <- 1
+    if(names(x)[1] == "x1"){
+      names(x) <- x[i,]
+      x <- x %>% clean_names
+      x <- x[-i, ]
+      i = i + 1 # go down the rows until the test expression is false
+    }
+    
+    x <- x %>%
+      select(starts_with("rat"), matches("x0_"), starts_with("shock"), matches("BSL"))
+    return(x)
+  }) 
+cocaine_intermediates_xl_shock$C01<- cocaine_intermediates_xl_shock$C01 %>% select(matches("rats$"), matches("x0_"), -matches("0_1"))
+cocaine_intermediates_xl_shock$C02<- cocaine_intermediates_xl_shock$C02 %>% select(matches("rats$"), matches("x0_"), -matches("0_1"))
+cocaine_intermediates_xl_shock$C03<- cocaine_intermediates_xl_shock$C03 %>% select(matches("rats_1$"), starts_with("shock"), -matches("0_1"))
+cocaine_intermediates_xl_shock$C04<- cocaine_intermediates_xl_shock$C04 %>% select(matches("rat$"), starts_with("shock"), -matches("0_1"))
+cocaine_intermediates_xl_shock$C05<- cocaine_intermediates_xl_shock$C05 %>% select(matches("rats_1$"), starts_with("shock"), -matches("0_1"))
+cocaine_intermediates_xl_shock$C07<- cocaine_intermediates_xl_shock$C07 %>% select(matches("rats$"), matches("bsl"), matches("^shock$"), -matches("0_1"))
+
+cocaine_intermediates_xl_shock_df <- cocaine_intermediates_xl_shock %>% 
+  lapply(function(x){
+    names(x) <- c("labanimalid", paste0("shock_", str_pad(2:3, "2", "left", "0"))) 
+    return(x)
+  }) %>% 
+  rbindlist(idcol = "cohort", fill = T) %>%  
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  mutate_at(vars(-matches("cohort|labanimal")), as.numeric) %>% 
+  subset(!is.na(labanimalid)) %>% 
+  select(labanimalid, shock_03)
+
+
+cocaine_intermediates_xl_bind <- left_join(cocaine_intermediates_xl_lga_df, cocaine_intermediates_xl_pr_df, by = "labanimalid") %>% 
+  left_join(cocaine_intermediates_xl_shock_df, by = "labanimalid")
 
 rm(list=ls(pattern="irr")) # conditionally clean the environment
 rm(list = ls())

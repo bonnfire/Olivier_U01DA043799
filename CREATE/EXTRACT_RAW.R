@@ -427,6 +427,17 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
 # date_time_subject_df_comp %>% dplyr::filter(subject != 0, valid == "yes") %>% select(subject, box, exp, valid) %>% group_by(subject, box, exp) %>% dplyr::filter(n() > 1) %>% arrange(subject) 
 
 
+## age table (at start of session)
+subjects_exp_age <- left_join( rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")], date_time_subject_df_comp, by = c("labanimalid", "cohort")) 
+%>% ## use rat_info_allcohort_xl_df to get rfid
+  # swap out the replacements and deaths
+  # use WFU_OlivierCocaine_test_df to get dob
+  # calculate the age 
+  # spread to get _age columns
+  # mutate_at(vars(-matches("labanimalid|cohort")), list(esc = ~.-dob)) # calculate the age 
+
+
+
 
 
 

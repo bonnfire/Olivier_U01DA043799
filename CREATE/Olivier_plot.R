@@ -70,6 +70,42 @@ for (i in seq_along(phenotypes_xl_vars)){
 dev.off()
 
 
+# pdftools::pdf_combine() # needed to open terminal and run , before install.packages("pdftools") 09/02/2020
+
+
+## PLOT 2 
+## Raw traits from Excel data, calculate mean and max locally, and plot
+
+pdf("olivier_cocaine_rawtraits_xl.pdf",onefile = T)
+
+plot_list_main = list()
+plot_list = list()
+plot_list2 = list()
+
+phenotypes_xl_vars <- grep("cohort|labanimalid", names(cocaine_intermediates_xl_bind), value = T, invert = T)
+for (i in seq_along(phenotypes_xl_vars)){
+  
+  plot_list_main[[i]] <- cocaine_intermediates_xl_bind %>% 
+    ggplot() + 
+    geom_density(aes_string(phenotypes_xl_vars[i])) +
+    theme(axis.text=element_text(size=12))
+  plot_list[[i]] <- cocaine_intermediates_xl_bind %>% 
+    ggplot(aes(x = cohort)) + 
+    geom_boxplot(aes_string(y = phenotypes_xl_vars[i])) + 
+    theme(axis.text=element_text(size=12), axis.text.x = element_text(angle = 45))
+  plot_list2[[i]] <- cocaine_intermediates_xl_bind %>% 
+    ggplot() + 
+    geom_density(aes_string(phenotypes_xl_vars[i])) + 
+    facet_grid(rows = vars(cohort)) + 
+    theme(axis.text=element_text(size=12), axis.text.x = element_text(angle = 45))
+  
+  print(plot_list_main[[i]])
+  print(plot_list[[i]])
+  print(plot_list2[[i]])
+  
+}
+dev.off()
+
 ##############################################
 ## plotting excel self admin data
 ##############################################
