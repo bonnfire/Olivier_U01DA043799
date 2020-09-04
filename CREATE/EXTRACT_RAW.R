@@ -428,12 +428,23 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
 
 
 ## age table (at start of session)
-subjects_exp_age <- left_join( rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")], date_time_subject_df_comp, by = c("labanimalid", "cohort")) 
-%>% ## use rat_info_allcohort_xl_df to get rfid
-  # swap out the replacements and deaths
-  # use WFU_OlivierCocaine_test_df to get dob
-  # calculate the age 
-  # spread to get _age columns
+subjects_exp_age <- left_join( rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
+                                 subset(grepl("^[MF]", labanimalid)), 
+                               date_time_subject_df_comp %>% 
+                                 subset(valid == "yes"), 
+                               by = c("labanimalid", "cohort")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the start date for exp
+  left_join(WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = c("rfid")) %>% # use WFU_OlivierCocaine_test_df to get dob
+  left_join(WFU_OlivierOxycodone_naive_test[, c("rfid", "dob")], by = c("rfid")) %>% # extract the dob of the scrubs from subset(is.na(dob)) (XX temp fix)
+  mutate_all(as.character) %>% 
+  mutate(dob = coalesce(dob.x, dob.y)) %>% # merge the two dob columns
+  mutate_at(vars(matches("start_date|dob")), as.Date) %>% 
+  mutate(age = difftime(start_date, dob, units = c("days")) %>% as.numeric) %>% # calculate the age
+  select(cohort, labanimalid, rfid, exp, age) %>% 
+  distinct(cohort, labanimalid, rfid, exp, age) %>% 
+  mutate(exp = paste0(exp, "_age")) %>% 
+  subset(grepl("SHA|SHOCK|LGA(0[1-9]|1[1-4])|PR", exp)) %>%
+  spread(exp, age) # spread to get _age columns
+  
   # mutate_at(vars(-matches("labanimalid|cohort")), list(esc = ~.-dob)) # calculate the age 
 
 
