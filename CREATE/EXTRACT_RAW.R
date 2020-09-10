@@ -441,8 +441,8 @@ subjects_exp_age <- left_join( rat_info_allcohort_xl_df[, c("cohort", "labanimal
   mutate(age = difftime(start_date, dob, units = c("days")) %>% as.numeric) %>% # calculate the age
   select(cohort, labanimalid, rfid, exp, age) %>% 
   distinct(cohort, labanimalid, rfid, exp, age) %>% 
-  mutate(exp = paste0(exp, "_age")) %>% 
   subset(grepl("SHA|SHOCK|LGA(0[1-9]|1[1-4])|PR", exp)) %>%
+  mutate(exp = paste0(gsub("(\\D+)(\\d+)", "\\1_\\2", tolower(exp)), "_age")) %>% 
   spread(exp, age) # spread to get _age columns
   
   # mutate_at(vars(-matches("labanimalid|cohort")), list(esc = ~.-dob)) # calculate the age 

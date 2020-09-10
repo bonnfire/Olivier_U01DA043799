@@ -260,6 +260,8 @@ for(i in 1:length(cohortfiles)){
     assign(paste0("cohort", i), olivierfiles(cohortfiles[i]))
 }
 
+olivierxl_df <- lapply(cohortfiles, olivierfiles) %>% lapply(function(x){ return(x$tselfadmin)}) %>% rbindlist(fill = T)
+
 ## After 08/05/2020
 setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data")
 cohortfiles_sa_2 <- list.files(pattern = "*.xls[xm]")

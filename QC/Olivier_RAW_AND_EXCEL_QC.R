@@ -232,12 +232,12 @@ genotyped_ids_1 <- genotyped_ids_1 %>%
 
 
 calc_sa_phenotype <- function(x){
-  x <- Olivier_Cocaine_df %>% subset(cohort == x) %>% 
+  x <- Olivier_Cocaine_df %>% subset(cohort%in%x) %>% 
     mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
     select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
     distinct() %>% 
     spread(exp, rewards) %>%
-    select(matches("cohort|rfid|labanimalid|sex|LGA|PR0[23]|SHA\\d+|SHOCK03")) %>%
+    select(matches("cohort|rfid|labanimalid|sex|LGA|PR0[123]|SHA\\d+|SHOCK03")) %>%
     # select(matches("cohort|rfid|labanimalid|sex|LGA(01|1[234])|PR0[23]|SHA\\d+|SHOCK03")) %>%
     mutate(PR_max = pmax(PR02, PR03, na.rm = F)) %>% # exclude animal if the PR02 03 is not complete data
     group_by(sex) %>% 
@@ -265,18 +265,21 @@ calc_sa_phenotype <- function(x){
     # select(matches("cohort|rfid|labanimalid|sex|SHA_last3_mean|PR_index|esc_index|SHOCK_index|addiction_index")) 
   
   # "How long does it take the animal to hit 5 rewards in SHA?"
-  y <- Olivier_Cocaine_df %>% subset(cohort == "C01") %>% 
-    mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
-    select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
-    distinct() %>% 
-    subset(grepl("SHA", exp)) %>% 
-    group_by(rfid) %>% 
-    mutate(SHA_daysto5 = cumsum(case_when(rewards >= 5 ~ 1, TRUE ~ 0))) %>% 
-    dplyr::filter(rewards >= 5|SHA_daysto5 == 0) %>% slice(1) %>% 
-    ungroup() %>% 
-    select(SHA_daysto5)
-    
-  final_phenotypes <- cbind(x, y)
+  # y <- Olivier_Cocaine_df %>% subset(cohort == x|cohort%in% x) %>% 
+  #   mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+")) %>% 
+  #   select(cohort, rfid, labanimalid, sex, exp, rewards) %>% 
+  #   distinct() %>% 
+  #   subset(grepl("SHA", exp)) %>% 
+  #   group_by(rfid) %>% 
+  #   mutate(SHA_daysto5 = cumsum(case_when(rewards >= 5 ~ 1, TRUE ~ 0))) %>% 
+  #   dplyr::filter(rewards >= 5|SHA_daysto5 == 0) %>% slice(1) %>% 
+  #   ungroup() %>% 
+  #   select(SHA_daysto5)
+  #   
+  # final_phenotypes <- cbind(x, y)
+  # 
+  # return(final_phenotypes)
+  return(x)
 }
 
 
@@ -652,12 +655,13 @@ cocaine_intermediates_xl_lga_corrected <- cocaine_intermediates_xl_lga_df %>%
 
 
 
-# cohorts 01-07
+# cohorts 01-07 (LGA)
 cohort01_07_cocaine_lga <- cocaine_intermediates_xl_lga_corrected %>% 
   mutate(exp = paste0(exp, "_rewards")) %>% 
   spread(exp, rewards) %>% 
   mutate_at(vars(matches("lga_(0[2-9]|1[0-4])_rewards$")), list(esc = ~.-lga_01_rewards)) %>% 
-  mutate(esc11_14_mean = rowMeans(select(., ends_with("1[1-4]_esc")), na.rm = TRUE)) %>% 
+  mutate(esc11_14_mean = rowMeans(select(., matches("1[1-4]_rewards_esc")), na.rm = TRUE)) %>% 
+  left_join(subjects_exp_age %>% select(matches("cohort|rfid|labanimalid|^lga")), c("cohort", "rfid", "labanimalid")) %>%  # join the age data xx *new line* # join the active and inactive lever presses
   select(cohort, rfid, sex, labanimalid, everything())
 # quick qc before upload 
 cohort01_07_cocaine_lga %>% get_dupes(rfid)
@@ -667,7 +671,28 @@ setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
 write.csv(cohort01_07_cocaine_lga, file = "cohort01_07_lga_phenotypes.csv", row.names = F)
 
 
+# cohort01-08 (SHA)
+cohort01_08_cocaine_sha_qc <- rbind(sha_rewards_new_valid %>% subset(grepl("SHA(0[89]|10)", exp)) %>% select(cohort, labanimalid, exp, rewards, filename),
+      sha_rewards_old %>% subset(grepl("SHA(0[89]|10)", exp)) %>% mutate(filename = gsub("(.*/){4}", "", filename)) %>% select(cohort, labanimalid, exp, rewards, filename)) %>% 
+  left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
+  rename("rewards_raw" =  "rewards") %>% 
+  left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^sha(0[89]|10)$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
+  mutate(sex = str_extract(labanimalid, "[MF]"),
+         rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
 
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cohort01_08_cocaine_sha_qc %>% subset(rewards_QC == "fail") %>% 
+  spread(exp, rewards_xl) %>% 
+  mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num) %>% 
+  openxlsx::write.xlsx(file = "cocaine_qc_sha.xlsx")
+  
+  
+# qc raw vs excel 
+mutate(rewards_QC_diff = rewards_xl - rewards_raw,
+       rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
+calc_sa_phenotype(c("C01", "C02")) %>% select(cohort, rfid, labanimalid, sex, matches("^PR0[123]$"), SHOCK03, matches("SHA_last3_mean")) %>% head(3)
 
 
 
