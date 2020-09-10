@@ -689,13 +689,46 @@ cohort01_08_cocaine_sha_qc %>% subset(rewards_QC == "fail") %>%
   openxlsx::write.xlsx(file = "cocaine_qc_sha.xlsx")
   
   
-# qc raw vs excel 
-mutate(rewards_QC_diff = rewards_xl - rewards_raw,
-       rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
+
+
+# qc raw vs excel ## extract multiple cohorts at once for the phenotypes 
 calc_sa_phenotype(c("C01", "C02")) %>% select(cohort, rfid, labanimalid, sex, matches("^PR0[123]$"), SHOCK03, matches("SHA_last3_mean")) %>% head(3)
 
 
+# cohort01-08 (PR)
+cohort01_08_cocaine_pr_qc <- rbind(pr_rewards_new_valid %>% subset(grepl("PR0[123]", exp)) %>% select(cohort, labanimalid, exp, rewards, filename),
+                                    pr_rewards_old %>% subset(grepl("PR0[123]", exp)) %>% mutate(filename = gsub("(.*/){4}", "", filename)) %>% select(cohort, labanimalid, exp, rewards, filename)) %>% 
+  left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
+  rename("rewards_raw" =  "rewards") %>% 
+  left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^pr0[123]$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
+  mutate(sex = str_extract(labanimalid, "[MF]"),
+         rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
 
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cohort01_08_cocaine_pr_qc %>% subset(rewards_QC == "fail") %>% 
+  spread(exp, rewards_xl) %>% 
+  mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num) %>% 
+  openxlsx::write.xlsx(file = "cocaine_qc_pr.xlsx")
+
+
+
+# cohort01-08 (SHOCKS)
+cohort01_08_cocaine_shock_qc <- shock_rewards_new_valid %>% subset(grepl("SHOCK0[3]", exp)) %>% select(cohort, labanimalid, exp, rewards, filename) %>% # no need for rbind bc there are no old files for shock rewards 
+  left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
+  rename("rewards_raw" =  "rewards") %>% 
+  left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^shock0[3]$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
+  mutate(sex = str_extract(labanimalid, "[MF]"),
+         rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
+
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cohort01_08_cocaine_shock_qc %>% subset(rewards_QC == "fail") %>% 
+  spread(exp, rewards_xl) %>% 
+  mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num) %>% 
+  openxlsx::write.xlsx(file = "cocaine_qc_shock.xlsx")
 
 
 
