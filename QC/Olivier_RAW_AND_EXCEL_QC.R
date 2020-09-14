@@ -674,7 +674,10 @@ write.csv(cohort01_07_cocaine_lga, file = "cohort01_07_lga_phenotypes.csv", row.
 # cohort01-08 (SHA)
 cohort01_08_cocaine_sha_qc <- rbind(sha_rewards_new_valid %>% subset(grepl("SHA(0[89]|10)", exp)) %>% select(cohort, labanimalid, exp, rewards, filename),
       sha_rewards_old %>% subset(grepl("SHA(0[89]|10)", exp)) %>% mutate(filename = gsub("(.*/){4}", "", filename)) %>% select(cohort, labanimalid, exp, rewards, filename)) %>% 
+  mutate(labanimalid = replace(labanimalid, labanimalid == "F414"&exp == "SHA09", "F414"),
+         rewards = replace(rewards, labanimalid == "F511"&exp =="SHA08", NA)) %>% # notes from rat info and cocaine self admin excel 
   left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
+  # mutate(rewards = replace(rewards, rfid %in% unique(compromised_rats[grep("died", compromised_rats$death_comment, ignore.case = T),]$rfid), NA)) %>%   # XX make values NA if dead after date
   rename("rewards_raw" =  "rewards") %>% 
   left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^sha(0[89]|10)$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
   mutate(sex = str_extract(labanimalid, "[MF]"),
@@ -689,6 +692,11 @@ cohort01_08_cocaine_sha_qc %>% subset(rewards_QC == "fail") %>%
   openxlsx::write.xlsx(file = "cocaine_qc_sha.xlsx")
   
   
+# exclude the un-qc'ed id's for the database 09/14/2020
+cohort01_08_cocaine_sha <- cohort01_08_cocaine_sha_qc %>% 
+  subset(rfid %in% unique(cohort01_08_cocaine_sha_qc[which(cohort01_08_cocaine_sha_qc$rewards_QC == "pass"),]$rfid)) %>% 
+  # group_by(rfid, cohort, labanimalid, sex) %>% 
+  # summarize(mean_sha_last3 = mean(rewards_raw, is.na = T)) ## XX come back to this -- fix because it is taking the group by incorrectly
 
 
 # qc raw vs excel ## extract multiple cohorts at once for the phenotypes 
