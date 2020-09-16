@@ -674,15 +674,18 @@ write.csv(cohort01_07_cocaine_lga, file = "cohort01_07_lga_phenotypes.csv", row.
 # cohort01-08 (SHA)
 cohort01_08_cocaine_sha_qc <- rbind(sha_rewards_new_valid %>% subset(grepl("SHA(0[89]|10)", exp)) %>% select(cohort, labanimalid, exp, rewards, filename),
       sha_rewards_old %>% subset(grepl("SHA(0[89]|10)", exp)) %>% mutate(filename = gsub("(.*/){4}", "", filename)) %>% select(cohort, labanimalid, exp, rewards, filename)) %>% 
-  mutate(labanimalid = replace(labanimalid, labanimalid == "F414"&exp == "SHA09", "F414"),
+  mutate(labanimalid = replace(labanimalid, labanimalid == "F414"&exp == "SHA09", "F424"),
          rewards = replace(rewards, labanimalid == "F511"&exp =="SHA08", NA)) %>% # notes from rat info and cocaine self admin excel 
+  rowwise() %>% 
+  mutate(labanimalid = replace(labanimalid, cohort=="C05"&grepl("F1", labanimalid), gsub("F1", "F5", labanimalid))) %>% 
   left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
   # mutate(rewards = replace(rewards, rfid %in% unique(compromised_rats[grep("died", compromised_rats$death_comment, ignore.case = T),]$rfid), NA)) %>%   # XX make values NA if dead after date
   rename("rewards_raw" =  "rewards") %>% 
   left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^sha(0[89]|10)$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
   mutate(sex = str_extract(labanimalid, "[MF]"),
          rewards_QC_diff = rewards_xl - rewards_raw,
-         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail")) %>% 
+  ungroup()
 
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 cohort01_08_cocaine_sha_qc %>% subset(rewards_QC == "fail") %>% 
@@ -690,8 +693,34 @@ cohort01_08_cocaine_sha_qc %>% subset(rewards_QC == "fail") %>%
   mutate(labanimalid_num = parse_number(labanimalid)) %>% 
   arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num) %>% 
   openxlsx::write.xlsx(file = "cocaine_qc_sha.xlsx")
+
+## create the corrected objects (SHA)  
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_qc_decisions_sha <- u01.importxlsx("decision_cocaine_qc_sha.xlsx")[[1]]
   
+cocaine_intermediates_xl_sha_corrected <- cohort01_08_cocaine_sha_qc %>% 
+  left_join(cocaine_qc_decisions_sha %>% 
+              select(cohort, labanimalid, rfid, source, starts_with("SHA")) %>% 
+              gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% ## maybe add F52[345]
+              subset(!is.na(rewards)), 
+            by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  naniar::replace_with_na_all(condition = ~.x %in% c("NA", "NaN")) %>% 
+  mutate(rewards = ifelse(is.na(rewards_QC)&!is.na(rewards_xl), rewards_xl,  
+                          ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl))) %>% ## make sure that there are no gaps 
+  # source = ifelse(is.na(source), "raw", source)) %>% 
+  subset(!(is.na(rewards)&grepl("F52[345]", labanimalid))) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards) # remove source from data
+
+
+# mean sha
+cohort01_07_cocaine_sha <- cocaine_intermediates_xl_sha_corrected %>% 
+  mutate(exp = tolower(exp)) %>% 
+  spread(exp, rewards) %>% 
+  mutate(mean_sha_last3 = rowMeans(select(., starts_with("sha")), na.rm = T)) 
+
   
+
+
 # exclude the un-qc'ed id's for the database 09/14/2020
 cohort01_08_cocaine_sha <- cohort01_08_cocaine_sha_qc %>% 
   subset(rfid %in% unique(cohort01_08_cocaine_sha_qc[which(cohort01_08_cocaine_sha_qc$rewards_QC == "pass"),]$rfid)) %>% 
@@ -720,6 +749,28 @@ cohort01_08_cocaine_pr_qc %>% subset(rewards_QC == "fail") %>%
   arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num) %>% 
   openxlsx::write.xlsx(file = "cocaine_qc_pr.xlsx")
 
+## create the corrected objects (PR)  
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_qc_decisions_pr <- u01.importxlsx("decision_cocaine_qc_pr.xlsx")[[1]]
+
+cocaine_intermediates_xl_pr_corrected <- cohort01_08_cocaine_pr_qc %>% 
+  left_join(cocaine_qc_decisions_pr %>% 
+              select(cohort, labanimalid, rfid, source, starts_with("PR")) %>% 
+              gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% ## maybe add F52[345]
+              subset(!is.na(rewards)), 
+            by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  naniar::replace_with_na_all(condition = ~.x %in% c("NA", "NaN")) %>% 
+  mutate(rewards = ifelse(is.na(rewards_QC)&!is.na(rewards_xl), rewards_xl,  
+                          ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl))) %>% ## make sure that there are no gaps 
+  # source = ifelse(is.na(source), "raw", source)) %>% 
+  subset(!is.na(rfid)) %>%
+  mutate(exp = tolower(exp)) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards) %>%  # remove source from data
+  spread(exp, rewards)
+
+
+
+
 
 
 # cohort01-08 (SHOCKS)
@@ -738,8 +789,33 @@ cohort01_08_cocaine_shock_qc %>% subset(rewards_QC == "fail") %>%
   arrange(cohort, sex, labanimalid_num) %>% select(-labanimalid_num) %>% 
   openxlsx::write.xlsx(file = "cocaine_qc_shock.xlsx")
 
+## create the corrected objects (SHOCK)  
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_qc_decisions_shock <- u01.importxlsx("decision_cocaine_qc_shock.xlsx")[[1]]
 
+cocaine_intermediates_xl_shock_corrected <- cohort01_08_cocaine_shock_qc %>% 
+  left_join(cocaine_qc_decisions_shock %>% 
+              select(cohort, labanimalid, rfid, source, starts_with("SHOCK")) %>% 
+              gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% ## maybe add F52[345]
+              subset(!is.na(rewards)), 
+            by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  naniar::replace_with_na_all(condition = ~.x %in% c("NA", "NaN")) %>% 
+  mutate(rewards = ifelse(is.na(rewards_QC)&!is.na(rewards_xl), rewards_xl,  
+                          ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl))) %>% ## make sure that there are no gaps 
+  # source = ifelse(is.na(source), "raw", source)) %>% 
+  subset(!is.na(rfid)) %>%
+  mutate(exp = tolower(exp)) %>% 
+  select(cohort, rfid, labanimalid, sex, exp, rewards) %>%  # remove source from data
+  spread(exp, rewards)
 
+cocaine_ints_c01_08_merge_pr_shock <- merge(cocaine_intermediates_xl_pr_corrected, cocaine_intermediates_xl_shock_corrected)
+# 
+cohort01_07_phenotypes_merge <- merge(cohort01_07_cocaine_lga, cohort01_07_cocaine_sha)
+
+cocaine_phenotypes_merge <- merge(cohort01_07_phenotypes_merge, cocaine_ints_c01_08_merge_pr_shock)
+cocaine_phenotypes_merge %>% write.csv(file = "cocaine_phenotypes_n223_all_vars.csv", row.names = F)
+cocaine_phenotypes_merge %>% select(cohort, rfid, sex, labanimalid, esc11_14_mean, mean_sha_last3, starts_with("pr"), shock03) %>% 
+  write.csv(file = "cocaine_phenotypes_n223_stripped_vars.csv", row.names = F)
 
 # will return to cohorts for the expert opinion values 
 ## once the values have been corrected, now calculate the indices 
