@@ -427,12 +427,18 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
 # date_time_subject_df_comp %>% dplyr::filter(subject != 0, valid == "yes") %>% select(subject, box, exp, valid) %>% group_by(subject, box, exp) %>% dplyr::filter(n() > 1) %>% arrange(subject) 
 
 
-## age table (at start of session)
-subjects_exp_age <- left_join( rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
-                                 subset(grepl("^[MF]", labanimalid)), 
-                               date_time_subject_df_comp %>% 
-                                 subset(valid == "yes"), 
-                               by = c("labanimalid", "cohort")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the start date for exp
+## age table (at start of session), box, directory, rooom
+subjects_exp_age <-  rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
+  subset(grepl("^[MF]", labanimalid)) %>%
+  distinct() %>% 
+  left_join(cohorts_exp_date, by = c("cohort")) %>% 
+  rename("start_date" = "excel_date") %>% 
+  left_join(date_time_subject_df_comp %>% 
+              subset(valid == "yes") %>% 
+              select(labanimalid, cohort, exp, box, room), 
+            by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the start date for exp
+  # mutate(comment_date = "NA") %>%
+  # mutate(comment_date = replace(comment, !is.na(start_date), ""))
   left_join(WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = c("rfid")) %>% # use WFU_OlivierCocaine_test_df to get dob
   left_join(WFU_OlivierOxycodone_naive_test[, c("rfid", "dob")], by = c("rfid")) %>% # extract the dob of the scrubs from subset(is.na(dob)) (XX temp fix)
   mutate_all(as.character) %>% 
@@ -444,9 +450,11 @@ subjects_exp_age <- left_join( rat_info_allcohort_xl_df[, c("cohort", "labanimal
   subset(grepl("SHA|SHOCK|LGA(0[1-9]|1[1-4])|PR", exp)) %>%
   mutate(exp = paste0(gsub("(\\D+)(\\d+)", "\\1_\\2", tolower(exp)), "_age")) %>% 
   spread(exp, age) # spread to get _age columns
-  
+
   # mutate_at(vars(-matches("labanimalid|cohort")), list(esc = ~.-dob)) # calculate the age 
 
+
+## box table
 
 
 
