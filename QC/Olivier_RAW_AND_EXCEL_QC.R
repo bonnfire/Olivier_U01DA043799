@@ -649,7 +649,8 @@ cocaine_intermediates_xl_lga_corrected <- cocaine_intermediates_xl_lga_df %>%
             by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
   naniar::replace_with_na_all(condition = ~.x %in% c("NA", "NaN")) %>% 
   mutate(rewards = ifelse(is.na(rewards_QC)&!is.na(rewards_xl), rewards_xl,  
-                          ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl))) %>% ## make sure that there are no gaps 
+                          ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl)),
+         sex = str_extract(labanimalid, "[MF]")) %>% ## make sure that there are no gaps 
          # source = ifelse(is.na(source), "raw", source)) %>% 
   select(cohort, rfid, labanimalid, sex, exp, rewards) # remove source from data
 
@@ -735,9 +736,10 @@ calc_sa_phenotype(c("C01", "C02")) %>% select(cohort, rfid, labanimalid, sex, ma
 # cohort01-08 (PR)
 cohort01_08_cocaine_pr_qc <- rbind(pr_rewards_new_valid %>% subset(grepl("PR0[123]", exp)) %>% select(cohort, labanimalid, exp, rewards, filename),
                                     pr_rewards_old %>% subset(grepl("PR0[123]", exp)) %>% mutate(filename = gsub("(.*/){4}", "", filename)) %>% select(cohort, labanimalid, exp, rewards, filename)) %>% 
-  left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
-  rename("rewards_raw" =  "rewards") %>% 
-  left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^pr0[123]$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
+  left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>% # give rfid
+  rename("rewards_raw" =  "rewards") %>%
+  subset(!is.na(rfid)) %>% 
+  right_join(olivierxl_df %>% select(cohort, rfid, labanimalid, matches("^pr0[123]$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid, -cohort) %>% mutate(exp = toupper(exp)), by = c("cohort", "labanimalid", "rfid", "exp")) %>%
   mutate(sex = str_extract(labanimalid, "[MF]"),
          rewards_QC_diff = rewards_xl - rewards_raw,
          rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"))
@@ -808,14 +810,32 @@ cocaine_intermediates_xl_shock_corrected <- cohort01_08_cocaine_shock_qc %>%
   select(cohort, rfid, labanimalid, sex, exp, rewards) %>%  # remove source from data
   spread(exp, rewards)
 
-cocaine_ints_c01_08_merge_pr_shock <- merge(cocaine_intermediates_xl_pr_corrected, cocaine_intermediates_xl_shock_corrected)
+cocaine_ints_c01_08_merge_pr_shock <- full_join(cocaine_intermediates_xl_pr_corrected, cocaine_intermediates_xl_shock_corrected, by = c("cohort", "rfid", "labanimalid", "sex"))
 # 
-cohort01_07_phenotypes_merge <- merge(cohort01_07_cocaine_lga, cohort01_07_cocaine_sha)
+cohort01_07_phenotypes_merge <- full_join(cohort01_07_cocaine_lga, cohort01_07_cocaine_sha, by = c("cohort", "rfid", "labanimalid", "sex"))
 
-cocaine_phenotypes_merge <- merge(cohort01_07_phenotypes_merge, cocaine_ints_c01_08_merge_pr_shock)
-cocaine_phenotypes_merge %>% write.csv(file = "cocaine_phenotypes_n223_all_vars.csv", row.names = F)
+cocaine_phenotypes_merge <- full_join(cohort01_07_phenotypes_merge, cocaine_ints_c01_08_merge_pr_shock, by = c("cohort", "rfid", "sex", "labanimalid"))
+cocaine_phenotypes_merge %>% write.csv(file = "cocaine_phenotypes_n223_all_vars.csv", row.names = F) # current csv is written for the 223, not 365
 cocaine_phenotypes_merge %>% select(cohort, rfid, sex, labanimalid, esc11_14_mean, mean_sha_last3, starts_with("pr"), shock03) %>% 
+  left_join(subjects_exp_age %>% select(cohort, labanimalid, rfid, lga_11_age, sha_08_age, starts_with("pr_"), shock_03_age), 
+            by = c("cohort", "labanimalid", "rfid")) %>%  # get age 
+  mutate(lga_11_age = replace(lga_11_age, is.na(esc11_14_mean), NA),
+         sha_08_age = replace(sha_08_age, is.na(mean_sha_last3), NA),
+         pr_01_age = replace(pr_01_age, is.na(pr01), NA),
+         pr_02_age = replace(pr_02_age, is.na(pr02), NA),
+         pr_03_age = replace(pr_03_age, is.na(pr03), NA),
+         shock_03_age = replace(shock_03_age, is.na(shock03), NA)) %>% 
+  left_join(box_metadata_wide, by = c("cohort", "labanimalid", "rfid")) %>% 
+  mutate(lga_11_box = replace(lga_11_box, is.na(esc11_14_mean), NA),
+         sha_08_box = replace(sha_08_box, is.na(mean_sha_last3), NA),
+         pr_01_box = replace(pr_01_box, is.na(pr01), NA),
+         pr_02_box = replace(pr_02_box, is.na(pr02), NA),
+         pr_03_box = replace(pr_03_box, is.na(pr03), NA),
+         shock_03_box = replace(shock_03_box, is.na(shock03), NA)) %>% 
+  mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
   write.csv(file = "cocaine_phenotypes_n223_stripped_vars.csv", row.names = F)
+
+
 
 # will return to cohorts for the expert opinion values 
 ## once the values have been corrected, now calculate the indices 

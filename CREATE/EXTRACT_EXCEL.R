@@ -261,7 +261,10 @@ for(i in 1:length(cohortfiles)){
 }
 
 olivierxl_df <- lapply(cohortfiles, olivierfiles) %>% lapply(function(x){ return(x$tselfadmin)}) %>% rbindlist(fill = T)
-
+olivierxl_df <- olivierxl_df %>% 
+  left_join(rat_info_allcohort_xl_df[c("labanimalid", "cohort")], by = "labanimalid") %>% # get cohort info
+  subset(grepl("\\d{15}", rfid))
+  
 ## After 08/05/2020
 setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data")
 cohortfiles_sa_2 <- list.files(pattern = "*.xls[xm]")

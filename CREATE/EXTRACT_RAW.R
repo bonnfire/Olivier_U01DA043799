@@ -404,6 +404,9 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
     grepl("PR", exp) & exp_dur_min > 60 & excel_date == start_date~ "yes"),
     valid = replace(valid, is.na(valid), "no")
   ) # 9808 for cohorts C01-C09 (no C06) ## change the minimum times - Olivier (from 1/24 meeting)
+date_time_subject_df_comp <- date_time_subject_df_comp %>% 
+  subset(!(labanimalid == "806"&box =="6"&room=="BSB273C"&exp =="LGA02")) # remove after manual check
+
 
 # date_time_subject_df_comp %>% dplyr::filter(valid == "yes", labanimalid != 0) %>% group_by(labanimalid, exp) %>% dplyr::filter(n() > 1)
 # date_time_subject_df_comp %>% dplyr::filter(valid == "yes", labanimalid != 0, is.na(dbcomment)) %>% group_by(labanimalid, exp) %>% dplyr::filter(n() > 1)
@@ -428,7 +431,7 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
 
 
 ## age table (at start of session), box, directory, rooom
-subjects_exp_age <-  rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
+subjects_exp_age_source <-  rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
   subset(grepl("^[MF]", labanimalid)) %>%
   distinct() %>% 
   left_join(cohorts_exp_date, by = c("cohort")) %>% 
@@ -442,20 +445,55 @@ subjects_exp_age <-  rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid
   left_join(WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = c("rfid")) %>% # use WFU_OlivierCocaine_test_df to get dob
   left_join(WFU_OlivierOxycodone_naive_test[, c("rfid", "dob")], by = c("rfid")) %>% # extract the dob of the scrubs from subset(is.na(dob)) (XX temp fix)
   mutate_all(as.character) %>% 
-  mutate(dob = coalesce(dob.x, dob.y)) %>% # merge the two dob columns
-  mutate_at(vars(matches("start_date|dob")), as.Date) %>% 
+  mutate(dob = coalesce(dob.x, dob.y), 
+         source_dob = ifelse(!is.na(dob), "wfu", "NA")) %>% # merge the two dob columns
+  left_join(rat_info_allcohort_xl_df[, c("labanimalid", "d_o_b")], by = "labanimalid") %>%
+  mutate(source_dob = replace(source_dob, source_dob == "NA"&!is.na(d_o_b), "olivier excel")) %>%
+  mutate(dob = coalesce(dob, d_o_b)) %>% 
+  mutate_at(vars(matches("^(start_date|dob)")), as.Date) %>% 
   mutate(age = difftime(start_date, dob, units = c("days")) %>% as.numeric) %>% # calculate the age
-  select(cohort, labanimalid, rfid, exp, age) %>% 
-  distinct(cohort, labanimalid, rfid, exp, age) %>% 
+  distinct(cohort, labanimalid, rfid, exp, age, source_dob, source_dob) %>% 
   subset(grepl("SHA|SHOCK|LGA(0[1-9]|1[1-4])|PR", exp)) %>%
   mutate(exp = paste0(gsub("(\\D+)(\\d+)", "\\1_\\2", tolower(exp)), "_age")) %>% 
+  mutate(source_date = ifelse(!is.na(age), "olivierexcel", "NA")) %>% 
+  group_by(labanimalid) %>% fill(age) %>% 
+  mutate(source_date = replace(source_date, source_date == "NA", "fill by previous date")) %>% 
+  ungroup() 
+
+subjects_exp_age <- subjects_exp_age_source %>%
+  select(-matches("source")) %>% 
   spread(exp, age) # spread to get _age columns
+
+
+
 
   # mutate_at(vars(-matches("labanimalid|cohort")), list(esc = ~.-dob)) # calculate the age 
 
 
 ## box table
 
+box_metadata_long <- rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
+  subset(grepl("^[MF]", labanimalid)) %>%
+  distinct() %>% 
+  left_join(cohorts_exp_date %>% select(-excel_date), by = c("cohort")) %>% 
+  left_join(date_time_subject_df_comp %>% 
+              subset(valid == "yes") %>% 
+              select(labanimalid, cohort, exp, box, room), 
+            by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the start date for exp
+  mutate_all(as.character)
+  
+# XX 09/17/2020 fix this eventually (maybe go back to the comp object and fix from there) box_metadata_long %>% distinct() %>% get_dupes(labanimalid, exp)
+box_metadata_wide <- box_metadata_long %>% 
+  subset(grepl("SHA08|SHOCK03|LGA11|PR\\d", exp)) %>%
+  mutate(exp = paste0(gsub("(\\D+)(\\d+)", "\\1_\\2", tolower(exp)), "_box")) %>% 
+  naniar::replace_with_na_all(~.x %in% c("<NA>")) %>% 
+  mutate(room = replace(room, is.na(room), "MED1110")) %>% 
+  mutate(box = ifelse(!is.na(room)&!is.na(box), paste0(box, "-", room), box)) %>% 
+  select(-room) %>%
+  distinct() %>% 
+  mutate(box = replace(box, is.na(box), "NA")) %>% 
+  spread(exp, box)
+  
 
 
 
