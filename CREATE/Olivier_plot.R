@@ -1,6 +1,16 @@
 # plotting olivier's data
 
 ##############################################
+## plotting stripped phenotypes
+##############################################
+cocaine_phenotypes_merge_stripped %>% 
+
+
+
+
+
+
+##############################################
 ## plotting excel self admin data
 ##############################################
 

@@ -816,7 +816,7 @@ cohort01_07_phenotypes_merge <- full_join(cohort01_07_cocaine_lga, cohort01_07_c
 
 cocaine_phenotypes_merge <- full_join(cohort01_07_phenotypes_merge, cocaine_ints_c01_08_merge_pr_shock, by = c("cohort", "rfid", "sex", "labanimalid"))
 cocaine_phenotypes_merge %>% write.csv(file = "cocaine_phenotypes_n223_all_vars.csv", row.names = F) # current csv is written for the 223, not 365
-cocaine_phenotypes_merge %>% select(cohort, rfid, sex, labanimalid, esc11_14_mean, mean_sha_last3, starts_with("pr"), shock03) %>% 
+cocaine_phenotypes_merge_stripped <- cocaine_phenotypes_merge %>% select(cohort, rfid, sex, labanimalid, esc11_14_mean, mean_sha_last3, starts_with("pr"), shock03) %>% 
   left_join(subjects_exp_age %>% select(cohort, labanimalid, rfid, lga_11_age, sha_08_age, starts_with("pr_"), shock_03_age), 
             by = c("cohort", "labanimalid", "rfid")) %>%  # get age 
   mutate(lga_11_age = replace(lga_11_age, is.na(esc11_14_mean), NA),
@@ -833,7 +833,10 @@ cocaine_phenotypes_merge %>% select(cohort, rfid, sex, labanimalid, esc11_14_mea
          pr_03_box = replace(pr_03_box, is.na(pr03), NA),
          shock_03_box = replace(shock_03_box, is.na(shock03), NA)) %>% 
   mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
-  write.csv(file = "cocaine_phenotypes_n223_stripped_vars.csv", row.names = F)
+  naniar::replace_with_na_all(~.x %in% c("<NA>", "NA")) 
+  
+cocaine_phenotypes_merge_stripped %>% 
+  write.csv(file = "cocaine_phenotypes_n364_stripped_vars.csv", row.names = F)
 
 
 

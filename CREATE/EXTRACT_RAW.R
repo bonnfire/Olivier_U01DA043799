@@ -475,11 +475,12 @@ subjects_exp_age <- subjects_exp_age_source %>%
 box_metadata_long <- rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
   subset(grepl("^[MF]", labanimalid)) %>%
   distinct() %>% 
-  left_join(cohorts_exp_date %>% select(-excel_date), by = c("cohort")) %>% 
+  left_join(cohorts_exp_date %>% select(-excel_date), by = c("cohort")) %>% # get all exps 
   left_join(date_time_subject_df_comp %>% 
               subset(valid == "yes") %>% 
               select(labanimalid, cohort, exp, box, room), 
-            by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the start date for exp
+            by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the box and room 
+  full_join(rewards[, c("cohort", "labanimalid", "exp", "box", "computer")], by = c("cohort", "labanimalid", "exp")) %>% 
   mutate_all(as.character)
   
 # XX 09/17/2020 fix this eventually (maybe go back to the comp object and fix from there) box_metadata_long %>% distinct() %>% get_dupes(labanimalid, exp)
@@ -494,7 +495,7 @@ box_metadata_wide <- box_metadata_long %>%
   mutate(box = replace(box, is.na(box), "NA")) %>% 
   spread(exp, box)
   
-
+lga_rewards_old
 
 
 
