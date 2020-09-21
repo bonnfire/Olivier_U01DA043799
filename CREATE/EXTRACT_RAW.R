@@ -480,7 +480,7 @@ box_metadata_long <- rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid
               subset(valid == "yes") %>% 
               select(labanimalid, cohort, exp, box, room), 
             by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the box and room 
-  full_join(rewards[, c("cohort", "labanimalid", "exp", "box", "computer")], by = c("cohort", "labanimalid", "exp")) %>% 
+  full_join(rewards[, c("cohort", "labanimalid", "exp", "box", "computer")], by = c("cohort", "labanimalid", "exp")) %>% # get the old directory animals since the comp object only gives new directory animals
   mutate_all(as.character)
   
 # XX 09/17/2020 fix this eventually (maybe go back to the comp object and fix from there) box_metadata_long %>% distinct() %>% get_dupes(labanimalid, exp)
