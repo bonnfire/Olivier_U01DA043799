@@ -296,6 +296,33 @@ cohort5$tselfadmin[, date_sha02 := lubridate::ymd("2018-07-31")]
 ## don't use this line bc this converts the data.table to dataframe and throws off the rbindlist in create_dataabasestructure to make allcohorts2 # cohort5$tselfadmin %<>% mutate(date_lga19 = lubridate::ymd("2018-09-19"), date_sha02 = lubridate::ymd("2018-07-31"))
 
 
+## extract the irritability tables for all cohorts
+irritability <- lapply(lapply(ls(pattern = "^cohort\\d$"), get), function(x){
+  x$tirritability
+})  
+names(irritability) <- paste0("C", str_pad(parse_number(ls(pattern = "^cohort\\d$")), 2, "left", "0"))
+irritability_df <- irritability %>% rbindlist(fill = T, idcol = "cohort") %>% 
+  rename("labanimalid" = "rat") %>% 
+  mutate("labanimalid" = str_extract(labanimalid, "[MF]\\d+"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### EXTRACT THE MAPPING FILES FROM THEIR DROPBOX
 setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/Rat Information/Cocaine")
 rat_info_xl_filenames <- list.files(pattern = "*.xlsx")

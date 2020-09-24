@@ -63,7 +63,13 @@ if(ratinfo_list_replacements %>% subset(!originalrat %in% ratinfo_list_deaths$ta
 setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
 compromised_rats <- left_join(ratinfo_list_deaths, ratinfo_list_replacements %>% 
                                 select(-cohort), by = c("tailmark" = "originalrat")) %>% 
-  rename("death_comment" = "reasoning") 
+  rename("death_comment" = "reasoning",
+         "rfid_compromised" = "rfid") %>% 
+  mutate(comment = str_to_title(comment)) %>% 
+  mutate(labanimalid = ifelse(grepl("^Not Renumbered", comment), replacement, tailmark),
+         rfid = ifelse(grepl("Renumbered", comment), rfidreplacement, rfid_compromised)) %>% 
+  # mutate(labanimalid = coalesce(rfidreplacement, tailmark)) %>%  # labanimalid is the one ultimately used 
+  mutate(death_comment = gsub("^ | $", "", death_comment))
 # %>%  ## 08/07/2020 RUN THIS LINE OF CODE WHEN THE TWO COHORT 11 ANIMALS DEATH INFO IS RECORDED
   # write.csv("compromised_rats_n70_c01_10.csv")
   

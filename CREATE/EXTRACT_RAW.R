@@ -480,8 +480,19 @@ box_metadata_long <- rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid
               subset(valid == "yes") %>% 
               select(labanimalid, cohort, exp, box, room), 
             by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the box and room 
-  full_join(rewards[, c("cohort", "labanimalid", "exp", "box", "computer")], by = c("cohort", "labanimalid", "exp")) %>% # get the old directory animals since the comp object only gives new directory animals
-  mutate_all(as.character)
+  full_join(rewards[, c("directory", "cohort", "labanimalid", "exp", "box", "computer")], by = c("cohort", "labanimalid", "exp")) %>% # get the old directory animals since the comp object only gives new directory animals
+  mutate_all(as.character) %>% 
+  mutate(box = coalesce(box.x, box.y)) %>% 
+  select(-c("box.x", "box.y")) %>% 
+  rowwise() %>% 
+  mutate(room = replace(room, is.na(room)&grepl("F\\d?(0[1-9]|1[0-6])$", labanimalid)&parse_number(cohort)<7, "MED1110"),
+         computer = replace(computer, is.na(computer)&grepl("F\\d?(1[7-9]|2[0-2])$", labanimalid)&parse_number(cohort)<7, "K1"),
+         computer = replace(computer, is.na(computer)&grepl("F\\d?(2[3-8]$)", labanimalid)&parse_number(cohort)<7, "K2"),
+         computer = replace(computer, is.na(computer)&grepl("(F\\d?(29|30))|(M\\d?(5[1-4]))$", labanimalid)&parse_number(cohort)<7, "K3"),
+         room = replace(room, is.na(room)&grepl("M\\d?(5[5-9]|6[0-8])$", labanimalid)&parse_number(cohort)<7, "MED1113"),
+         computer = replace(computer, is.na(computer)&grepl("M\\d?(69|7[0-4])$", labanimalid)&parse_number(cohort)<7, "Q2"),
+         computer = replace(computer, is.na(computer)&grepl("(M\\d?(7[5-9]|80))$", labanimalid)&parse_number(cohort)<7, "Q3")) %>% #using Brent's comments 09/23/2020 
+  ungroup() 
   
 # XX 09/17/2020 fix this eventually (maybe go back to the comp object and fix from there) box_metadata_long %>% distinct() %>% get_dupes(labanimalid, exp)
 box_metadata_wide <- box_metadata_long %>% 
@@ -735,11 +746,14 @@ lga_rewards_old <- lga_rewards_old %>% group_by(labanimalid, exp) %>%
 ########## PR ##################
 ################################
 
+setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+
+
 ###### NEW FILES ##############
 pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*PR/", value = T) # 77 files
 # label data with...
 pr_subjects_new <- process_subjects_new(pr_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%
-  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #800
+  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #1159
 # extract data with diff function from `read_rewards_new` for sha
 readrewards_pr <- function(x){
   rewards <- fread(paste0("awk '/B:/{print NR \"_\" $2}' ", "'", x, "'"), header = F, fill = T)
@@ -751,7 +765,7 @@ pr_rewards_new <- lapply(pr_new_files, readrewards_pr) %>% rbindlist() %>% separ
   bind_cols(pr_subjects_new) %>%
   separate(
     labanimalid,
-    into = c("labanimalid", "cohort", "exp", "filename", "date", "time"),
+    into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"),
     sep = "_"
   ) %>% mutate(
     date = lubridate::mdy(date),
@@ -759,10 +773,10 @@ pr_rewards_new <- lapply(pr_new_files, readrewards_pr) %>% rbindlist() %>% separ
     rewards = as.numeric(rewards)
   ) %>% 
   left_join(., date_time_subject_df_comp %>% 
-              mutate(start_time = format(ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
+              mutate(start_time = format(lubridate::ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
               select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
-            by = c("cohort", "exp", "filename", "date", "time")) ## 1041
+            by = c("cohort", "exp", "filename", "date", "time")) ## 1180
 
 pr_rewards_new_valid <- pr_rewards_new %>%  
   dplyr::filter(valid == "yes") %>% 
@@ -778,6 +792,7 @@ pr_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset
 # join and update "df" by reference, i.e. without copy 
 
 ## add _valid
+pr_rewards_new_valid <- pr_rewards_new_valid %>% mutate(date = as.character(date))
 setDT(pr_rewards_new_valid)             # convert to data.table without copy
 pr_rewards_new_valid[setDT(pr_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
                        left_join(., date_time_subject_df_comp %>% 
