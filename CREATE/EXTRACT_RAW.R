@@ -489,11 +489,34 @@ box_metadata_long <- rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid
          computer = replace(computer, is.na(computer)&grepl("F\\d?(1[7-9]|2[0-2])$", labanimalid)&parse_number(cohort)<7, "K1"),
          computer = replace(computer, is.na(computer)&grepl("F\\d?(2[3-8]$)", labanimalid)&parse_number(cohort)<7, "K2"),
          computer = replace(computer, is.na(computer)&grepl("(F\\d?(29|30))|(M\\d?(5[1-4]))$", labanimalid)&parse_number(cohort)<7, "K3"),
-         room = replace(room, is.na(room)&grepl("M\\d?(5[5-9]|6[0-8])$", labanimalid)&parse_number(cohort)<7, "MED1113"),
+         room = replace(room, is.na(room)&grepl("M\\d?(5[5-9]|6[0-b8])$", labanimalid)&parse_number(cohort)<7, "MED1113"),
          computer = replace(computer, is.na(computer)&grepl("M\\d?(69|7[0-4])$", labanimalid)&parse_number(cohort)<7, "Q2"),
          computer = replace(computer, is.na(computer)&grepl("(M\\d?(7[5-9]|80))$", labanimalid)&parse_number(cohort)<7, "Q3")) %>% #using Brent's comments 09/23/2020 
   ungroup() 
   
+
+# breakdown by cohorts 
+# boxes for cohort 1
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+c01_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
+  subset(cohort == "C01") %>% 
+  mutate(room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("([.]/.*/.*/.*/)?(.*)C\\d{2}HS.*", "\\2", filename), NA)) %>% 
+  select(cohort, labanimalid, exp, box, room) %>% 
+  naniar::replace_with_na_all( ~ .x %in% c("<NA>")) %>% 
+  rowwise() %>% 
+  mutate(room_box = ifelse(!is.na(room), paste0(room, "-", box), box)) %>%
+  select(-c("box", "room")) %>% 
+  subset(exp %in% c("SHA08", "SHA09", "SHA10", "SHOCK03", "PR01", "PR02", "PR03", "LGA11", "LGA12", "LGA13", "LGA14")) %>% 
+  ungroup() %>% 
+  spread(key = "exp", value = "room_box") %>% 
+  mutate(labanimalid_num = parse_number(labanimalid),
+         sex = str_extract(labanimalid, "[MF]")) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% select(-c("labanimalid_num", "sex"))
+  
+openxlsx::write.xlsx(c01_boxes, file = "cocaine_c01_boxes_toqc.xlsx")
+
+
+
 # XX 09/17/2020 fix this eventually (maybe go back to the comp object and fix from there) box_metadata_long %>% distinct() %>% get_dupes(labanimalid, exp)
 box_metadata_wide <- box_metadata_long %>% 
   subset(grepl("SHA08|SHOCK03|LGA11|PR\\d", exp)) %>%
