@@ -519,6 +519,9 @@ setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
 
 
 
+## extract the index values
+
+
 
 
 ## extract the intermediate values

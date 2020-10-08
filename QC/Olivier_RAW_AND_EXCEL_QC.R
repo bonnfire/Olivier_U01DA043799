@@ -450,25 +450,18 @@ Olivier_Cocaine_df %>%
 # 08/07/2020
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 
-Olivier_phenotype_xl <- openxlsx::read.xlsx("Cocaine_GWAS_ADDIND.xlsx") %>% 
+addiction_index_xl <- openxlsx::read.xlsx("Cocaine_GWAS_ADDIND.xlsx") %>% 
   clean_names() %>% 
-  select_if(~sum(!is.na(.)) > 0) %>% 
-  select(-matches("x\\d+$")) %>%  # manually removing, after looking at column contents on 08/07/2020
-  rename("labanimalid" = "rat")
+  rename("labanimalid" = "rat") %>% 
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+"),
+         cohort = paste0("C", str_pad(cohort, 2, "left", "0")))
+  
 
-Olivier_Cocaine_C01_09 %>% 
-  left_join(Olivier_phenotype_xl %>% 
-              select(-cohort), by = "rfid") %>% 
-  subset(!is.na(labanimalid.y)) %>% 
-  subset(cohort == "C03")
-
-Olivier_Cocaine_C01_09 %>% 
-  left_join(Olivier_phenotype_xl %>% 
-              select(-cohort), by = "rfid") %>% 
-  subset(cohort == "C04")
-
-
-
+  
+  
+  
+  
+  
 
 ### EXTRACT THE EXCEL INDICES (AND INTERMEDIATE VALUES FOR COHORTS 01-07)
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
@@ -883,6 +876,8 @@ cocaine_phenotypes_merge_stripped <- cocaine_phenotypes_merge %>% select(cohort,
   mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
   naniar::replace_with_na_all(~.x %in% c("<NA>", "NA")) 
   
+cocaine_phenotypes_merge_stripped
+
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 cocaine_phenotypes_merge_stripped %>% 
   write.csv(file = "cocaine_phenotypes_n364_stripped_vars_2.csv", row.names = F) # make a copy in Desktop
