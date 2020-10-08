@@ -22,7 +22,7 @@ library(stringr)
 
 olivierfiles <- function(filename){
   # setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/Olivier_George_U01DA043799 (Cocaine)/Olivier_George_U01/DATA Updated")
-  setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/DATA Updated")
+  # setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/DATA Updated")
   options(scipen = 100) # prevent sci notation
   u01.importxlsx <- function(xlname){
     df <- lapply(excel_sheets(path = xlname), read_excel, path = xlname)
@@ -264,7 +264,56 @@ olivierxl_df <- lapply(cohortfiles, olivierfiles) %>% lapply(function(x){ return
 olivierxl_df <- olivierxl_df %>% 
   left_join(rat_info_allcohort_xl_df[c("labanimalid", "cohort")], by = "labanimalid") %>% # get cohort info
   subset(grepl("\\d{15}", rfid))
-  
+
+# join cohort 9 temporarily 
+# as of 09/30/2020 there are c01-11 
+setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data")
+# olivierxl_df_c09_11 <-lapply(list.files()[8:10], olivierfiles) %>% lapply(function(x){ return(x$tselfadmin)}) %>% rbindlist(fill = T)
+olivier_xl_df_c09 <- read_xlsx("C09 COCAINE.xlsx") %>% 
+  mutate_all(as.character)
+olivier_xl_df_c09_t <- rbind(olivier_xl_df_c09, as.character(names(olivier_xl_df_c09))) %>% t() %>% as.data.frame() %>% 
+  mutate_all(as.character)
+names(olivier_xl_df_c09_t) <- olivier_xl_df_c09_t[1, ]
+names(olivier_xl_df_c09_t) <- gsub("((SHA|LGA|PRESHOCK|SHOCK|PR)\\d+).*", "\\1", toupper(names(olivier_xl_df_c09_t))) %>% gsub("((PRE)?SHOCK).*", "\\1", .) %>% gsub("(\\D)(\\d)$", "\\10\\2", .) %>% gsub("^SHOCK", "SHOCK03",. ) %>% make_clean_names
+olivier_xl_df_c09_t <- olivier_xl_df_c09_t[-1, ]
+olivier_xl_df_c09_df <- olivier_xl_df_c09_t %>%
+  mutate(cohort = "C09") %>% 
+  rename("labanimalid" = "rat_01") %>% 
+  rowwise() %>% 
+  mutate(leverpresses = "NA") %>% 
+  mutate(leverpresses = replace(leverpresses, grepl("Description", labanimalid), "rewards"),
+         leverpresses = replace(leverpresses, grepl("ACTIVE", labanimalid), str_extract(tolower(labanimalid), "active|inactive"))) %>%
+  ungroup() %>% 
+  naniar::replace_with_na_all(~ .x %in% c("NA")) %>% 
+  fill(leverpresses) %>% 
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  select(-na) %>% 
+  subset(leverpresses == "rewards"&!(is.na(sha01)&is.na(sha02)&is.na(sha03)&!is.na(pr01)&!is.na(pr02))) %>% # filter out non rewards data and pr ratio data
+  subset(!(rfid %in% c("933000320047165", "933000320047383", "933000320047595", "933000320047598") & grepl("[.]", sha01))) %>% 
+  select(-leverpresses) %>% 
+  select(cohort, rfid, labanimalid, everything())
+
+
+
+# add exp date columns
+nm <- names(olivier_xl_df_c09_df)[-c(1:3)]# use these columns to make date columns
+nm1 <- paste("date", nm, sep = "_") # make these date columns
+setDT(olivier_xl_df_c09_df)
+olivier_xl_df_c09_df[ , ( nm1 ) := lapply( .SD, function(x) c(grep("^\\d{4}\\-(0?[1-9]|1[012])\\-(0?[1-9]|[12][0-9]|3[01])$", x, value = T)) ) ,  .SDcols = nm ]
+ind <- grep("^(date)", names(olivier_xl_df_c09_df), perl = T) # bring date characters back to posixct
+for (i in seq_along(ind)) {
+  set(olivier_xl_df_c09_df, NULL, ind[i], as.POSIXct(olivier_xl_df_c09_df[[ind[i]]], tz = "UTC"))
+}
+
+# remove rows and make numeric
+olivier_xl_df_c09_df <- olivier_xl_df_c09_df %>% 
+  subset(grepl("^933", rfid)) %>%
+  mutate_at(vars(-matches("rfid|labanimalid|cohort|date")), as.numeric) # remove the row with dates
+
+
+olivierxl_df <- bind_rows(olivierxl_df, olivier_xl_df_c09_df) # cohort 9 is NA for all comment and dates
+
+
 ## After 08/05/2020
 setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data")
 cohortfiles_sa_2 <- list.files(pattern = "*.xls[xm]")

@@ -355,7 +355,8 @@ date_time_subject_df <- date_time_subject_mut %>%
 date_time_subject_df %>% subset(!cohort %in% c("C10", "C11")&nchar(labanimalid)>4)
 date_time_subject_df <- date_time_subject_df %>% 
   mutate(labanimalid = replace(labanimalid, labanimalid == "F8256", "F826"),
-         labanimalid = replace(labanimalid, labanimalid == "M5556", "M556"))
+         labanimalid = replace(labanimalid, labanimalid == "M5556", "M556")) %>% 
+  mutate(exp = replace(exp, grepl("PRESHOCK", filename), "PRESHOCK"))
   
 # waiting on their response for these cases (trying to assign labanimalid [MF]\\d{4,})
 ## date_time_subject_df %>% arrange(cohort, as.numeric(box)) %>% dplyr::filter(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )|lead(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T ))|lag(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )))
@@ -403,7 +404,10 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
     grepl("LGA", exp) & exp_dur_min > 355 & excel_date == start_date~ "yes",
     grepl("PR", exp) & exp_dur_min > 60 & excel_date == start_date~ "yes"),
     valid = replace(valid, is.na(valid), "no")
-  ) # 9808 for cohorts C01-C09 (no C06) ## change the minimum times - Olivier (from 1/24 meeting)
+  )   # 9808 for cohorts C01-C09 (no C06) ## change the minimum times - Olivier (from 1/24 meeting)
+  # mutate()# temporarily give a free pass for cohort 9
+  
+
 date_time_subject_df_comp <- date_time_subject_df_comp %>% 
   subset(!(labanimalid == "806"&box =="6"&room=="BSB273C"&exp =="LGA02")) # remove after manual check
 
@@ -434,12 +438,22 @@ date_time_subject_df_comp <- date_time_subject_df_comp %>%
 subjects_exp_age_source <-  rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
   subset(grepl("^[MF]", labanimalid)) %>%
   distinct() %>% 
-  left_join(cohorts_exp_date, by = c("cohort")) %>% 
+  left_join(
+    rbind(cohorts_exp_date, 
+          olivierxl_df %>% 
+            subset(cohort == "C09") %>% 
+            select(cohort, matches("date")) %>% 
+            gather("exp", "date", -cohort) %>% distinct() %>% 
+            mutate(exp = gsub("date_", "", exp) %>% toupper) %>%
+            rename("excel_date" = "date"))
+          , by = c("cohort")
+    ) %>% # XX TEMP get cohort 9 dates
   rename("start_date" = "excel_date") %>% 
-  left_join(date_time_subject_df_comp %>% 
-              subset(valid == "yes") %>% 
-              select(labanimalid, cohort, exp, box, room), 
-            by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the start date for exp
+  # left_join(date_time_subject_df_comp %>% 
+  #             subset(valid == "yes") %>% 
+  #             select(labanimalid, cohort, exp, box, room), 
+  #           by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the start date for exp
+  # left_join()
   # mutate(comment_date = "NA") %>%
   # mutate(comment_date = replace(comment, !is.na(start_date), ""))
   left_join(WFU_OlivierCocaine_test_df[, c("rfid", "dob")], by = c("rfid")) %>% # use WFU_OlivierCocaine_test_df to get dob
@@ -447,7 +461,8 @@ subjects_exp_age_source <-  rat_info_allcohort_xl_df[, c("cohort", "labanimalid"
   mutate_all(as.character) %>% 
   mutate(dob = coalesce(dob.x, dob.y), 
          source_dob = ifelse(!is.na(dob), "wfu", "NA")) %>% # merge the two dob columns
-  left_join(rat_info_allcohort_xl_df[, c("labanimalid", "d_o_b")], by = "labanimalid") %>%
+  left_join(rat_info_allcohort_xl_df[, c("labanimalid", "d_o_b")] %>% 
+              mutate(d_o_b = ifelse(!grepl("-", d_o_b), openxlsx::convertToDate(d_o_b) %>% as.character, d_o_b)), by = "labanimalid") %>%
   mutate(source_dob = replace(source_dob, source_dob == "NA"&!is.na(d_o_b), "olivier excel")) %>%
   mutate(dob = coalesce(dob, d_o_b)) %>% 
   mutate_at(vars(matches("^(start_date|dob)")), as.Date) %>% 
@@ -471,35 +486,136 @@ subjects_exp_age <- subjects_exp_age_source %>%
 
 
 ## box table
-
+# record of the raw data (combined with Brent's knowledge for the rooms)
 box_metadata_long <- rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid")] %>% 
-  subset(grepl("^[MF]", labanimalid)) %>%
+  subset(grepl("^[MF]", labanimalid)&!is.na(labanimalid)) %>%
   distinct() %>% 
   left_join(cohorts_exp_date %>% select(-excel_date), by = c("cohort")) %>% # get all exps 
   left_join(date_time_subject_df_comp %>% 
               subset(valid == "yes") %>% 
               select(labanimalid, cohort, exp, box, room), 
             by = c("labanimalid", "cohort", "exp")) %>% ## use rat_info_allcohort_xl_df to get rfid and use the comp to get the box and room 
-  full_join(rewards[, c("directory", "cohort", "labanimalid", "exp", "box", "computer")], by = c("cohort", "labanimalid", "exp")) %>% # get the old directory animals since the comp object only gives new directory animals
+  full_join(rewards[, c("directory", "cohort", "labanimalid", "exp", "room", "box", "computer")], by = c("cohort", "labanimalid", "exp")) %>% # get the old directory animals since the comp object only gives new directory animals
   mutate_all(as.character) %>% 
-  mutate(box = coalesce(box.x, box.y)) %>% 
-  select(-c("box.x", "box.y")) %>% 
+  mutate(box = coalesce(box.x, box.y),
+         room = coalesce(room.y, room.x), # chose this order bc room y has less missingness
+         room_computer = coalesce(room, computer)) %>% 
+  select(-matches("\\.[xy]$|^computer|^room$")) %>% 
   rowwise() %>% 
-  mutate(room = replace(room, is.na(room)&grepl("F\\d?(0[1-9]|1[0-6])$", labanimalid)&parse_number(cohort)<7, "MED1110"),
-         computer = replace(computer, is.na(computer)&grepl("F\\d?(1[7-9]|2[0-2])$", labanimalid)&parse_number(cohort)<7, "K1"),
-         computer = replace(computer, is.na(computer)&grepl("F\\d?(2[3-8]$)", labanimalid)&parse_number(cohort)<7, "K2"),
-         computer = replace(computer, is.na(computer)&grepl("(F\\d?(29|30))|(M\\d?(5[1-4]))$", labanimalid)&parse_number(cohort)<7, "K3"),
-         room = replace(room, is.na(room)&grepl("M\\d?(5[5-9]|6[0-b8])$", labanimalid)&parse_number(cohort)<7, "MED1113"),
-         computer = replace(computer, is.na(computer)&grepl("M\\d?(69|7[0-4])$", labanimalid)&parse_number(cohort)<7, "Q2"),
-         computer = replace(computer, is.na(computer)&grepl("(M\\d?(7[5-9]|80))$", labanimalid)&parse_number(cohort)<7, "Q3")) %>% #using Brent's comments 09/23/2020 
-  ungroup() 
+  mutate(room_computer = replace(room_computer, is.na(room_computer)&grepl("F\\d?([1-9]|0[1-9]|1[0-6]|90)$", labanimalid)&parse_number(cohort)<7, "MED1110"),
+         room_computer = replace(room_computer, is.na(room_computer)&grepl("F\\d?(1[7-9]|2[0-2])$", labanimalid)&parse_number(cohort)<7, "K1"),
+         room_computer = replace(room_computer, is.na(room_computer)&grepl("F\\d?(2[3-8]$)", labanimalid)&parse_number(cohort)<7, "K2"),
+         room_computer = replace(room_computer, is.na(room_computer)&grepl("(F\\d?(29|30))|(M\\d?(5[1-4]))$", labanimalid)&parse_number(cohort)<7, "K3"),
+         room_computer = replace(room_computer, is.na(room_computer)&grepl("M\\d?(5[5-9]|6[0-b8])$", labanimalid)&parse_number(cohort)<7, "MED1113"),
+         room_computer = replace(room_computer, is.na(room_computer)&grepl("M\\d?(69|7[0-4])$", labanimalid)&parse_number(cohort)<7, "Q2"),
+         room_computer = replace(room_computer, is.na(room_computer)&grepl("(M\\d?(7[5-9]|80))$", labanimalid)&parse_number(cohort)<7, "Q3"),
+         room_computer = replace(room_computer, grepl("SHOCK", exp)&parse_number(cohort)>5, "BSB273B"),
+         room_computer = replace(room_computer, grepl("SHOCK", exp)&parse_number(cohort)<=5, "MED1110")) %>% #using Brent's comments 09/23/2020 
+  ungroup() %>% 
+  subset(!is.na(labanimalid)|grepl("[MF]", labanimalid))
   
+
+## qc 
+box_metadata_long <- box_metadata_long %>% 
+  subset(!grepl("[MF]0\\d", labanimalid)) %>% # remove cases like F03
+  subset(!grepl("[MF]\\d+-\\d", labanimalid)) # remove cases like M156-1 and F79-1
+
+## create dataframe with all filled for NA 
+# record of the raw data (combined with Brent's knowledge for the rooms) ON TOP OF the knowledge theoretically, each animal should be run on the same boxes throughout the exps
+box_metadata_long_fill_2 <- box_metadata_long %>% # for those animals that don't have raw data # exlude animals for all na
+  naniar::replace_with_na_all(~.x %in% c("NA", "<NA>", "N/A")) %>% 
+  mutate(phenotype_box = ifelse(!is.na(box), paste0(room_computer, "-", box), NA)) %>% 
+  subset(!grepl("SHOCK", exp)) %>% 
+  group_by(labanimalid) %>%
+  dplyr::filter(!all(is.na(box))) %>% 
+  arrange(desc(!is.na(phenotype_box))) %>% 
+  # fill(phenotype_box) %>%
+  mutate(phenotype_box = zoo::na.locf(phenotype_box)) %>%
+  ungroup() %>% 
+  rbind(box_metadata_long %>% # for those animals that don't have raw data
+          naniar::replace_with_na_all(~.x %in% c("NA", "<NA>", "N/A")) %>% 
+          mutate(phenotype_box = ifelse(!is.na(box), paste0(room_computer, "-", box), NA)) %>% 
+          subset(grepl("SHOCK", exp)) %>% 
+          group_by(labanimalid) %>%
+          dplyr::filter(!all(is.na(box))) %>% 
+          arrange(desc(!is.na(phenotype_box))) %>% 
+          # fill(phenotype_box) %>%
+          mutate(phenotype_box = zoo::na.locf(phenotype_box)) %>%
+          ungroup()) %>% 
+  rbind(date_time_subject_df_comp %>% 
+          subset(cohort == "C09") %>%
+          mutate(labanimalid = replace(labanimalid, labanimalid == "F951", "M951"),
+                 labanimalid = replace(labanimalid, labanimalid == "F952", "M952")) %>% 
+          mutate(phenotype_box = paste0(room, "-", box)) %>% 
+          rename("room_computer" = "room") %>% 
+          mutate(directory = "new_sha") %>% 
+          subset(!(labanimalid == "F925"&phenotype_box == "BSB273E-9")) %>% # animal died before SHA06, should not have LGA sessions
+          left_join(rat_info_allcohort_xl_df[, c("labanimalid", "rfid")], by = "labanimalid") %>% # give df rfid column
+          distinct(cohort, labanimalid, rfid, exp, directory, box, room_computer, phenotype_box)
+  ) ## XX TEMP FOR COHORT 9
+
+
+# box_metadata_long_fill <- box_metadata_long %>% # for those animals that don't have raw data
+#   naniar::replace_with_na_all(~.x %in% c("NA", "<NA>", "N/A")) %>% 
+#   mutate(phenotype_box = ifelse(!is.na(box), paste0(room_computer, "-", box), NA)) %>% 
+#   subset(!grepl("SHOCK", exp)) %>% 
+#   group_by(labanimalid) %>%
+#   fill(phenotype_box) %>%
+#   # mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast = T)) %>%
+#   ungroup() %>% 
+#   rbind(box_metadata_long %>% # for those animals that don't have raw data
+#           naniar::replace_with_na_all(~.x %in% c("NA", "<NA>", "N/A")) %>% 
+#           mutate(phenotype_box = ifelse(!is.na(box), paste0(room_computer, "-", box), NA)) %>% 
+#           subset(grepl("SHOCK", exp)) %>% 
+#           group_by(labanimalid) %>%
+#           fill(phenotype_box) %>%
+#           # mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast = T)) %>%
+#           ungroup())
+
+# by cohort and sex for all non shock exps
+box_metadata_long_fill <- box_metadata_long_fill %>% mutate(phenotype_box = replace(phenotype_box, cohort == "C02"&grepl("F(80|10[6-9])", labanimalid)&!grepl("SHOCK", exp), "No phenotype data"))
+box_metadata_long_fill <- box_metadata_long_fill %>% mutate(phenotype_box = replace(phenotype_box, cohort == "C02"&grepl("F90", labanimalid)&!grepl("SHOCK", exp), "MED1110-11"))
+box_metadata_long_fill %>% subset(cohort == "C02"&grepl("F", labanimalid)&!grepl("SHOCK", exp)) %>% group_by(labanimalid) %>% mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast=T)) %>% ungroup()%>% distinct(labanimalid, phenotype_box) %>% add_count(labanimalid) %>% subset(n!= 1) %>% View()
+# box_metadata_long_fill %>% subset(cohort == "C02"&grepl("F80", labanimalid)&!grepl("SHOCK", exp))%>% select(labanimalid, exp, phenotype_box) %>% spread("exp", "phenotype_box")
+# box_metadata_long_fill %>% subset(cohort == "C02"&grepl("F9[36]", labanimalid)&!grepl("SHOCK", exp))%>% subset(labanimalid == "F93"&phenotype_box != "MED1110-14"| labanimalid == "F96"&phenotype_box != "MED1110-15")
+box_metadata_long_fill %>% subset(cohort == "C02"&grepl("M", labanimalid)&!grepl("SHOCK", exp)) %>% group_by(labanimalid) %>% mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast=T)) %>% ungroup()%>% distinct(labanimalid, phenotype_box) %>% add_count(labanimalid) %>% subset(n!= 1) %>% View()
+# box_metadata_long_fill %>% subset(cohort == "C02"&grepl("M17[35]", labanimalid)&!grepl("SHOCK", exp))%>% subset(labanimalid == "M173"&phenotype_box != "Q3-1"| labanimalid == "M175"&phenotype_box != "Q3-3")
+box_metadata_long_fill %>% subset(cohort == "C03"&grepl("M", labanimalid)&!grepl("SHOCK", exp))%>% distinct(labanimalid, phenotype_box) %>% add_count(labanimalid) %>% subset(n== 1&is.na(phenotype_box)|n!=1) %>% select(labanimalid) %>% mutate(labanimalid = gsub("M", "", labanimalid)) %>% unlist() %>% paste0(collapse = ", ")
+box_metadata_long_fill %>% subset(cohort == "C04"&grepl("M", labanimalid)&!grepl("SHOCK", exp))%>% distinct(labanimalid, phenotype_box) %>% add_count(labanimalid) %>% subset(n==2&phenotype_box %>% is.na) %>% select(labanimalid) %>% mutate(labanimalid = gsub("M", "", labanimalid)) %>% unlist() %>% paste0(collapse = ", ")
+
+# by cohort and sex for all shock exps
+# once you filter out the n==1&is.na(phenotype_box), use group_by(labanimalid) %>% mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast=T)) %>% ungroup()
+box_metadata_long_fill %>% subset(cohort == "C01"&grepl("F", labanimalid)&grepl("SHOCK", exp)) %>% distinct(labanimalid, phenotype_box) %>% add_count(labanimalid) %>% subset(n== 1&is.na(phenotype_box)|n!=1) %>% View()
+
+
+# clean up the duplicates for non shock
+box_metadata_long_fill %>% 
+  subset(!grepl("SHOCK", exp)) %>% 
+  distinct(labanimalid, room_box) %>% 
+  add_count(labanimalid) %>% 
+  subset(n!=1)
+
+# make sure that shock has value
+
 
 # breakdown by cohorts 
 # boxes for cohort 1
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 c01_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
   subset(cohort == "C01") %>% 
+  select(cohort, labanimalid, exp, room_box) %>% 
+  subset(exp %in% c("SHA08", "SHA09", "SHA10", "SHOCK03", "PR01", "PR02", "PR03", "LGA11", "LGA12", "LGA13", "LGA14")) %>% 
+  spread(key = "exp", value = "room_box") %>% 
+  mutate(labanimalid_num = parse_number(labanimalid),
+         sex = str_extract(labanimalid, "[MF]")) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% select(-c("labanimalid_num", "sex")) %>% 
+  
+  
+openxlsx::write.xlsx(c01_boxes, file = "cocaine_c01_boxes_toqc.xlsx")
+
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+c02_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
+  subset(cohort == "C02") %>% 
   mutate(room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("([.]/.*/.*/.*/)?(.*)C\\d{2}HS.*", "\\2", filename), NA)) %>% 
   select(cohort, labanimalid, exp, box, room) %>% 
   naniar::replace_with_na_all( ~ .x %in% c("<NA>")) %>% 
@@ -512,26 +628,47 @@ c01_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
   mutate(labanimalid_num = parse_number(labanimalid),
          sex = str_extract(labanimalid, "[MF]")) %>% 
   arrange(cohort, sex, labanimalid_num) %>% select(-c("labanimalid_num", "sex"))
-  
-openxlsx::write.xlsx(c01_boxes, file = "cocaine_c01_boxes_toqc.xlsx")
+openxlsx::write.xlsx(c02_boxes, file = "cocaine_c02_boxes_toqc.xlsx")
+
+
+c03_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
+  subset(cohort == "C02") %>% 
+  mutate(room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("([.]/.*/.*/.*/)?(.*)C\\d{2}HS.*", "\\2", filename), NA)) %>% 
+  select(cohort, labanimalid, exp, box, room) %>% 
+  naniar::replace_with_na_all( ~ .x %in% c("<NA>")) %>% 
+  rowwise() %>% 
+  mutate(room_box = ifelse(!is.na(room), paste0(room, "-", box), box)) %>%
+  select(-c("box", "room")) %>% 
+  subset(exp %in% c("SHA08", "SHA09", "SHA10", "SHOCK03", "PR01", "PR02", "PR03", "LGA11", "LGA12", "LGA13", "LGA14")) %>% 
+  ungroup() %>% 
+  spread(key = "exp", value = "room_box") %>% 
+  mutate(labanimalid_num = parse_number(labanimalid),
+         sex = str_extract(labanimalid, "[MF]")) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% select(-c("labanimalid_num", "sex"))
+openxlsx::write.xlsx(c03_boxes, file = "cocaine_c03_boxes_toqc.xlsx")
+
 
 
 
 # XX 09/17/2020 fix this eventually (maybe go back to the comp object and fix from there) box_metadata_long %>% distinct() %>% get_dupes(labanimalid, exp)
-box_metadata_wide <- box_metadata_long %>% 
-  subset(grepl("SHA08|SHOCK03|LGA11|PR\\d", exp)) %>%
-  mutate(exp = paste0(gsub("(\\D+)(\\d+)", "\\1_\\2", tolower(exp)), "_box")) %>% 
-  naniar::replace_with_na_all(~.x %in% c("<NA>")) %>% 
-  mutate(room = replace(room, is.na(room), "MED1110")) %>% 
-  mutate(box = ifelse(!is.na(room)&!is.na(box), paste0(box, "-", room), box)) %>% 
-  select(-room) %>%
-  distinct() %>% 
-  mutate(box = replace(box, is.na(box), "NA")) %>% 
-  spread(exp, box)
+# box_metadata_wide <- box_metadata_long %>% 
+#   subset(grepl("SHA08|SHOCK03|LGA11|PR\\d", exp)) %>%
+#   mutate(exp = paste0(gsub("(\\D+)(\\d+)", "\\1_\\2", tolower(exp)), "_box")) %>% 
+#   naniar::replace_with_na_all(~.x %in% c("<NA>")) %>% 
+#   mutate(room = replace(room, is.na(room), "MED1110")) %>% 
+#   mutate(box = ifelse(!is.na(room)&!is.na(box), paste0(box, "-", room), box)) %>% 
+#   select(-room) %>%
+#   distinct() %>% 
+#   mutate(box = replace(box, is.na(box), "NA")) %>% 
+#   spread(exp, box)
   
-lga_rewards_old
 
 
+box_metadata_wide_2 <- box_metadata_long_fill_2 %>% 
+  subset(grepl("SHA08|SHOCK03|LGA11|PR\\d", exp)) %>%
+  distinct(cohort, labanimalid, rfid, exp, phenotype_box) %>% 
+  mutate(exp = paste0(gsub("(\\D+)(\\d+)", "\\1_\\2", tolower(exp)), "_box")) %>%
+  spread(exp, phenotype_box)
 
 
 
@@ -661,16 +798,16 @@ sha_rewards_old %>% get_dupes(labanimalid, cohort,exp)
 
 ###### NEW FILES ##############
 # label data with... 
-lga_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 416 files
+lga_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 464 files
 lga_subjects_new <- process_subjects_new(lga_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
   arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
 # extract data with `read_rewards_new` same for sha
 lga_rewards_new <- lapply(lga_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
   bind_cols(lga_subjects_new) %>% 
-  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time"), sep = "_") %>% 
+  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
   mutate(date = lubridate::mdy(date), time = chron::chron(times = time), rewards = as.numeric(rewards)) %>%  
   left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
+              select(cohort, exp, filename, valid, start_date, start_time) %>% 
               rename("date" = "start_date", "time" = "start_time"), 
             by = c("cohort", "exp", "filename", "date", "time")) ## 6348 
 
@@ -707,6 +844,9 @@ lga_rewards_new_valid %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
 lga_rewards_new_valid %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA09"&time=="09:00:21"&filename=="MED1114C07HSLGA09", "M779"))
 lga_rewards_new_valid %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA10"&time=="09:21:34"&filename=="MED1114C07HSLGA10", "M779"))
 lga_rewards_new_valid %<>% dplyr::filter(!(grepl("MED1114C07HSLGA(09|10)",filename) & labanimalid == "M779"))
+lga_rewards_new_valid %<>% dplyr::filter(!(labanimalid == "F516" & box %in% c("7", "15")))
+
+
 
 lga_rewards_new_valid %>% get_dupes(labanimalid, exp)
 
@@ -869,6 +1009,9 @@ pr_rewards_old <- pr_rewards_old %>%
 ################################
 ########## SHOCK ###############
 ################################
+setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+
+
 
 ###### NEW FILES ##############
 shock_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*SHOCK/", value = T) # 54 files

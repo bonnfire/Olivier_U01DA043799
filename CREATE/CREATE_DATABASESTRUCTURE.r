@@ -10,7 +10,8 @@ list <- list("cohort1" = cohort1$tselfadmin,
              "cohort4" = cohort4$tselfadmin, 
              "cohort5" = cohort5$tselfadmin,
              "cohort7" = cohort7$tselfadmin,
-             "cohort8" = cohort8$tselfadmin) # cohort 5 isn't working 
+             "cohort8" = cohort8$tselfadmin,
+             "cohort9") # cohort 5 isn't working 
 
 
 # listwnames <- lapply(list, function(x){

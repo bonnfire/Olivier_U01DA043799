@@ -141,8 +141,17 @@ rewards <- rbindlist(
   ),
   idcol = "directory",
   fill = T
-)
+) %>%  ## get box information 
+  mutate(room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("([.]/.*/.*/.*/)?(.*)C\\d{2}HS.*", "\\2", filename), NA)) %>% 
+  naniar::replace_with_na_all( ~ .x %in% c("<NA>")) 
 
+# %>% 
+#   rowwise() %>% 
+#   mutate(room = replace(room, parse_number(cohort) > 8 & grepl("SHOCK", exp), "BSB273B"),
+#          room = replace(room, parse_number(cohort) < 8 & grepl("SHOCK", exp), "MED1110")) %>% 
+#   mutate(room_box = ifelse(!is.na(room), paste0(room, "-", box), box)) %>%
+#   select(-c("box", "room")) %>% 
+#   ungroup()
 
 
 ######### JOIN TO WFU DATABASE 
@@ -671,7 +680,26 @@ cohort01_07_cocaine_lga %>% ggplot() + geom_density(aes(x = esc11_14_mean)) + fa
 setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine/")
 write.csv(cohort01_07_cocaine_lga, file = "cohort01_07_lga_phenotypes.csv", row.names = F)
 
+# cohorts 01-08 (LGA)
+## 10/07/2020 add the cohort 8 and 9 lga from excel 
 
+sa_lga_c08_09 <- olivierxl_df %>% subset(cohort %in% c("C08", "C09")) %>% 
+  mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
+  select(cohort, labanimalid, sex, rfid, matches("^lga(0[1-9]|1[0-4])$")) %>% 
+  gather("exp", "rewards", -cohort, -labanimalid, -rfid, -sex) %>% 
+  mutate(exp = paste0(gsub("(lga)(\\d+)", "\\1_\\2", exp), "_rewards")) %>% 
+  spread(exp, rewards) %>% 
+  mutate_at(vars(matches("lga_(0[2-9]|1[0-4])_rewards$")), list(esc = ~.-lga_01_rewards)) %>% 
+  mutate(esc11_14_mean = rowMeans(select(., matches("1[1-4]_rewards_esc")), na.rm = TRUE)) %>% 
+  left_join(subjects_exp_age %>% select(matches("cohort|rfid|labanimalid|^lga")), c("cohort", "rfid", "labanimalid")) %>%  # join the age data xx *new line* # join the active and inactive lever presses
+  select(cohort, rfid, sex, labanimalid, everything())
+  
+# cohorts 01-09 (LGA)
+cohort01_09_cocaine_lga <- cohort01_07_cocaine_lga %>% 
+  rbind(sa_lga_c08_09) 
+  
+  olivier_xl_df_c09_df %>% 
+  mutate(sex = str_extract(labanimalid, "[MF]")) 
 # cohort01-08 (SHA)
 cohort01_08_cocaine_sha_qc <- rbind(sha_rewards_new_valid %>% subset(grepl("SHA(0[89]|10)", exp)) %>% select(cohort, labanimalid, exp, rewards, filename),
       sha_rewards_old %>% subset(grepl("SHA(0[89]|10)", exp)) %>% mutate(filename = gsub("(.*/){4}", "", filename)) %>% select(cohort, labanimalid, exp, rewards, filename)) %>% 
@@ -682,7 +710,7 @@ cohort01_08_cocaine_sha_qc <- rbind(sha_rewards_new_valid %>% subset(grepl("SHA(
   left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
   # mutate(rewards = replace(rewards, rfid %in% unique(compromised_rats[grep("died", compromised_rats$death_comment, ignore.case = T),]$rfid), NA)) %>%   # XX make values NA if dead after date
   rename("rewards_raw" =  "rewards") %>% 
-  left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^sha(0[89]|10)$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
+  full_join(olivierxl_df %>% select(cohort, rfid, labanimalid, matches("^sha(0[89]|10)$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid, -cohort) %>% mutate(exp = toupper(exp)), by = c("cohort", "labanimalid", "rfid", "exp")) %>%
   mutate(sex = str_extract(labanimalid, "[MF]"),
          rewards_QC_diff = rewards_xl - rewards_raw,
          rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail")) %>% 
@@ -714,10 +742,14 @@ cocaine_intermediates_xl_sha_corrected <- cohort01_08_cocaine_sha_qc %>%
 
 
 # mean sha
-cohort01_07_cocaine_sha <- cocaine_intermediates_xl_sha_corrected %>% 
-  mutate(exp = tolower(exp)) %>% 
-  spread(exp, rewards) %>% 
-  mutate(mean_sha_last3 = rowMeans(select(., starts_with("sha")), na.rm = T)) 
+cohort01_09_cocaine_sha <- cocaine_intermediates_xl_sha_corrected %>%
+  mutate(exp = tolower(exp)) %>%
+  spread(exp, rewards) %>%
+  rbind(olivierxl_df %>% 
+          subset(cohort %in% c("C08", "C09")) %>% 
+          mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
+          select(cohort, labanimalid, rfid, sex, matches("^sha(0[89]|10)$"))) %>% 
+  mutate(mean_sha_last3 = rowMeans(select(., starts_with("sha")), na.rm = T))
 
   
 
@@ -767,8 +799,15 @@ cocaine_intermediates_xl_pr_corrected <- cohort01_08_cocaine_pr_qc %>%
   # source = ifelse(is.na(source), "raw", source)) %>% 
   subset(!is.na(rfid)) %>%
   mutate(exp = tolower(exp)) %>% 
+  mutate(rewards = replace(rewards, labanimalid == "F22"&exp == "pr02", NA), 
+         rewards = replace(rewards , labanimalid=="M22"& exp == "pr03", NA),
+         rewards = replace(rewards , labanimalid=="F522"& exp == "pr02", NA),) %>% 
   select(cohort, rfid, labanimalid, sex, exp, rewards) %>%  # remove source from data
-  spread(exp, rewards)
+  spread(exp, rewards) %>% 
+  rbind(olivier_xl_df_c09_df %>% 
+          mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
+          select(cohort, rfid, labanimalid, sex, matches("pr\\d+")) %>% 
+          mutate(pr02 = replace(pr02, labanimalid %in% c("F917", "F914", "M974"), NA))) # brevital failed, based on comments in excel sheets
 
 
 
@@ -776,7 +815,9 @@ cocaine_intermediates_xl_pr_corrected <- cohort01_08_cocaine_pr_qc %>%
 
 
 # cohort01-08 (SHOCKS)
-cohort01_08_cocaine_shock_qc <- shock_rewards_new_valid %>% subset(grepl("SHOCK0[3]", exp)) %>% select(cohort, labanimalid, exp, rewards, filename) %>% # no need for rbind bc there are no old files for shock rewards 
+cohort01_08_cocaine_shock_qc <- shock_rewards_new_valid %>% 
+  subset(grepl("SHOCK0[3]", exp)) %>%
+  select(cohort, labanimalid, exp, rewards, filename) %>% # no need for rbind bc there are no old files for shock rewards 
   left_join(rat_info_allcohort_xl_df[c("labanimalid", "rfid")], by = "labanimalid") %>%
   rename("rewards_raw" =  "rewards") %>% 
   left_join(olivierxl_df %>% select(rfid, labanimalid, matches("^shock0[3]$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid) %>% mutate(exp = toupper(exp)), by = c("labanimalid", "rfid", "exp")) %>%
@@ -801,21 +842,28 @@ cocaine_intermediates_xl_shock_corrected <- cohort01_08_cocaine_shock_qc %>%
               gather("exp", "rewards", -cohort, -labanimalid, -rfid, -source) %>% ## maybe add F52[345]
               subset(!is.na(rewards)), 
             by = c("cohort", "labanimalid", "rfid", "exp")) %>% 
+  full_join(olivierxl_df %>% select(cohort, rfid, labanimalid, matches("^shock0[3]$")) %>% gather("exp", "rewards_xl", -rfid, -labanimalid, -cohort) %>% mutate(exp = toupper(exp))) %>%
   naniar::replace_with_na_all(condition = ~.x %in% c("NA", "NaN")) %>% 
   mutate(rewards = ifelse(is.na(rewards_QC)&!is.na(rewards_xl), rewards_xl,  
                           ifelse(rewards_QC == "pass"|source == "raw"|is.na(rewards_xl), rewards_raw, rewards_xl))) %>% ## make sure that there are no gaps 
   # source = ifelse(is.na(source), "raw", source)) %>% 
   subset(!is.na(rfid)) %>%
   mutate(exp = tolower(exp)) %>% 
+  mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
   select(cohort, rfid, labanimalid, sex, exp, rewards) %>%  # remove source from data
-  spread(exp, rewards)
+  spread(exp, rewards) 
+# %>% 
+#   rbind(olivier_xl_df_c09_df %>% 
+#           mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
+#           select(cohort, rfid, labanimalid, sex, shock03))
 
-cocaine_ints_c01_08_merge_pr_shock <- full_join(cocaine_intermediates_xl_pr_corrected, cocaine_intermediates_xl_shock_corrected, by = c("cohort", "rfid", "labanimalid", "sex"))
+cocaine_ints_c01_09_merge_pr_shock <- full_join(cocaine_intermediates_xl_pr_corrected, cocaine_intermediates_xl_shock_corrected, by = c("cohort", "rfid", "labanimalid", "sex"))
 # 
-cohort01_07_phenotypes_merge <- full_join(cohort01_07_cocaine_lga, cohort01_07_cocaine_sha, by = c("cohort", "rfid", "labanimalid", "sex"))
+cohort01_09_phenotypes_merge <- full_join(cohort01_09_cocaine_lga, cohort01_09_cocaine_sha, by = c("cohort", "rfid", "labanimalid", "sex"))
 
-cocaine_phenotypes_merge <- full_join(cohort01_07_phenotypes_merge, cocaine_ints_c01_08_merge_pr_shock, by = c("cohort", "rfid", "sex", "labanimalid"))
-cocaine_phenotypes_merge %>% write.csv(file = "cocaine_phenotypes_n223_all_vars.csv", row.names = F) # current csv is written for the 223, not 365
+cocaine_phenotypes_merge <- full_join(cocaine_ints_c01_09_merge_pr_shock, cohort01_09_phenotypes_merge, by = c("cohort", "rfid", "sex", "labanimalid"))
+# cocaine_phenotypes_merge %>% write.csv(file = "cocaine_phenotypes_n223_all_vars.csv", row.names = F) # current csv is written for the 223, not 365
+cocaine_phenotypes_merge # now has 483 animals, with cohorts 8 and 9 joined
 cocaine_phenotypes_merge_stripped <- cocaine_phenotypes_merge %>% select(cohort, rfid, sex, labanimalid, esc11_14_mean, mean_sha_last3, starts_with("pr"), shock03) %>% 
   left_join(subjects_exp_age %>% select(cohort, labanimalid, rfid, lga_11_age, sha_08_age, starts_with("pr_"), shock_03_age), 
             by = c("cohort", "labanimalid", "rfid")) %>%  # get age 
@@ -825,7 +873,7 @@ cocaine_phenotypes_merge_stripped <- cocaine_phenotypes_merge %>% select(cohort,
          pr_02_age = replace(pr_02_age, is.na(pr02), NA),
          pr_03_age = replace(pr_03_age, is.na(pr03), NA),
          shock_03_age = replace(shock_03_age, is.na(shock03), NA)) %>% 
-  left_join(box_metadata_wide, by = c("cohort", "labanimalid", "rfid")) %>% 
+  left_join(box_metadata_wide_2, by = c("cohort", "labanimalid", "rfid")) %>% 
   mutate(lga_11_box = replace(lga_11_box, is.na(esc11_14_mean), NA),
          sha_08_box = replace(sha_08_box, is.na(mean_sha_last3), NA),
          pr_01_box = replace(pr_01_box, is.na(pr01), NA),
@@ -835,8 +883,9 @@ cocaine_phenotypes_merge_stripped <- cocaine_phenotypes_merge %>% select(cohort,
   mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
   naniar::replace_with_na_all(~.x %in% c("<NA>", "NA")) 
   
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 cocaine_phenotypes_merge_stripped %>% 
-  write.csv(file = "cocaine_phenotypes_n364_stripped_vars.csv", row.names = F)
+  write.csv(file = "cocaine_phenotypes_n364_stripped_vars_2.csv", row.names = F) # make a copy in Desktop
 
 
 
