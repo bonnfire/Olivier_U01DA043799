@@ -447,14 +447,15 @@ Olivier_Cocaine_df %>%
 
 
 ## Extract the Excel data for the indices
-# 08/07/2020
+# 10/08/2020 for cohorts 01-13
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 
 addiction_index_xl <- openxlsx::read.xlsx("Cocaine_GWAS_ADDIND.xlsx") %>% 
   clean_names() %>% 
   rename("labanimalid" = "rat") %>% 
   mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+"),
-         cohort = paste0("C", str_pad(cohort, 2, "left", "0")))
+         cohort = paste0("C", str_pad(cohort, 2, "left", "0")),
+         sex = str_extract(labanimalid, "[MF]"))
   
 
   
@@ -739,7 +740,7 @@ cohort01_09_cocaine_sha <- cocaine_intermediates_xl_sha_corrected %>%
   mutate(exp = tolower(exp)) %>%
   spread(exp, rewards) %>%
   rbind(olivierxl_df %>% 
-          subset(cohort %in% c("C08", "C09")) %>% 
+          subset(cohort %in% c("C09")) %>% 
           mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
           select(cohort, labanimalid, rfid, sex, matches("^sha(0[89]|10)$"))) %>% 
   mutate(mean_sha_last3 = rowMeans(select(., starts_with("sha")), na.rm = T))
@@ -748,8 +749,8 @@ cohort01_09_cocaine_sha <- cocaine_intermediates_xl_sha_corrected %>%
 
 
 # exclude the un-qc'ed id's for the database 09/14/2020
-cohort01_08_cocaine_sha <- cohort01_08_cocaine_sha_qc %>% 
-  subset(rfid %in% unique(cohort01_08_cocaine_sha_qc[which(cohort01_08_cocaine_sha_qc$rewards_QC == "pass"),]$rfid)) %>% 
+# cohort01_08_cocaine_sha <- cohort01_08_cocaine_sha_qc %>% 
+#   subset(rfid %in% unique(cohort01_08_cocaine_sha_qc[which(cohort01_08_cocaine_sha_qc$rewards_QC == "pass"),]$rfid)) %>% 
   # group_by(rfid, cohort, labanimalid, sex) %>% 
   # summarize(mean_sha_last3 = mean(rewards_raw, is.na = T)) ## XX come back to this -- fix because it is taking the group by incorrectly
 
@@ -876,11 +877,66 @@ cocaine_phenotypes_merge_stripped <- cocaine_phenotypes_merge %>% select(cohort,
   mutate(sex = str_extract(labanimalid, "[MF]")) %>% 
   naniar::replace_with_na_all(~.x %in% c("<NA>", "NA")) 
   
-cocaine_phenotypes_merge_stripped
+# add the add ind columns
+cocaine_phenotypes_merge_stripped_2 <- cocaine_phenotypes_merge_stripped %>% left_join(addiction_index_xl[c("labanimalid", "rfid","add_ind")], by = c("rfid", "labanimalid")) %>% 
+  distinct()
 
+cocaine_phenotypes_merge_stripped_2 %>% write.csv(file = "cocaine_phenotypes_n423_stripped_vars.csv", row.names = F)
+  
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 cocaine_phenotypes_merge_stripped %>% 
   write.csv(file = "cocaine_phenotypes_n364_stripped_vars_2.csv", row.names = F) # make a copy in Desktop
+
+
+# to calculate the add ind column
+cocaine_phenotype_add_ind_calc <- cocaine_phenotypes_merge %>% 
+  select(cohort, rfid, labanimalid, sex, matches("pr(0[23])|shock03|lga_(01|1[1-4])_rewards$")) %>%
+  mutate(pr_max = pmax(pr02, pr03, na.rm = F)) %>% 
+  group_by(cohort, sex) %>% 
+  mutate(lga_01_mean = mean(lga_01_rewards, na.rm = T),
+         lga_01_sd = sd(lga_01_rewards, na.rm = T), 
+         pr_max_mean = mean(pr_max, na.rm = T), 
+         pr_max_sd = sd(pr_max, na.rm = T), 
+         shock_mean = mean(shock03, na.rm = T), 
+         shock_sd = mean(shock03, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate_at(vars(matches("lga_1[1-4]_rewards")), list(esc = ~ . - lga_01_mean)) %>% 
+  mutate_at(vars(ends_with("_esc")), ~./lga_01_sd) %>% 
+  mutate(pr_index = (pr_max - pr_max_mean)/pr_max_sd, 
+         shock_index = (shock03 - shock_mean)/shock_sd) %>% 
+  mutate(ind_esc_mean = rowMeans(select(., matches("lga_1[1-4]_rewards_esc")), na.rm = T)) %>% 
+  group_by(cohort, sex) %>% 
+  mutate(esc_mean = mean(ind_esc_mean, na.rm = T),
+         esc_sd = sd(ind_esc_mean, na.rm = T)) %>% 
+  ungroup() %>% 
+  mutate(esc_index = (ind_esc_mean - esc_mean)/esc_sd) %>% 
+  mutate(addiction_index = rowMeans(select(., ends_with("index")), na.rm = T)) %>% 
+  rename("add_ind_calc" = "addiction_index")
+  
+# join to the phenotypes for gwas 
+cocaine_phenotypes_merge_stripped_3 <- cocaine_phenotypes_merge_stripped_2 %>% left_join(cocaine_phenotype_add_ind_calc[c("rfid","add_ind_calc")], by = "rfid") %>% 
+  distinct() %>% 
+  rename("pr_01" = "pr01", 
+         "pr_02" = "pr02",
+         "pr_03" = "pr03",
+         "shock_03" = "shock03",
+         "mean_lga_esc_11_14" = "esc11_14_mean",
+         "mean_sha_08_10" = "mean_sha_last3",
+         "mean_lga_esc_11_14_box" = "lga_11_box",
+         "mean_sha_08_10_box" = "sha_08_box",
+         "mean_lga_esc_11_14_age" = "lga_11_age",
+         "mean_sha_08_10_age" = "sha_08_age") %>% # rename column names for uniformity
+  naniar::replace_with_na_all(~ .x %in% c("<NA>")) %>%  # make box fixes 
+  mutate_at(vars(ends_with("box")), ~replace(., is.na(.), "NABox"))
+
+setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
+cocaine_phenotypes_merge_stripped_3 %>% 
+    write.csv(file = "cocaine_phenotypes_n423_stripped_vars_2.csv", row.names = F) # make a copy in Desktop # overwrite previous copy
+
+
+
+
+
 
 
 
