@@ -46,3 +46,9 @@ rownames(varnametally_measurevars) <- NULL
 
 save(varnametally, file = "Oliviercohortvariables.RData")
 
+
+
+### creating csv files 
+setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
+write.csv(compromised_rats, "compromised_rats_C01_11.csv", row.names = F)
+

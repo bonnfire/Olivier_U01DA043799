@@ -938,7 +938,7 @@ cocaine_phenotypes_merge_stripped_3 %>%
 
 
 
-
+  
 
 # will return to cohorts for the expert opinion values 
 ## once the values have been corrected, now calculate the indices 
