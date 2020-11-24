@@ -692,8 +692,7 @@ sa_lga_c08_09 <- olivierxl_df %>% subset(cohort %in% c("C08", "C09")) %>%
 cohort01_09_cocaine_lga <- cohort01_07_cocaine_lga %>% 
   rbind(sa_lga_c08_09) 
   
-  olivier_xl_df_c09_df %>% 
-  mutate(sex = str_extract(labanimalid, "[MF]")) 
+
 # cohort01-08 (SHA)
 cohort01_08_cocaine_sha_qc <- rbind(sha_rewards_new_valid %>% subset(grepl("SHA(0[89]|10)", exp)) %>% select(cohort, labanimalid, exp, rewards, filename),
       sha_rewards_old %>% subset(grepl("SHA(0[89]|10)", exp)) %>% mutate(filename = gsub("(.*/){4}", "", filename)) %>% select(cohort, labanimalid, exp, rewards, filename)) %>% 

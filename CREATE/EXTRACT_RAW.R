@@ -575,7 +575,8 @@ box_metadata_long_fill_2 <- box_metadata_long %>% # for those animals that don't
 # by cohort and sex for all non shock exps
 box_metadata_long_fill <- box_metadata_long_fill %>% mutate(phenotype_box = replace(phenotype_box, cohort == "C02"&grepl("F(80|10[6-9])", labanimalid)&!grepl("SHOCK", exp), "No phenotype data"))
 box_metadata_long_fill <- box_metadata_long_fill %>% mutate(phenotype_box = replace(phenotype_box, cohort == "C02"&grepl("F90", labanimalid)&!grepl("SHOCK", exp), "MED1110-11"))
-box_metadata_long_fill %>% subset(cohort == "C02"&grepl("F", labanimalid)&!grepl("SHOCK", exp)) %>% group_by(labanimalid) %>% mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast=T)) %>% ungroup()%>% distinct(labanimalid, phenotype_box) %>% add_count(labanimalid) %>% subset(n!= 1) %>% View()
+box_metadata_long_fill %>% subset(cohort == "C02"&grepl("F", labanimalid)&!grepl("SHOCK", exp)) %>% group_by(labanimalid) %>% mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast=T)) %>% ungroup()%>% distinct(labanimalid, phenotype_box) %>% 
+  add_count(labanimalid) %>% subset(n!= 1) %>% View()
 # box_metadata_long_fill %>% subset(cohort == "C02"&grepl("F80", labanimalid)&!grepl("SHOCK", exp))%>% select(labanimalid, exp, phenotype_box) %>% spread("exp", "phenotype_box")
 # box_metadata_long_fill %>% subset(cohort == "C02"&grepl("F9[36]", labanimalid)&!grepl("SHOCK", exp))%>% subset(labanimalid == "F93"&phenotype_box != "MED1110-14"| labanimalid == "F96"&phenotype_box != "MED1110-15")
 box_metadata_long_fill %>% subset(cohort == "C02"&grepl("M", labanimalid)&!grepl("SHOCK", exp)) %>% group_by(labanimalid) %>% mutate(phenotype_box = zoo::na.locf(phenotype_box, fromLast=T)) %>% ungroup()%>% distinct(labanimalid, phenotype_box) %>% add_count(labanimalid) %>% subset(n!= 1) %>% View()
@@ -1186,8 +1187,91 @@ shock_rewards_new_valid <- shock_rewards_new_valid %>% mutate(date = lubridate::
 
 
 
+### Extract timeout presses
+
+## lga
+lga_c01_11_files <- list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T) %>% 
+  grep("LGA", ., value = T)
 
 
+lga_c01_11_timeout <- lapply(lga_c01_11_files, function(x){
+  if(grepl("Old", x)){ # process if directory is old
+    df <- fread(paste0("awk '/^RatNumber/{flag=1;next}/^ProgramName/{flag=0}flag' ", "'", x, "'"), fill = T, header = F) 
+    df$filename = x
+    df$to_active_presses = fread(paste0("awk '/^TotalTOResponses/{flag=1;next}/^TotalRspInAct/{flag=0}flag' ", "'", x, "'"), fill = T, header = F)
+  }
+  
+  if(grepl("New", x)){ # process if directory is new
+    df <- fread(paste0("awk '/Subject/{print NR \"_\" $2}' ", "'", x, "'"), fill = T, header = F)
+    df$filename = x 
+    df$rewards = fread(paste0("awk '/B:/{print $2}' ", "'", x, "'"), fill = T, header = F)
+    df$presses = fread(paste0("awk '/G:/{print $2}' ", "'", x, "'"), fill = T, header = F)
+    df$to_active_presses =  df$presses -  df$rewards
+    df <- df[, c("V1", "filename", "to_active_presses")]
+  }
+  
+  return(df)
+  
+})
+
+# use to try for old  lga_c01_11_files[c(19:22, 538:541)]
+# use to try for new  lga_c01_11_files[c(1:4, 885:888)]
+# use to try for old and new  lga_c01_11_files[c(1:4, 885:888, 19:22, 538:541)]
+
+lga_c01_11_timeout_df <- lga_c01_11_timeout %>% rbindlist() %>% 
+  rename("labanimalid" = "V1") %>% 
+  mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+"),
+         session = str_extract(toupper(filename), "LGA\\d+"),
+         cohort = str_extract(toupper(filename), "/C\\d+/") %>% gsub("/", "", .),
+         sex = str_extract(toupper(labanimalid), "[MF]")
+  ) %>% 
+  select(cohort, labanimalid, sex, session, to_active_presses, filename)
+
+# fix these 
+lga_c01_11_timeout_df %>% get_dupes(labanimalid, session)
+
+## sha
+sha_c01_11_files <- list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T) %>% 
+  grep("SHA", ., value = T)
+
+
+sha_c01_11_timeout <- lapply(sha_c01_11_files, function(x){
+  if(grepl("Old", x)){ # process if directory is old
+    df <- fread(paste0("awk '/^RatNumber/{flag=1;next}/^ProgramName/{flag=0}flag' ", "'", x, "'"), fill = T, header = F) 
+    df$filename = x
+    df$to_active_presses = fread(paste0("awk '/^TotalTOResponses/{flag=1;next}/^TotalRspInAct/{flag=0}flag' ", "'", x, "'"), fill = T, header = F)
+  }
+  
+  if(grepl("New", x)){ # process if directory is new
+    df <- fread(paste0("awk '/Subject/{print NR \"_\" $2}' ", "'", x, "'"), fill = T, header = F)
+    df$filename = x 
+    df$rewards = fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
+    df$presses = fread(paste0("awk '/R:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
+    df$to_active_presses =  df$presses -  df$rewards
+    df <- df[, c("V1", "filename", "to_active_presses")]
+  }
+  
+  return(df)
+  
+})
+
+# use to test old  sha_c01_11_files[c(10:13, 268:271)]
+# use to test new  sha_c01_11_files[c(1:4, 465:468)]
+# use to test old and new  sha_c01_11_files[c(1:4, 465:468, 10:13, 268:271))]
+
+sha_c01_11_timeout_df <- sha_c01_11_timeout %>% rbindlist() %>% 
+  rename("labanimalid" = "V1") %>% 
+  mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+"),
+         session = str_extract(toupper(filename), "SHA\\d+"),
+         cohort = str_extract(toupper(filename), "/C\\d+/") %>% gsub("/", "", .),
+         sex = str_extract(toupper(labanimalid), "[MF]")
+  ) %>% 
+  select(cohort, labanimalid, sex, session, to_active_presses, filename)
+
+# fix these cases
+sha_c01_11_timeout_df %>% get_dupes(labanimalid, session)
+
+## shock
 
 
 

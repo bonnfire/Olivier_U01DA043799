@@ -80,7 +80,7 @@ trait_description_table <- data.frame(
               subset(!grepl("LGA([2]\\d+|[1][5-9])", exp)) %>% 
               mutate(exp = gsub("(\\D+)(\\d+)", "\\1_\\2", exp) %>% tolower) %>% 
               mutate(variable = paste0(exp, "_age"),
-                     variable_description = "age of animal on", 
+                     variable_description = "j ", 
                      cov_or_trait = "cov",
                      general_category = "NA", 
                      trait_name = "NA",
