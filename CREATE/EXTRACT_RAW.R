@@ -1189,7 +1189,10 @@ shock_rewards_new_valid <- shock_rewards_new_valid %>% mutate(date = lubridate::
 
 ### Extract timeout presses
 
+#####
 ## lga
+#####
+
 lga_c01_11_files <- list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T) %>% 
   grep("LGA", ., value = T)
 
@@ -1230,7 +1233,13 @@ lga_c01_11_timeout_df <- lga_c01_11_timeout %>% rbindlist() %>%
 # fix these 
 lga_c01_11_timeout_df %>% get_dupes(labanimalid, session)
 
+
+
+
+
+#####
 ## sha
+#####
 sha_c01_11_files <- list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T) %>% 
   grep("SHA", ., value = T)
 
@@ -1271,7 +1280,45 @@ sha_c01_11_timeout_df <- sha_c01_11_timeout %>% rbindlist() %>%
 # fix these cases
 sha_c01_11_timeout_df %>% get_dupes(labanimalid, session)
 
+
+
+
+
+
+#####
 ## shock
+#####
+shock_c01_11_files <- list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T) %>% 
+  grep("SHOCK", ., value = T) %>% 
+  grep("PRESHOCK", ., value = T, invert = T) %>% 
+  grep("SHOCK0[12]", ., value = T, invert = T)
+
+
+shock_c01_11_timeout <- lapply(shock_c01_11_files, function(x){
+
+  df <- fread(paste0("awk '/Subject/{print NR \"_\" $2}' ", "'", x, "'"), fill = T, header = F)
+  df$filename = x 
+  df$rewards = fread(paste0("awk '/B:/{print $2}' ", "'", x, "'"), fill = T, header = F)
+  df$presses = fread(paste0("awk '/G:/{print $2}' ", "'", x, "'"), fill = T, header = F)
+  df$to_active_presses =  df$presses -  df$rewards
+  df <- df[, c("V1", "filename", "to_active_presses")]
+  return(df)
+  
+})
+
+# small list, no need to subset 
+
+shock_c01_11_timeout_df <- shock_c01_11_timeout %>% rbindlist() %>% 
+  rename("labanimalid" = "V1") %>% 
+  mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+"),
+         session = "SHOCK03",
+         cohort = str_extract(toupper(filename), "/C\\d+/") %>% gsub("/", "", .),
+         sex = str_extract(toupper(labanimalid), "[MF]")
+  ) %>% 
+  select(cohort, labanimalid, sex, session, to_active_presses, filename)
+
+# fix these cases
+shock_c01_11_timeout_df %>% get_dupes(labanimalid)
 
 
 
