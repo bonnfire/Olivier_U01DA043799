@@ -1367,8 +1367,9 @@ shock_c01_11_timeout <- lapply(shock_c01_11_files, function(x){
   df$filename = x 
   df$rewards = fread(paste0("awk '/B:/{print $2}' ", "'", x, "'"), fill = T, header = F)
   df$presses = fread(paste0("awk '/G:/{print $2}' ", "'", x, "'"), fill = T, header = F)
+  df$box = fread(paste0("awk '/Box:/{print $2}' ", "'", x, "'"), fill = T, header = F) 
   df$to_active_presses =  df$presses -  df$rewards
-  df <- df[, c("V1", "filename", "to_active_presses")]
+  df <- df[, c("V1", "filename", "box", "to_active_presses")]
   return(df)
   
 })
@@ -1380,13 +1381,45 @@ shock_c01_11_timeout_df <- shock_c01_11_timeout %>% rbindlist() %>%
   mutate(labanimalid = str_extract(toupper(labanimalid), "[MF]\\d+"),
          session = "SHOCK03",
          cohort = str_extract(toupper(filename), "/C\\d+/") %>% gsub("/", "", .),
-         sex = str_extract(toupper(labanimalid), "[MF]")
+         sex = str_extract(toupper(labanimalid), "[MF]"),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHOCK/", "", .), NA)
   ) %>% 
-  select(cohort, labanimalid, sex, session, to_active_presses, filename)
+  mutate(box = as.character(box)) %>% 
+  select(cohort, labanimalid, sex, session, box, room, to_active_presses, filename)
 
 # fix these cases
 shock_c01_11_timeout_df %>% get_dupes(labanimalid)
+# fix the na subject with boxes 
+shock_c01_11_timeout_df_join <- shock_c01_11_timeout_df %>% 
+  left_join(box_metadata_long %>% 
+              select(cohort, exp, box, room, labanimalid) %>% 
+              rename("session" = "exp"), by = c("cohort", "room", "box", "session")) %>% 
+  mutate(labanimalid = coalesce(labanimalid.x, labanimalid.y)) %>% 
+  select(-labanimalid.x, -labanimalid.y) 
+shock_c01_11_timeout_distinct <- shock_c01_11_timeout_df_join %>% 
+  select(cohort, labanimalid, sex, session, box, room, to_active_presses) %>% 
+  distinct() %>% 
+  left_join(shock_c01_11_timeout_df_join %>% 
+              select(cohort, labanimalid, sex, session, box, room, to_active_presses) %>% 
+              distinct() %>% 
+              get_dupes(labanimalid, session) %>% 
+              group_by(labanimalid, session, .drop = F) %>% 
+              mutate(nzero = sum(to_active_presses)) %>% 
+              subset(to_active_presses != nzero&to_active_presses == 0) %>% ungroup() %>% mutate(drop = "drop") %>% 
+              select(labanimalid, cohort, session, to_active_presses, drop), by = c("labanimalid", "cohort", "session", "to_active_presses")) %>% 
+  subset(is.na(drop))
+shock_c01_11_timeout_brent <- shock_c01_11_timeout_distinct %>% 
+  left_join(., shock_c01_11_timeout_distinct %>% get_dupes(labanimalid, session) %>% select(labanimalid, cohort, session, to_active_presses, dupe_count), by = c("labanimalid", "cohort", "session", "to_active_presses")) %>% 
+  rename("need_check"="dupe_count") %>% 
+  mutate(need_check = ifelse(!is.na(need_check), "check", NA)) %>% 
+  select(cohort, labanimalid, sex, session, box, room, to_active_presses, need_check) %>% 
+  mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+  arrange(cohort, sex, labanimalid_num, session) %>% 
+  select(-labanimalid_num) %>% 
+  distinct()
 
+openxlsx::write.xlsx(shock_c01_11_timeout_brent, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_shock_to_presses.xlsx")
+  
 
 
 
