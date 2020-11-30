@@ -1271,6 +1271,37 @@ lga_c01_11_timeout_trials1_14_brent <- lga_c01_11_timeout_trials1_14_distinct %>
 
 write.xlsx(lga_c01_11_timeout_trials1_14_brent, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses.xlsx")
 
+# use brent's file to correct 
+lga_c01_11_timeout_trials1_14_brent_decision <- lga_c01_11_timeout_trials1_14_brent %>% 
+  cbind(openxlsx::read.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses_BB.xlsx")) %>% 
+  clean_names() %>% 
+  mutate_all(as.character) %>% 
+  mutate(cohort = coalesce(cohort, cohort_2),
+         labanimalid = coalesce(labanimalid, labanimalid_2),
+         sex = coalesce(sex, sex_2), 
+         session = coalesce(session, session_2), 
+         box = coalesce(box, box_2), 
+         room = coalesce(room, room_2), 
+         to_active_presses = coalesce(to_active_presses, to_active_presses_2)) %>% 
+  select(-matches("_2$")) %>% 
+  subset(is.na(decision)|decision=="KEEP") %>% 
+  rowwise() %>% 
+  mutate(labanimalid = replace(labanimalid, cohort == "C07"&grepl("M3", labanimalid), gsub("M3", "M7", labanimalid))) %>% 
+  mutate(session = replace(session, grepl("typo LGA", notes), str_extract(notes,"LGA\\d+")),
+         labanimalid = replace(labanimalid, grepl("typo [FM]\\d+", notes), str_extract(notes, "[FM]\\d+"))) %>% 
+  # mutate(notes = replace(notes, grepl("blank replaced with corr(r)?ect animal ID, toss repeats", notes)|grepl("typo", notes), NA)) %>%  # after fixing
+  ungroup() 
+# %>% 
+  # select(-decision, -notes) # after fixing
+
+lga_c01_11_timeout_trials1_14_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
+
+# lga_c01_11_timeout_trials1_14_brent_decision <- lga_c01_11_timeout_trials1_14_brent_decision %>% 
+#   mutate(labanimalid)
+  
+# mutate()
+# mutate_at(vars(-decision, -notes, -matches("_2")), ~ . = coalesce(., select(., !! matches("_2"))))
+
 #####
 ## sha
 #####
