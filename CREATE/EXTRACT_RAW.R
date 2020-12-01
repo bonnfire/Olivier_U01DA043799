@@ -1309,6 +1309,16 @@ lga_c01_11_timeout_trials1_14_brent_decision %>% mutate(to_active_presses = as.n
 # mutate()
 # mutate_at(vars(-decision, -notes, -matches("_2")), ~ . = coalesce(., select(., !! matches("_2"))))
 
+lga_c01_11_timeout_trials1_14_brent_decision_2 <- lga_c01_11_timeout_trials1_14_brent_decision %>% 
+  select(cohort, labanimalid, sex, session, box, room, to_active_presses) %>% 
+  distinct()
+
+# spread, mean, and deviation 
+lga_c01_11_timeout_trials1_14_spread <- lga_c01_11_timeout_trials1_14_brent_decision_2 %>% 
+  spread(session, to_active_presses) %>% mutate_at(vars(matches("^LGA")), as.numeric) %>% mutate(mean = rowMeans(select(., matches("^LGA")))) %>% mutate_at(vars(matches("^LGA")), list(dev = ~round((.-mean)^2)))
+openxlsx::write.xlsx(lga_c01_11_timeout_trials1_14_brent, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses.xlsx")
+
+
 #####
 ## sha
 #####
@@ -1415,6 +1425,16 @@ sha_c01_11_timeout_brent_decision %>% get_dupes(labanimalid, session) %>% View()
 
 sha_c01_11_timeout_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
 
+sha_c01_11_timeout_brent_decision_2 <- sha_c01_11_timeout_brent_decision %>% 
+  select(cohort, labanimalid, sex, session, box, room, to_active_presses) %>% 
+  distinct()
+
+# write the data in wide form and calculate mean and deviations 
+sha_c01_11_timeout_brent_decision_dev <- sha_c01_11_timeout_brent_decision_2 %>% 
+  spread(session, to_active_presses) %>% mutate_at(vars(matches("^SHA")), as.numeric) %>% mutate(mean = rowMeans(select(., matches("^SHA")))) %>% mutate_at(vars(matches("^SHA")), list(dev = ~round((.-mean)^2)))
+openxlsx::write.xlsx(sha_c01_11_timeout_brent_decision_dev, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses.xlsx")
+
+
 # provide graphs for olivier
 sha_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
   ggplot(aes(x = to_active_presses)) + geom_histogram(bins = 1000) + facet_wrap(~ cohort)
@@ -1423,9 +1443,8 @@ sha_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_a
 sha_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
   ggplot(aes(x = cohort, y = to_active_presses)) + geom_boxplot()
 
-
-
-
+# spread, mean, and deviation 
+lga_c01_11_timeout_trials1_14_spread <- lga_c01_11_timeout_trials1_14_brent_decision_2 
 
 
 #####
@@ -1521,6 +1540,11 @@ shock_c01_11_timeout_brent_decision <- shock_c01_11_timeout_brent %>%
 
 shock_c01_11_timeout_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
 
+shock_c01_11_timeout_brent_decision_2 <- shock_c01_11_timeout_brent_decision %>% 
+  select(cohort, labanimalid, sex, session, box, room, to_active_presses) %>% 
+  distinct()
+
+shock_c01_11_timeout_brent_decision_2 %>% get_dupes(labanimalid, session) %>% View()  
 
 # provide graphs for olivier
 shock_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
@@ -1530,4 +1554,9 @@ shock_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to
 shock_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
   ggplot(aes(x = cohort, y = to_active_presses)) + geom_boxplot()
 
+
+# write the data in wide form and calculate mean and deviations 
+shock_c01_11_timeout_brent_decision_2 <- shock_c01_11_timeout_brent_decision_2 %>% 
+  spread(session, to_active_presses) %>% mutate_at(vars(matches("^SHA")), as.numeric) %>% mutate(mean = rowMeans(select(., matches("^SHA")))) %>% mutate_at(vars(matches("^SHA")), list(dev = ~round((.-mean)^2)))
+openxlsx::write.xlsx(sha_c01_11_timeout_brent_decision_dev, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses.xlsx")
 
