@@ -1311,12 +1311,18 @@ lga_c01_11_timeout_trials1_14_brent_decision %>% mutate(to_active_presses = as.n
 
 lga_c01_11_timeout_trials1_14_brent_decision_2 <- lga_c01_11_timeout_trials1_14_brent_decision %>% 
   select(cohort, labanimalid, sex, session, box, room, to_active_presses) %>% 
-  distinct()
+  distinct() %>% 
+  subset(!(labanimalid == "M459"&session == "LGA12"&to_active_presses == 0)) %>% 
+  subset(!(labanimalid == "M751"&session == "LGA03"&to_active_presses == 3))
 
 # spread, mean, and deviation 
 lga_c01_11_timeout_trials1_14_spread <- lga_c01_11_timeout_trials1_14_brent_decision_2 %>% 
-  spread(session, to_active_presses) %>% mutate_at(vars(matches("^LGA")), as.numeric) %>% mutate(mean = rowMeans(select(., matches("^LGA")))) %>% mutate_at(vars(matches("^LGA")), list(dev = ~round((.-mean)^2)))
-openxlsx::write.xlsx(lga_c01_11_timeout_trials1_14_brent, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses.xlsx")
+  spread(session, to_active_presses) %>% mutate_at(vars(matches("^LGA")), as.numeric) %>% mutate(mean = rowMeans(select(., matches("^LGA")), na.rm = T)) %>% mutate_at(vars(matches("^LGA")), list(dev = ~round((.-mean)^2))) %>% 
+  mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% 
+  select(-labanimalid_num)
+
+openxlsx::write.xlsx(lga_c01_11_timeout_trials1_14_spread, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses_wide_dev.xlsx")
 
 
 #####
@@ -1427,12 +1433,20 @@ sha_c01_11_timeout_brent_decision %>% get_dupes(labanimalid, session) %>% View()
 
 sha_c01_11_timeout_brent_decision_2 <- sha_c01_11_timeout_brent_decision %>% 
   select(cohort, labanimalid, sex, session, box, room, to_active_presses) %>% 
-  distinct()
+  distinct() %>% 
+  subset(!(labanimalid == "F2"&session == "SHA06"&to_active_presses == 1)) %>% 
+  subset(!(labanimalid == "F817"&session == "SHA04"&to_active_presses == 22)) %>% 
+  subset(!(labanimalid == "F98"&session == "SHA01"&to_active_presses == 0)) %>% 
+  subset(!(labanimalid == "M354"&session == "SHA10"&box == "6"))
 
 # write the data in wide form and calculate mean and deviations 
 sha_c01_11_timeout_brent_decision_dev <- sha_c01_11_timeout_brent_decision_2 %>% 
-  spread(session, to_active_presses) %>% mutate_at(vars(matches("^SHA")), as.numeric) %>% mutate(mean = rowMeans(select(., matches("^SHA")))) %>% mutate_at(vars(matches("^SHA")), list(dev = ~round((.-mean)^2)))
-openxlsx::write.xlsx(sha_c01_11_timeout_brent_decision_dev, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_lga_to_presses.xlsx")
+  spread(session, to_active_presses) %>% mutate_at(vars(matches("^SHA")), as.numeric) %>% mutate(mean = rowMeans(select(., matches("^SHA")), na.rm = T)) %>% mutate_at(vars(matches("^SHA")), list(dev = ~round((.-mean)^2))) %>% 
+  mutate(labanimalid_num = parse_number(labanimalid)) %>% 
+  arrange(cohort, sex, labanimalid_num) %>% 
+  select(-labanimalid_num)
+
+openxlsx::write.xlsx(sha_c01_11_timeout_brent_decision_dev, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_sha_to_presses_wide_dev.xlsx")
 
 
 # provide graphs for olivier
