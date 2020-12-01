@@ -1295,6 +1295,13 @@ lga_c01_11_timeout_trials1_14_brent_decision <- lga_c01_11_timeout_trials1_14_br
   # select(-decision, -notes) # after fixing
 
 lga_c01_11_timeout_trials1_14_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
+# provide graphs for olivier
+lga_c01_11_timeout_trials1_14_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = to_active_presses)) + geom_histogram(bins = 1000) + facet_wrap(~ cohort)
+lga_c01_11_timeout_trials1_14_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = to_active_presses)) + geom_density() 
+lga_c01_11_timeout_trials1_14_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = cohort, y = to_active_presses)) + geom_boxplot()
 
 # lga_c01_11_timeout_trials1_14_brent_decision <- lga_c01_11_timeout_trials1_14_brent_decision %>% 
 #   mutate(labanimalid)
@@ -1381,6 +1388,44 @@ sha_c01_11_timeout_brent <- sha_c01_11_timeout_distinct %>%
 
 openxlsx::write.xlsx(sha_c01_11_timeout_brent, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_sha_to_presses.xlsx")
 
+# use brent's file to correct 
+sha_c01_11_timeout_brent_decision <- sha_c01_11_timeout_brent %>% 
+  cbind(openxlsx::read.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_sha_to_presses_BB.xlsx")) %>% 
+  clean_names() %>% 
+  mutate_all(as.character) %>% 
+  mutate(cohort = coalesce(cohort, cohort_2),
+         labanimalid = coalesce(labanimalid, labanimalid_2),
+         sex = coalesce(sex, sex_2), 
+         session = coalesce(session, session_2), 
+         box = coalesce(box, box_2), 
+         room = coalesce(room, room_2), 
+         to_active_presses = coalesce(to_active_presses, to_active_presses_2)) %>% 
+  select(-matches("_2$")) %>% 
+  subset(is.na(decision)|decision=="KEEP") %>% 
+  rowwise() %>% 
+  mutate(session = replace(session, grepl("typo SHA", notes), str_extract(notes,"SHA\\d+")),
+         labanimalid = replace(labanimalid, grepl("typo [FM]\\d+", notes), str_extract(notes, "[FM]\\d+"))) %>% 
+  # mutate(notes = replace(notes, grepl("blank replaced with corr(r)?ect animal ID, toss repeats", notes)|grepl("typo", notes), NA)) %>%  # after fixing
+  ungroup() 
+# %>% 
+# select(-decision, -notes) # after fixing
+
+sha_c01_11_timeout_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
+
+
+sha_c01_11_timeout_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
+
+# provide graphs for olivier
+sha_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = to_active_presses)) + geom_histogram(bins = 1000) + facet_wrap(~ cohort)
+sha_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = to_active_presses)) + geom_density() 
+sha_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = cohort, y = to_active_presses)) + geom_boxplot()
+
+
+
+
 
 
 #####
@@ -1452,5 +1497,37 @@ shock_c01_11_timeout_brent <- shock_c01_11_timeout_distinct %>%
 openxlsx::write.xlsx(shock_c01_11_timeout_brent, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_shock_to_presses.xlsx")
   
 
+# use brent's file to correct 
+shock_c01_11_timeout_brent_decision <- shock_c01_11_timeout_brent %>% 
+  cbind(openxlsx::read.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_shock_to_presses_BB.xlsx")) %>% 
+  clean_names() %>% 
+  mutate_all(as.character) %>% 
+  mutate(cohort = coalesce(cohort, cohort_2),
+         labanimalid = coalesce(labanimalid, labanimalid_2),
+         sex = coalesce(sex, sex_2), 
+         session = coalesce(session, session_2), 
+         box = coalesce(box, box_2), 
+         room = coalesce(room, room_2), 
+         to_active_presses = coalesce(to_active_presses, to_active_presses_2)) %>% 
+  select(-matches("_2$")) %>% 
+  subset(is.na(decision)|decision=="KEEP") %>% 
+  rowwise() %>% 
+  mutate(session = replace(session, grepl("typo SHOCK", notes), str_extract(notes,"SHOCK\\d+")),
+         labanimalid = replace(labanimalid, grepl("typo [FM]\\d+", notes), str_extract(notes, "[FM]\\d+"))) %>% 
+  # mutate(notes = replace(notes, grepl("blank replaced with corr(r)?ect animal ID, toss repeats", notes)|grepl("typo", notes), NA)) %>%  # after fixing
+  ungroup() 
+# %>% 
+# select(-decision, -notes) # after fixing
+
+shock_c01_11_timeout_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
+
+
+# provide graphs for olivier
+shock_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = to_active_presses)) + geom_histogram(bins = 1000) + facet_wrap(~ cohort)
+shock_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = to_active_presses)) + geom_density() 
+shock_c01_11_timeout_brent_decision %>% mutate(to_active_presses = as.numeric(to_active_presses)) %>% 
+  ggplot(aes(x = cohort, y = to_active_presses)) + geom_boxplot()
 
 
