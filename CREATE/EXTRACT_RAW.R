@@ -1,6 +1,7 @@
 ## extract raw 
 setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
+
 # after cohort 5, there are only new files
 
 ## USEFUL FUNCTIONS
