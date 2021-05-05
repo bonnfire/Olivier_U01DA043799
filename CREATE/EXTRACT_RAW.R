@@ -634,7 +634,7 @@ openxlsx::write.xlsx(c02_boxes, file = "cocaine_c02_boxes_toqc.xlsx")
 
 
 c03_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
-  subset(cohort == "C02") %>% 
+  subset(cohort == "C03") %>% 
   mutate(room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("([.]/.*/.*/.*/)?(.*)C\\d{2}HS.*", "\\2", filename), NA)) %>% 
   select(cohort, labanimalid, exp, box, room) %>% 
   naniar::replace_with_na_all( ~ .x %in% c("<NA>")) %>% 
@@ -787,6 +787,46 @@ sha_rewards_old %>% get_dupes(labanimalid, cohort,exp)
 
 
 
+## cohorts 10 and 11 
+
+###### NEW FILES ##############
+# label data with... 
+sha_new_files_10_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) %>% grep("C1[01]", ., value = T) # 76 files
+
+# extract subject, box, and rewards, active, inactive (rai)
+sha_rai <- lapply(sha_new_files_10_11, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  metadata = cbind(subject = subject, box = box)
+  
+  rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive  
+  ) %>% do.call(cbind, .)
+  
+  data <- cbind(metadata, data) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(data)
+})
+
+sha_rai_df <- sha_rai %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/SHA/", "", filename),
+         exp = gsub(".*HS", "", filename) ,
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         box = as.character(box)) 
+
+
 
 
 
@@ -900,6 +940,44 @@ lga_rewards_old <- lga_rewards_old %>% group_by(labanimalid, exp) %>%
 
 
 
+###### NEW FILES ##############
+# label data with... 
+lga_new_files_10_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) %>% grep("C1[01]", ., value = T) # 76 files
+
+# extract subject, box, and rewards, active, inactive (rai)
+lga_rai <- lapply(lga_new_files_10_11, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  metadata = cbind(subject = subject, box = box)
+  
+  rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive  
+  ) %>% do.call(cbind, .)
+  
+  data <- cbind(metadata, data) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(data)
+})
+
+lga_rai_df <- lga_rai %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/LGA/", "", filename),
+         exp = gsub(".*HS", "", filename) ,
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         box = as.character(box)) 
+
+
 
 
 
@@ -1004,6 +1082,55 @@ pr_rewards_old <- pr_rewards_old %>%
 # %>% 
 #   add_count(labanimalid, cohort,exp) %>% 
 #   subset(n != 1) 
+
+
+#### NEW FILES
+pr_new_files_10_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*PR", value = T) %>% grep("C1[01]", ., value = T) # 32 files
+
+# extract subject, box, and rewards, active, inactive, pr 
+pr_msn <- lapply(pr_new_files_10_11, function(x){
+  internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+  
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  metadata = cbind(subject = subject, box = box)
+  
+  if(grepl("GWAS", unique(internal_filename$V1))){
+    rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    pr <- fread(paste0("awk '/^S: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  }
+  else{
+    rewards = fread(paste0("awk '/^C: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    active = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    pr <- fread(paste0("awk '/^L: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  }
+  
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive, 
+              "pr" = pr
+  ) %>% do.call(cbind, .)
+  
+  
+  internal_filename <- cbind(msn = internal_filename, cbind(metadata, data)) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(internal_filename)
+})
+
+pr_msn_df <- pr_msn %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/PR/", "", filename),
+         exp = gsub(".*HS", "", filename),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*PR/", "", .), NA),
+         box = as.character(box)) 
 
 
 

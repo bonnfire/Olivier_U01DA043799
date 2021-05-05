@@ -317,6 +317,58 @@ selfadmin <- selfadmin[-1,]
 selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
 names(selfadmin) <- gsub("-.*", "", names(selfadmin), perl = T)
 names(selfadmin) <- gsub("(\\D+)(\\d){1}$", "\\10\\2", names(selfadmin), perl = T)
+names(selfadmin) <- gsub("^SHOCK.*", "SHOCK03", names(selfadmin))
+names(selfadmin) <- gsub("PRESHOCK.*", "PRESHOCK", names(selfadmin))
+
+
+
+nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names  ## MISSING THE RFID COLUMN SO THAT IS WHY [-1] INSTEAD OF [-c(1:2)] 
+nm1 <- paste("date", nm, sep = "_") # make these date columns
+# selfadmin <- selfadmin %>% 
+#   as.data.table()
+# selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns 
+
+#extract comments
+comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
+comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>% 
+  as.data.frame() %>% 
+  rownames_to_column() %>% 
+  select(-rowname)
+setnames(comments_df, comments_df[1, 1:3] %>% t() %>% unlist() %>% as.character %>% tolower)
+comments_df <- comments_df[-1,]
+
+selfadmin_exps <- grep("REWARDS|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
+selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
+names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
+selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
+selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% dplyr::filter(measurement != "COMMENT") %>% 
+  mutate(measurement = replace(measurement, measurement == "Description", "REWARD"))
+selfadmin_xl_cohort10 <- selfadmin_df
+
+
+
+
+########################
+# COHORT 11
+########################
+
+setwd("~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data")
+selfadmin <- read_xlsx("C11 COCAINE.xlsm") %>% 
+  mutate_all(as.character)
+selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
+
+# set correct column names 
+# create date columns
+dates <- grep("^\\d+", selfadmin[1,], value = T) # use these columns to make date columns # ignore the ...\\d columns
+dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d")) # convert Excel character into dates
+
+setnames(selfadmin, toupper(names(selfadmin))) # now that dates are moved into separate vector, remove from the column names 
+setnames(selfadmin,  mgsub::mgsub(names(selfadmin), c("PR1", "PR2", "^T.+1$", "^T.+2$", "^T.+3$", "^T.+4$", "SHA.*?([0-9]{2})$", "LGA.*?([0-9]{2})$"), c("PR01", "PR02", "PR03_T01", "PR04_T02", "PR05_T03", "PR06_T04", "SHA\\1", "LGA\\1")))
+names(selfadmin)[1:2] <- c("RAT", "RFID")
+selfadmin <- selfadmin[-1,]
+selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
+names(selfadmin) <- gsub("-.*", "", names(selfadmin), perl = T)
+names(selfadmin) <- gsub("(\\D+)(\\d){1}$", "\\10\\2", names(selfadmin), perl = T)
 names(selfadmin) <- gsub("SHOCK.*", "SHOCK03", names(selfadmin))
 
 
@@ -331,7 +383,7 @@ comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESO
 comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>% 
   as.data.frame() %>% 
   rownames_to_column()
-setnames(comments_df, append("EXP", comments_df[1, 2:3] %>% t() %>% unlist() %>% as.character) %>% tolower)
+setnames(comments_df, append("EXP", "comment") %>% append(comments_df[1, 3:4] %>% t() %>% unlist() %>% as.character) %>% tolower)
 comments_df <- comments_df[-1,]
 # selfadmin <- selfadmin[!which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
 
@@ -339,8 +391,9 @@ selfadmin_exps <- grep("REWARDS|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
 selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
 names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
 selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
-selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% dplyr::filter(measurement != "COMMENT")
-selfadmin_xl_cohort10 <- selfadmin_df
+selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% dplyr::filter(measurement != "COMMENT") %>% 
+  mutate(measurement = replace(measurement, measurement == "Variable Type", "REWARD"))
+selfadmin_xl_cohort11 <- selfadmin_df
 
 
 

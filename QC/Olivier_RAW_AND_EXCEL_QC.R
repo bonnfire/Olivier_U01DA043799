@@ -1291,3 +1291,134 @@ rewards_lga_tograph %>% dplyr::filter(rewards_raw != rewards_excel) %>%
 
 rewards_lga_tograph %>% subset(rewards_raw != rewards_excel) %>% dim
 
+
+
+
+
+
+
+
+
+## C10 AND C11 
+cocaine_xl_10_11 <- bind_rows(selfadmin_xl_cohort10 %>% 
+                                mutate(cohort = "C10"),
+                              selfadmin_xl_cohort11 %>% 
+                                mutate(cohort = "C11"))
+
+### SHA
+cocaine_xl_sha_df <- sha_rai_df %>% 
+  select(cohort, subject, exp, rewards, active, inactive, room, filename, box) %>% 
+  rename("labanimalid" = "subject") %>% 
+  rename_at(vars(matches("rewards|active")), ~paste0(., "_raw")) %>% 
+  mutate(exp = tolower(exp)) %>% 
+  full_join(cocaine_xl_10_11 %>% select(matches("cohort|rat|rfid|^sha\\d|measurement")) %>% 
+              subset(measurement != "PR") %>% 
+              rename("labanimalid" = "RAT") %>% 
+              clean_names() %>% 
+              distinct() %>% gather("exp", "session", -cohort, -rfid, -measurement, -labanimalid) %>% 
+              spread(measurement, session) %>% 
+              rename_at(vars(matches("rewards|active")), ~paste0(tolower(.), "_xl")) %>% 
+              rename("rewards_xl" = "REWARD") %>% 
+              select_if(~sum(!is.na(.))>0) %>% 
+              mutate(rfid = as.character(rfid)),
+            by = c("cohort", "labanimalid", "exp")) %>% 
+  mutate_at(vars(matches("_(raw|xl)")), as.numeric) %>% 
+  subset(grepl("^[MF]\\d+", labanimalid))
+
+
+cocaine_xl_sha_df %>% ggplot(aes(x = rewards_raw, y = rewards_xl)) + geom_point()
+cocaine_xl_sha_df %>% ggplot(aes(x = active_raw, y = active_xl)) + geom_point()
+cocaine_xl_sha_df %>% ggplot(aes(x = inactive_raw, y = inactive_xl)) + geom_point()
+
+cocaine_xl_sha_df_qc <- cocaine_xl_sha_df %>% 
+  mutate(rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"),
+         active_QC_diff = active_xl - active_raw, 
+         active_QC = ifelse(active_QC_diff == 0, "pass", "fail"),
+         inactive_QC_diff = inactive_xl - inactive_raw, 
+         inactive_QC = ifelse(inactive_QC_diff == 0, "pass", "fail")
+  ) %>% 
+  mutate(sex = str_extract(labanimalid, "[MF]"))
+
+# %>% 
+#   left_join(compromised_rats[, c("labanimalid", "death_comment")], by = "labanimalid")
+
+
+########
+#### LGA
+########
+
+cocaine_xl_lga_df <- lga_rai_df %>% 
+  select(cohort, subject, exp, rewards, active, inactive, room, filename, box) %>% 
+  rename("labanimalid" = "subject") %>% 
+  rename_at(vars(matches("rewards|active")), ~paste0(., "_raw")) %>% 
+  mutate(exp = tolower(exp)) %>% 
+  full_join(cocaine_xl_10_11 %>% select(matches("cohort|rat|rfid|^lga\\d|measurement")) %>% 
+              subset(measurement != "PR") %>% 
+              rename("labanimalid" = "RAT") %>% 
+              clean_names() %>% 
+              distinct() %>% gather("exp", "session", -cohort, -rfid, -measurement, -labanimalid) %>% 
+              spread(measurement, session) %>% 
+              rename_at(vars(matches("rewards|active")), ~paste0(tolower(.), "_xl")) %>% 
+              rename("rewards_xl" = "REWARD") %>% 
+              select_if(~sum(!is.na(.))>0) %>% 
+              mutate(rfid = as.character(rfid)),
+            by = c("cohort", "labanimalid", "exp")) %>% 
+  mutate_at(vars(matches("_(raw|xl)")), as.numeric) %>% 
+  subset(grepl("^[MF]\\d+", labanimalid))
+
+
+cocaine_xl_lga_df %>% ggplot(aes(x = rewards_raw, y = rewards_xl)) + geom_point()
+cocaine_xl_lga_df %>% ggplot(aes(x = active_raw, y = active_xl)) + geom_point()
+cocaine_xl_lga_df %>% ggplot(aes(x = inactive_raw, y = inactive_xl)) + geom_point()
+
+cocaine_xl_lga_df_qc <- cocaine_xl_lga_df %>% 
+  mutate(rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"),
+         active_QC_diff = active_xl - active_raw, 
+         active_QC = ifelse(active_QC_diff == 0, "pass", "fail"),
+         inactive_QC_diff = inactive_xl - inactive_raw, 
+         inactive_QC = ifelse(inactive_QC_diff == 0, "pass", "fail")
+  ) %>% 
+  mutate(sex = str_extract(labanimalid, "[MF]"))
+
+
+
+########
+#### LGA
+########
+
+cocaine_xl_lga_df <- lga_rai_df %>% 
+  select(cohort, subject, exp, rewards, active, inactive, room, filename, box) %>% 
+  rename("labanimalid" = "subject") %>% 
+  rename_at(vars(matches("rewards|active")), ~paste0(., "_raw")) %>% 
+  mutate(exp = tolower(exp)) %>% 
+  full_join(cocaine_xl_10_11 %>% select(matches("cohort|rat|rfid|^lga\\d|measurement")) %>% 
+              subset(measurement != "PR") %>% 
+              rename("labanimalid" = "RAT") %>% 
+              clean_names() %>% 
+              distinct() %>% gather("exp", "session", -cohort, -rfid, -measurement, -labanimalid) %>% 
+              spread(measurement, session) %>% 
+              rename_at(vars(matches("rewards|active")), ~paste0(tolower(.), "_xl")) %>% 
+              rename("rewards_xl" = "REWARD") %>% 
+              select_if(~sum(!is.na(.))>0) %>% 
+              mutate(rfid = as.character(rfid)),
+            by = c("cohort", "labanimalid", "exp")) %>% 
+  mutate_at(vars(matches("_(raw|xl)")), as.numeric) %>% 
+  subset(grepl("^[MF]\\d+", labanimalid))
+
+
+cocaine_xl_lga_df %>% ggplot(aes(x = rewards_raw, y = rewards_xl)) + geom_point()
+cocaine_xl_lga_df %>% ggplot(aes(x = active_raw, y = active_xl)) + geom_point()
+cocaine_xl_lga_df %>% ggplot(aes(x = inactive_raw, y = inactive_xl)) + geom_point()
+
+cocaine_xl_lga_df_qc <- cocaine_xl_lga_df %>% 
+  mutate(rewards_QC_diff = rewards_xl - rewards_raw,
+         rewards_QC = ifelse(rewards_QC_diff == 0, "pass", "fail"),
+         active_QC_diff = active_xl - active_raw, 
+         active_QC = ifelse(active_QC_diff == 0, "pass", "fail"),
+         inactive_QC_diff = inactive_xl - inactive_raw, 
+         inactive_QC = ifelse(inactive_QC_diff == 0, "pass", "fail")
+  ) %>% 
+  mutate(sex = str_extract(labanimalid, "[MF]"))
+
