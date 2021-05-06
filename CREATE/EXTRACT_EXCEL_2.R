@@ -410,7 +410,9 @@ selfadmin_exps <- grep("REWARD|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
 selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
 names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
 selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
+selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement")
 selfadmin_xl_cohort7 <- selfadmin_df
+
 
 
 
@@ -418,8 +420,7 @@ selfadmin_xl_cohort7 <- selfadmin_df
 # COHORT 8
 ########################
 
-
-filename <- cohortfiles_xl_c01_11[6]
+filename <- cohortfiles_xl_c01_11[7]
 selfadmin <- u01.importxlsx(filename)[[1]] %>%
   as.data.table
 selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
@@ -433,21 +434,23 @@ dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12
 setnames(selfadmin, toupper(as.character(selfadmin[1,]) )) # now that dates are moved into separate vector, remove from the column names 
 selfadmin <- selfadmin[-1,]
 selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
-selfadmin <- selfadmin[,1:(length(selfadmin)-1)] # remove extra column bc the value includes a redundant comment that is in the Rat Info sheet (death)
 
 nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names  
 nm <- ifelse(grepl("^\\D{2}A", nm), as.character(stringr::str_match(nm,"^\\D{2}A")), nm) # reg exp fixes issuse of extracting mA
-nm <- ifelse(grepl("^PR", nm), as.character(stringr::str_match(nm,"PR")), nm)
-nm <- ifelse(grepl("PreShock[[:space:]][(LgA15)]", nm), "LgA", nm) # applies to cohort 8; technician error 
+nm <- ifelse(grepl("PRESHOCK[[:space:]]\\(LGA15\\)", nm), "LGA", nm) # applies to cohort 8; technician error 
 nm <- gsub(" |[(]|[)]|[-]", "", nm) # remove all unwanted characters
 nm <- gsub("^(1hr|PreShock).+", "preshock", nm, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+nm <- ifelse(grepl("^PR(?!E)", nm, perl = T), as.character(stringr::str_match(nm,"PR")), nm)
 nm <- ifelse(grepl("^Shock", nm, ignore.case = T), "Shock", nm) # make date columns for this vector of exp names 
 
 # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
 uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
 nm <- ave(nm, nm, FUN = uniquify) 
-# selfadmin$Rat <- ifelse(grepl("^Shock", selfadmin$Rat, ignore.case = T), gsub("(0)(\\d)", "\\1\\2", selfadmin$Rat), selfadmin$Rat) # remove the decimal pt in between because it causes problems in separation later ## note that later cohorts use shock03 as the only shock, so this may look like shock01
-# after it is uniquified shocks should turn into decimal numbers 
+
+# if only one shock, then should be made into shock03
+if(length(grep("^Shock", nm)) == 1)
+  nm <- gsub("^Shock", "Shock03", nm)
+
 
 names(selfadmin) <- append(nm, c("RAT", "RFID"), 0)
 
@@ -470,7 +473,8 @@ selfadmin_exps <- grep("REWARD|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
 selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
 names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
 selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
-selfadmin_xl_cohort7 <- selfadmin_df
+selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement")
+selfadmin_xl_cohort8 <- selfadmin_df
 
 
 
@@ -481,43 +485,62 @@ selfadmin_xl_cohort7 <- selfadmin_df
 # COHORT 9
 ########################
 
-filename <- cohortfiles_xl_c01_11[7]
-selfadmin <- u01.importxlsx(filename)[[1]] %>%
-  as.data.table
-selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
-
-# set correct column names 
-# create date columns
-dates <- grep("^\\d+", names(selfadmin), value = T) # use these columns to make date columns # ignore the ...\\d columns
-dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d")) # convert Excel character into dates
-
-setnames(selfadmin, toupper(as.character(selfadmin[1,]) )) # now that dates are moved into separate vector, remove from the column names 
-setnames(selfadmin,  mgsub::mgsub(names(selfadmin), c("PR1", "PR2", "^T.+1$", "^T.+2$", "^T.+3$", "^T.+4$", "SHA.*?([0-9]{2})$", "LGA.*?([0-9]{2})$"), c("PR01", "PR02", "PR03_T01", "PR04_T02", "PR05_T03", "PR06_T04", "SHA\\1", "LGA\\1")))
-names(selfadmin)[1:2] <- c("RAT", "RFID")
-selfadmin <- selfadmin[-1,]
-selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
-# selfadmin <- selfadmin[1:grep("average", selfadmin$RAT)[1],] # subset only the rewards table
-
-nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names  ## MISSING THE RFID COLUMN SO THAT IS WHY [-1] INSTEAD OF [-c(1:2)] 
-nm1 <- paste("date", nm, sep = "_") # make these date columns
-selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns 
-
-#extract comments
-comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
-comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>% 
-  as.data.frame() %>% 
-  rownames_to_column()
-setnames(comments_df, append("EXP", comments_df[1, 2:3] %>% t() %>% unlist() %>% as.character) %>% tolower)
-comments_df <- comments_df[-1,]
-# selfadmin <- selfadmin[!which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
-
-selfadmin_exps <- grep("REWARDS|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
-selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
-names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
-selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
-selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% dplyr::filter(measurement != "COMMENT")
-selfadmin_rewards_cohort9 <- selfadmin_df %>% dplyr::filter(measurement == "REWARDS")
-selfadmin_xl_cohort9 <- selfadmin_df
+## XX temporarily not included, asking if Brent can redo the format of this file 
+# 
+# filename <- cohortfiles_xl_c01_11[8]
+# selfadmin <- u01.importxlsx(filename)[[1]] %>%
+#   as.data.table
+# selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
+# 
+# # set correct column names 
+# # create date columns
+# dates <- grep("^\\d+", names(selfadmin), value = T) # use these columns to make date columns # ignore the ...\\d columns
+# dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d")) # convert Excel character into dates
+# 
+# 
+# setnames(selfadmin, toupper(as.character(selfadmin[1,]) )) # now that dates are moved into separate vector, remove from the column names 
+# selfadmin <- selfadmin[-1,]
+# selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
+# 
+# nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names  
+# nm <- ifelse(grepl("^\\D{2}A", nm), as.character(stringr::str_match(nm,"^\\D{2}A")), nm) # reg exp fixes issuse of extracting mA
+# nm <- ifelse(grepl("PRESHOCK[[:space:]]\\(LGA15\\)", nm), "LGA", nm) # applies to cohort 8; technician error 
+# nm <- gsub(" |[(]|[)]|[-]", "", nm) # remove all unwanted characters
+# nm <- gsub("^(1hr|PreShock).+", "preshock", nm, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+# nm <- ifelse(grepl("^PR(?!E)", nm, perl = T), as.character(stringr::str_match(nm,"PR")), nm)
+# nm <- ifelse(grepl("^Shock", nm, ignore.case = T), "Shock", nm) # make date columns for this vector of exp names 
+# 
+# # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
+# uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
+# nm <- ave(nm, nm, FUN = uniquify) 
+# 
+# # if only one shock, then should be made into shock03
+# if(length(grep("^Shock", nm)) == 1)
+#   nm <- gsub("^Shock", "Shock03", nm)
+# 
+# 
+# names(selfadmin) <- append(nm, c("RAT", "RFID"), 0)
+# 
+# nm1 <- paste("date", nm, sep = "_") # make these date columns
+# selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns 
+# 
+# #extract comments
+# selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("COMMENT.*", "CONFLICT.*", "RESO.*"), c("COMMENT", "CONFLICT", "RESOLUTION"))
+# comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))] #extact comments
+# comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>% 
+#   as.data.frame() %>% 
+#   rownames_to_column()
+# setnames(comments_df, append("EXP", comments_df[1, 2:4] %>% t() %>% unlist() %>% as.character) %>% tolower)
+# comments_df <- comments_df[-1,]
+# # selfadmin <- selfadmin[!which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
+# 
+# 
+# selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("REWARD.*", "^ACTIVE.*", "^INACTIVE.*", "(BREAK|PR).*"), c("REWARD", "ACTIVE", "INACTIVE", "PR"))
+# selfadmin_exps <- grep("REWARD|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
+# selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
+# names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
+# selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
+# selfadmin_xl_cohort9 <- selfadmin_df
 
 
 
@@ -525,42 +548,59 @@ selfadmin_xl_cohort9 <- selfadmin_df
 # COHORT 10
 ########################
 
-filename <- cohortfiles_xl_c01_11[8]
+filename <- cohortfiles_xl_c01_11[9]
 selfadmin <- u01.importxlsx(filename)[[1]] %>%
   as.data.table
 selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
 
-# set correct column names 
+# set correct column names
 # create date columns
-dates <- grep("^\\d+", names(selfadmin), value = T) # use these columns to make date columns # ignore the ...\\d columns
+dates <- grep("^\\d+", selfadmin[3,], value = T) # use these columns to make date columns # ignore the ...\\d columns
 dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d")) # convert Excel character into dates
+dates <- dates[-1]
 
-setnames(selfadmin, toupper(as.character(selfadmin[1,]) )) # now that dates are moved into separate vector, remove from the column names 
-setnames(selfadmin,  mgsub::mgsub(names(selfadmin), c("PR1", "PR2", "^T.+1$", "^T.+2$", "^T.+3$", "^T.+4$", "SHA.*?([0-9]{2})$", "LGA.*?([0-9]{2})$"), c("PR01", "PR02", "PR03_T01", "PR04_T02", "PR05_T03", "PR06_T04", "SHA\\1", "LGA\\1")))
-names(selfadmin)[1:2] <- c("RAT", "RFID")
-selfadmin <- selfadmin[-1,]
+setnames(selfadmin, toupper(as.character(names(selfadmin)) )) # now that dates are moved into separate vector, remove from the column names
 selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
-# selfadmin <- selfadmin[1:grep("average", selfadmin$RAT)[1],] # subset only the rewards table
 
-nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names  ## MISSING THE RFID COLUMN SO THAT IS WHY [-1] INSTEAD OF [-c(1:2)] 
+nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names
+nm <- ifelse(grepl("^\\D{2}A", nm), as.character(stringr::str_match(nm,"^\\D{2}A")), nm) # reg exp fixes issuse of extracting mA
+nm <- ifelse(grepl("PRESHOCK[[:space:]]\\(LGA15\\)", nm), "LGA", nm) # applies to cohort 8; technician error
+nm <- gsub(" |[(]|[)]|[-]", "", nm) # remove all unwanted characters
+nm <- gsub("^(1hr|PreShock).+", "preshock", nm, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+nm <- ifelse(grepl("^PR(?!E)", nm, perl = T), as.character(stringr::str_match(nm,"PR")), nm)
+nm <- ifelse(grepl("^Shock", nm, ignore.case = T), "Shock", nm) # make date columns for this vector of exp names
+
+# make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
+uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x))
+nm <- ave(nm, nm, FUN = uniquify)
+
+# if only one shock, then should be made into shock03
+if(length(grep("^Shock", nm)) == 1)
+  nm <- gsub("^Shock", "Shock03", nm)
+
+
+names(selfadmin) <- append(nm, c("RAT", "RFID"), 0)
+
 nm1 <- paste("date", nm, sep = "_") # make these date columns
-selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns 
+selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns
 
 #extract comments
-comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
-comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>% 
-  as.data.frame() %>% 
+selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("COMMENT.*", "CONFLICT.*", "RESO.*"), c("COMMENT", "CONFLICT", "RESOLUTION"))
+comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION", "FLAG", "IGNORE, EXCLUDE_DAY, EXCLUDE_SUBJECT"))] #extact comments
+comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>%
+  as.data.frame() %>%
   rownames_to_column()
-setnames(comments_df, append("EXP", comments_df[1, 2:3] %>% t() %>% unlist() %>% as.character) %>% tolower)
+setnames(comments_df, append("EXP", comments_df[1, 2:6] %>% t() %>% unlist() %>% as.character) %>% tolower)
 comments_df <- comments_df[-1,]
 # selfadmin <- selfadmin[!which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
 
-selfadmin_exps <- grep("REWARDS|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
+
+selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("REWARD.*", "^ACTIVE.*", "^INACTIVE.*", "(BREAK|PR).*"), c("REWARD", "ACTIVE", "INACTIVE", "PR"))
+selfadmin_exps <- grep("REWARD|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
 selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
 names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
 selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
-selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% dplyr::filter(measurement != "COMMENT")
-selfadmin_rewards_cohort10 <- selfadmin_df %>% dplyr::filter(measurement == "REWARDS")
+selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% mutate(measurement = ifelse(measurement == "Variable Type", "REWARD", measurement))
 selfadmin_xl_cohort10 <- selfadmin_df
 
 
@@ -569,44 +609,60 @@ selfadmin_xl_cohort10 <- selfadmin_df
 # COHORT 11
 ########################
 
-filename <- cohortfiles_xl_c01_11[8]
+filename <- cohortfiles_xl_c01_11[10]
 selfadmin <- u01.importxlsx(filename)[[1]] %>%
   as.data.table
 selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
 
-# set correct column names 
+# set correct column names
 # create date columns
-dates <- grep("^\\d+", names(selfadmin), value = T) # use these columns to make date columns # ignore the ...\\d columns
+dates <- grep("^\\d+", selfadmin[1,], value = T) # use these columns to make date columns # ignore the ...\\d columns
 dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d")) # convert Excel character into dates
+# dates <- dates[-1]
 
-setnames(selfadmin, toupper(as.character(selfadmin[1,]) )) # now that dates are moved into separate vector, remove from the column names 
-setnames(selfadmin,  mgsub::mgsub(names(selfadmin), c("PR1", "PR2", "^T.+1$", "^T.+2$", "^T.+3$", "^T.+4$", "SHA.*?([0-9]{2})$", "LGA.*?([0-9]{2})$"), c("PR01", "PR02", "PR03_T01", "PR04_T02", "PR05_T03", "PR06_T04", "SHA\\1", "LGA\\1")))
-names(selfadmin)[1:2] <- c("RAT", "RFID")
-selfadmin <- selfadmin[-1,]
+setnames(selfadmin, toupper(as.character(names(selfadmin)) )) # now that dates are moved into separate vector, remove from the column names
 selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
-# selfadmin <- selfadmin[1:grep("average", selfadmin$RAT)[1],] # subset only the rewards table
 
-nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names  ## MISSING THE RFID COLUMN SO THAT IS WHY [-1] INSTEAD OF [-c(1:2)] 
+nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names
+nm <- ifelse(grepl("^\\D{2}A", nm), as.character(stringr::str_match(nm,"^\\D{2}A")), nm) # reg exp fixes issuse of extracting mA
+nm <- ifelse(grepl("PRESHOCK[[:space:]]\\(LGA15\\)", nm), "LGA", nm) # applies to cohort 8; technician error
+nm <- gsub(" |[(]|[)]|[-]", "", nm) # remove all unwanted characters
+nm <- gsub("^(1hr|PreShock).+", "preshock", nm, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+nm <- ifelse(grepl("^PR(?!E)", nm, perl = T), as.character(stringr::str_match(nm,"PR")), nm)
+nm <- ifelse(grepl("^Shock", nm, ignore.case = T), "Shock", nm) # make date columns for this vector of exp names
+
+# make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
+uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x))
+nm <- ave(nm, nm, FUN = uniquify)
+
+# if only one shock, then should be made into shock03
+if(length(grep("^Shock", nm)) == 1)
+  nm <- gsub("^Shock", "Shock03", nm)
+
+
+names(selfadmin) <- append(nm, c("RAT", "RFID"), 0)
+
 nm1 <- paste("date", nm, sep = "_") # make these date columns
-selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns 
+selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns
 
 #extract comments
-comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
-comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>% 
-  as.data.frame() %>% 
+selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("COMMENT.*", "CONFLICT.*", "RESO.*"), c("COMMENT", "CONFLICT", "RESOLUTION"))
+comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION", "FLAG", "IGNORE, EXCLUDE_DAY, EXCLUDE_SUBJECT"))] #extact comments
+comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>%
+  as.data.frame() %>%
   rownames_to_column()
-setnames(comments_df, append("EXP", comments_df[1, 2:3] %>% t() %>% unlist() %>% as.character) %>% tolower)
+setnames(comments_df, append("EXP", comments_df[1, 2:6] %>% t() %>% unlist() %>% as.character) %>% tolower)
 comments_df <- comments_df[-1,]
 # selfadmin <- selfadmin[!which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
 
-selfadmin_exps <- grep("REWARDS|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
+
+selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("REWARD.*", "^ACTIVE.*", "^INACTIVE.*", "(BREAK|PR).*"), c("REWARD", "ACTIVE", "INACTIVE", "PR"))
+selfadmin_exps <- grep("REWARD|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
 selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
 names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
 selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
-selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% dplyr::filter(measurement != "COMMENT")
-selfadmin_rewards_cohort10 <- selfadmin_df %>% dplyr::filter(measurement == "REWARDS")
-selfadmin_xl_cohort10 <- selfadmin_df
-
+selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement") %>% mutate(measurement = ifelse(measurement == "Date", "REWARD", measurement))
+selfadmin_xl_cohort11 <- selfadmin_df
 
 ########################
 # COHORT 12
