@@ -1133,64 +1133,24 @@ pr_rai_df <- pr_rai %>%
          box = as.character(box)) 
 
 
-pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*PR/", value = T) # 77 files
-# label data with...
-pr_subjects_new <- process_subjects_new(pr_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%
-  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #1159
-# extract data with diff function from `read_rewards_new` for sha
-readrewards_pr <- function(x){
-  rewards <- fread(paste0("awk '/B:/{print NR \"_\" $2}' ", "'", x, "'"), header = F, fill = T)
-  rewards$filename <- x
-  return(rewards)
-}
-
-pr_rewards_new <- lapply(pr_new_files, readrewards_pr) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(pr_subjects_new) %>%
-  separate(
-    labanimalid,
-    into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"),
-    sep = "_"
-  ) %>% mutate(
-    date = lubridate::mdy(date),
-    time = chron::chron(times = time),
-    rewards = as.numeric(rewards)
-  ) %>% 
-  left_join(., date_time_subject_df_comp %>% 
-              mutate(start_time = format(lubridate::ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
-              rename("date" = "start_date", "time" = "start_time"), 
-            by = c("cohort", "exp", "filename", "date", "time")) ## 1180
-
-pr_rewards_new_valid <- pr_rewards_new %>%  
-  dplyr::filter(valid == "yes") %>% 
-  mutate(time = as.character(time)) %>% 
-  distinct() # 603 ## look into why Cohorts 9-11 are being invalidated XX 08/03/2020
-
 # qc with...
-pr_rewards_new %>% count(labanimalid, exp, cohort) %>% subset(n!=1)
-pr_rewards_new_valid %>% get_dupes(labanimalid, exp, cohort)
-pr_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1)
+pr_rai_df <- pr_rai_df %>% subset(subject != "717")
+pr_rai_df %>% count(labanimalid, exp, cohort) %>% subset(n!=1)
+pr_rai_df %>% get_dupes(labanimalid, exp, cohort)
+pr_rai_df %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1)
 
 # deal with the missing subjects...
-# join and update "df" by reference, i.e. without copy 
+pr_rai_df <- pr_rai_df %>% 
+  mutate(subject = ifelse(!grepl("[MF]", subject), NA, subject)) %>% 
+  group_by(cohort, room, box) %>% 
+  fill(subject, .direction = "downup") %>% 
+  ungroup()
 
-## add _valid
-pr_rewards_new_valid <- pr_rewards_new_valid %>% mutate(date = as.character(date))
-setDT(pr_rewards_new_valid)             # convert to data.table without copy
-pr_rewards_new_valid[setDT(pr_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
-                       left_join(., date_time_subject_df_comp %>% 
-                                   dplyr::filter(grepl("PR", exp)) %>% 
-                                   mutate(time = as.character(start_time), 
-                                          date = as.character(start_date)), 
-                                 by = c("exp", "filename", "date", "time"), all.x = T)), 
-                on = c("rewards", "exp", "filename", "date", "time"), labanimalid := labanimalid.y] # don't want to make another missing object
-setDF(pr_rewards_new_valid)
-pr_rewards_new_valid %<>% 
-  mutate_at(vars(rewards), as.numeric)
-# remove invalid point
-pr_rewards_new_valid %<>% dplyr::filter(!(labanimalid == "F717" & exp == "PR01" & time == "07:45:31"))
-pr_rewards_new_valid %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1) # dim of df is dim of distinct(df)
-pr_rewards_new_valid <- pr_rewards_new_valid %>% mutate(date = lubridate::ymd(date))
+pr_rai_df <- pr_rai_df %>% subset(grepl("[MF]", subject))
+
+pr_rai_df %>% get_dupes(subject, exp)
+
+
 
 ###### OLD FILES ##############
 
