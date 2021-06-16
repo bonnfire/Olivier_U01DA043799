@@ -697,30 +697,122 @@ box_metadata_wide_2 <- box_metadata_long_fill_2 %>%
 
 
 
-################################
+################################  
 ########## SHA #################
 ################################
 
 setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
 ###### NEW FILES ##############
-# label data with... 
-sha_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) # 254 files
-sha_subjects_new <- process_subjects_new(sha_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
-  arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
-read_rewards_new <- function(x){
-  rewards <- fread(paste0("awk '/W:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print NR \"_\" $2}'"), header = F, fill = T)
-  rewards$filename <- x
-  return(rewards)
-}
-sha_rewards_new <-  lapply(sha_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(sha_subjects_new) %>% 
-  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
-  mutate(date = lubridate::mdy(date), time = chron::chron(times = time)) %>%  
-  left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
-              rename("date" = "start_date", "time" = "start_time"), 
-            by = c("cohort", "exp", "filename", "date", "time")) 
+sha_new_files_01_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) %>% grep("C(0[1-9]|1[01])", ., value = T) # 254 files
+
+# check cohorts and experiments represented 
+sha_new_files_01_11 %>% as.data.frame() %>% 
+  mutate(cohort = str_extract(., "C\\d+"),
+         exp = str_extract(., "SHA\\d+")) %>% 
+  select(cohort, exp) %>% table(exclude = NULL)
+
+# check which ones are NA
+sha_new_files_01_11 %>% as.data.frame() %>% 
+  mutate(cohort = str_extract(., "C\\d+"),
+         exp = str_extract(., "SHA\\d+")) %>% 
+  subset(is.na(exp))
+
+# extract subject, box, and rewards, active, inactive (rai)
+sha_rai <- lapply(sha_new_files_01_11, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  date = fread(paste0("awk '/^Start Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  enddate = fread(paste0("awk '/^End Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  time = fread(paste0("awk '/^Start Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  endtime = fread(paste0("awk '/^End Time:/{print $3}' '", x, "'"), header = F, fill = T)
+    
+  session_duration <- cbind(date = date, enddate = enddate) %>%
+    cbind(time = time) %>% cbind(endtime = endtime) %>% 
+    mutate(start_datetime = lubridate::mdy_hms(paste(format(as.Date(date, "%m/%d/%y"), "%m/%d/20%y"), time)),
+         end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
+         session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
+  
+  metadata = cbind(subject = subject, box = box) %>% 
+    cbind(startdate = date) %>% 
+    cbind(session_duration = session_duration$session_duration)
+  # %>% 
+  # cbind(internal_filename)
+  
+  
+  if(grepl("GWAS 2hNEW", unique(internal_filename$V1))){
+    rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  }
+  else{
+    rewards = fread(paste0("awk '/^W:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
+    active =  fread(paste0("awk '/^R:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
+    inactive = fread(paste0("awk '/^L:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
+  }
+  
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive  
+  ) %>% do.call(cbind, .)
+  
+  data <- cbind(metadata, data) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(data)
+})
+
+sha_rai_df <- sha_rai %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         subject = str_extract(toupper(subject), "[MF]\\d+"),
+         filename = gsub(".*/SHA/", "", filename),
+         exp = gsub(".*HS", "", filename) ,
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         box = as.character(box)) %>% 
+  distinct()
+
+## testmsn <- lapply(sha_new_files_01_11, function(x){
+# setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+# internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+# 
+# data <- cbind(unique(internal_filename)) %>% mutate(filename = x)
+# return(data)
+# }) %>% rbindlist()
+# testmsn %>% get_dupes(filename)
+
+
+# fix NA subjects and duplicated values
+sha_rai_df %>% get_dupes(subject, exp) %>% View()
+
+# NA subjects 
+sha_rai_df <- sha_rai_df %>% 
+  group_by(cohort, box, room) %>% 
+  fill(subject, .direction = "downup") %>% 
+  ungroup()
+
+# check again 
+# sha_rai_df %>% get_dupes(subject, exp) %>% View()
+
+# replace NA subjects for animals that died from the start of SHA, don't have any values to fill
+sha_rai_df <- sha_rai_df %>% 
+  rowwise() %>% 
+  mutate(subject = ifelse(grepl("C04HSSHA\\d+", filename)&is.na(subject), paste0("F40", box), subject)) %>% 
+  ungroup()
+
+# duplicated values
+#### figure this one out 
+sha_rai_df <- sha_rai_df %>% 
+  add_count(subject, exp) %>% 
+  subset(!(n > 1&rewards==0&active==0&inactive==0)) %>%  # remove if bad session
+  select(-n)
+
 
 ## reconsider since the data may not be updated from the date_time_subject_df_comp object
 sha_rewards_new_valid <- sha_rewards_new %>% 
@@ -989,10 +1081,58 @@ lga_rai_df <- lga_rai %>%
 ########## PR ##################
 ################################
 
-setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
-
-
 ###### NEW FILES ##############
+
+# label data with... 
+pr_new_files_01_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*PR/", value = T) %>% grep("C(0[1-9]|1[0-1])", ., value = T)
+
+# extract subject, box, and rewards, active, inactive, pr 
+pr_rai <- lapply(pr_new_files_01_11, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+  
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  metadata = cbind(subject = subject, box = box)
+  
+  if(grepl("GWAS", unique(internal_filename$V1))){
+    rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    pr <- fread(paste0("awk '/^S: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  }
+  else{
+    rewards = fread(paste0("awk '/^C: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    active = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    pr <- fread(paste0("awk '/^L: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  }
+  
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive, 
+              "pr" = pr
+  ) %>% do.call(cbind, .)
+  
+  
+  internal_filename <- cbind(msn = internal_filename, cbind(metadata, data)) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(internal_filename)
+})
+
+pr_rai_df <- pr_rai %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/PR/", "", filename),
+         exp = gsub(".*HS", "", filename),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*PR/", "", .), NA),
+         box = as.character(box)) 
+
+
 pr_new_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*New.*PR/", value = T) # 77 files
 # label data with...
 pr_subjects_new <- process_subjects_new(pr_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%

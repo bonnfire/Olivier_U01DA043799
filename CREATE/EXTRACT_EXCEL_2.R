@@ -4,29 +4,38 @@
 # create object for all values
 oliviercocaine_excel_all <- list(
   "C01"=selfadmin_xl_cohort1,
+  "C02"=selfadmin_xl_cohort2,
   "C03"=selfadmin_xl_cohort3,
   "C04"=selfadmin_xl_cohort4,
   "C05"=selfadmin_xl_cohort5,
-  "C06"=selfadmin_xl_cohort6,
   "C07"=selfadmin_xl_cohort7,
+  "C08"=selfadmin_xl_cohort8,
   "C09"=selfadmin_xl_cohort9,
-  "C10"=selfadmin_xl_cohort10
+  "C10"=selfadmin_xl_cohort10,
+  "C11"=selfadmin_xl_cohort11
 ) %>% rbindlist(idcol = "cohort", fill = T) %>%
+  naniar::replace_with_na_all(condition = ~.x %in% c("N/A")) %>% 
   select_if(~sum(!is.na(.)) > 0) %>% 
   clean_names() %>% 
   rename("labanimalid" = "rat") %>% 
   mutate(measurement = gsub("^ACTIVE.*", "active", measurement),
          measurement = gsub("^INACTIVE.*", "inactive", measurement),
          measurement = gsub("^PR.*", "pr_breakpoint", measurement),
-         measurement = gsub("^REWARDS.*", "rewards", measurement)) 
-
-oliviercocaine_excel_all <- oliviercocaine_excel_all %>% 
-  subset(!grepl("\\D+:", labanimalid)) %>% 
-  naniar::replace_with_na_all(condition = ~.x %in% c("N/A")) %>% 
-  subset(!(is.na(labanimalid)&cohort %in% c("C01", "C03", "C04"))) # add to investigate other cohorts before removing, ensure with naniar::vis_miss()
+         measurement = gsub("^REWARD(S)?.*", "rewards", measurement)) %>% 
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  select(cohort, measurement, labanimalid, rfid, matches("^(sha|pr|lga)"), matches("date")) # reorder columns
 
 
-rm(list = ls(pattern = "selfadmin_(xl|rewards)|cohortinfo|comments_df|selfadmin(_df)?|nm(1)?|dates"))
+## check for dupes in rfid
+oliviercocaine_excel_all %>% distinct(labanimalid, rfid) %>% get_dupes(rfid)
+oliviercocaine_excel_all <- oliviercocaine_excel_all %>% mutate(labanimalid = ifelse(rfid == "933000120138282", "F105", labanimalid))
+oliviercocaine_excel_all %>% select(cohort, measurement, labanimalid, rfid, matches("^(sha|pr|lga)"), matches("date")) %>% names
+# oliviercocaine_excel_all <- oliviercocaine_excel_all %>% 
+  # subset(!grepl("\\D+:", labanimalid)) %>% 
+  # subset(!(is.na(labanimalid)&cohort %in% c("C01", "C03", "C04"))) # add to investigate other cohorts before removing, ensure with naniar::vis_miss()
+
+
+rm(list = ls(pattern = "selfadmin_(xl|rewards)|cohortinfo|comments_df|selfadmin(_df)?|nm(1)?|dates|cocaine_metadata$"))
 
 
 ## to extract the mapping excels 
@@ -42,16 +51,64 @@ u01.importxlsx <- function(xlname){
 cocaine_metadata <- lapply(cohortinfofiles, openxlsx::read.xlsx)
 names(cocaine_metadata) <- cohortinfofiles
 cocaine_metadata_df <- cocaine_metadata %>% 
+  lapply(clean_names) %>% 
   rbindlist(fill = T, idcol = "cohort") %>% 
-  subset(grepl("^\\d{15}$", RFID)) %>% 
+  subset(grepl("^\\d{15}$", rfid)) %>% 
   mutate(cohort = gsub(".*(C\\d+).*", "\\1", cohort),
-         sex = gsub(".*([MF]).*", "\\1", RAT)) %>% 
-  clean_names 
-# %>% 
+         sex = gsub(".*([MF]).*", "\\1", rat),
+         d_o_b = openxlsx::convertToDate(d_o_b), 
+         date_of_wean = openxlsx::convertToDate(date_of_wean)) %>% 
+  rename("coatcolor" = "coat_color") %>% 
+  uniform.coatcolors.df %>% # read in function from WFU project
+  mutate(coatcolor = gsub("ED$", "", coatcolor)) %>% 
+  rename("labanimalid" = "rat") %>% 
+  mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
+  mutate(rfid = ifelse(rfid == "933000320047343", "933000320047009", rfid)) %>% # notes from excel  
+  subset(!(rfid == "933000320047009"&is.na(d_o_b))) %>% # prevent duplicates in rfid, labanimalid
+  mutate(labanimalid = ifelse(rfid == "933000320047163", "F901", labanimalid))
+  
+## check if rfid's are all unique 
+cocaine_metadata_df %>% get_dupes(rfid)
+
+
 # select(cohort, rat, rfid, sex)
 
-cohortfiles_xl_c01_11 <- list.files(path = "~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data", pattern = "*.xls(x|m)", full.names = T) %>% grep("C(0[1-9]|1[0|1])", ., value = T)
+# use mapping files to correct labanimalid and rfid in excel files 
+cocaine_metadata_df %>% subset(rfid %in% c("933000120138282", "933000120138333"))
 
+# animals that are not in Excel data
+oliviercocaine_excel_all %>% 
+  mutate(labanimalid = ifelse(rfid == "933000120138282", "F105", labanimalid),
+         labanimalid = ifelse(rfid == "933000120138333", "M167", labanimalid)) %>%
+  distinct(cohort, rfid, labanimalid) %>% 
+  full_join(cocaine_metadata_df %>% 
+              select(cohort, rfid, labanimalid), by = "rfid") %>% 
+  subset(labanimalid.x != labanimalid.y|is.na(labanimalid.x)|is.na(labanimalid.y)) %>% naniar::vis_miss()
+
+oliviercocaine_excel_all %>% 
+  mutate(labanimalid = ifelse(rfid == "933000120138282", "F105", labanimalid),
+         labanimalid = ifelse(rfid == "933000120138333", "M167", labanimalid)) %>%
+  distinct(cohort, rfid, labanimalid) %>% 
+  full_join(cocaine_metadata_df %>% 
+              select(cohort, rfid, labanimalid), by = "rfid") %>% 
+  subset(labanimalid.x != labanimalid.y|is.na(labanimalid.x)|is.na(labanimalid.y)) %>% select(cohort.y) %>% table()
+# apart from the C09 and C13 (C09 waiting on reformatting,C13 doesn't yet have phenotypes so no Excel)
+
+oliviercocaine_excel_all %>% 
+  mutate(labanimalid = ifelse(rfid == "933000120138282", "F105", labanimalid),
+         labanimalid = ifelse(rfid == "933000120138333", "M167", labanimalid)) %>%
+  distinct(cohort, rfid, labanimalid) %>% 
+  full_join(cocaine_metadata_df %>% 
+              select(cohort, rfid, labanimalid), by = "rfid") %>% 
+  subset(labanimalid.x != labanimalid.y|is.na(labanimalid.x)|is.na(labanimalid.y)) %>% subset(is.na(labanimalid.y))
+
+
+
+## extract excel
+
+cohortfiles_xl_c01_11 <- list.files(path = "~/Dropbox (Palmer Lab)/Olivier_George_U01/GWAS Self Administration Data/Cocaine Data", pattern = "*.xls(x|m)", full.names = T) %>% grep("C(0[1-9]|1[0|1])", ., value = T)
+# use the correct c09 file 
+cohortfiles_xl_c01_11 <- grep("C09 COCAINE.xlsx", cohortfiles_xl_c01_11, perl = T, value = T, invert = T)
 
 ########################
 # COHORT 1 
@@ -485,63 +542,62 @@ selfadmin_xl_cohort8 <- selfadmin_df
 # COHORT 9
 ########################
 
-## XX temporarily not included, asking if Brent can redo the format of this file 
-# 
-# filename <- cohortfiles_xl_c01_11[8]
-# selfadmin <- u01.importxlsx(filename)[[1]] %>%
-#   as.data.table
-# selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
-# 
-# # set correct column names 
-# # create date columns
-# dates <- grep("^\\d+", names(selfadmin), value = T) # use these columns to make date columns # ignore the ...\\d columns
-# dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d")) # convert Excel character into dates
-# 
-# 
-# setnames(selfadmin, toupper(as.character(selfadmin[1,]) )) # now that dates are moved into separate vector, remove from the column names 
-# selfadmin <- selfadmin[-1,]
-# selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
-# 
-# nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names  
-# nm <- ifelse(grepl("^\\D{2}A", nm), as.character(stringr::str_match(nm,"^\\D{2}A")), nm) # reg exp fixes issuse of extracting mA
-# nm <- ifelse(grepl("PRESHOCK[[:space:]]\\(LGA15\\)", nm), "LGA", nm) # applies to cohort 8; technician error 
-# nm <- gsub(" |[(]|[)]|[-]", "", nm) # remove all unwanted characters
-# nm <- gsub("^(1hr|PreShock).+", "preshock", nm, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
-# nm <- ifelse(grepl("^PR(?!E)", nm, perl = T), as.character(stringr::str_match(nm,"PR")), nm)
-# nm <- ifelse(grepl("^Shock", nm, ignore.case = T), "Shock", nm) # make date columns for this vector of exp names 
-# 
-# # make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
-# uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
-# nm <- ave(nm, nm, FUN = uniquify) 
-# 
-# # if only one shock, then should be made into shock03
-# if(length(grep("^Shock", nm)) == 1)
-#   nm <- gsub("^Shock", "Shock03", nm)
-# 
-# 
-# names(selfadmin) <- append(nm, c("RAT", "RFID"), 0)
-# 
-# nm1 <- paste("date", nm, sep = "_") # make these date columns
-# selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns 
-# 
-# #extract comments
-# selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("COMMENT.*", "CONFLICT.*", "RESO.*"), c("COMMENT", "CONFLICT", "RESOLUTION"))
-# comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))] #extact comments
-# comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>% 
-#   as.data.frame() %>% 
-#   rownames_to_column()
-# setnames(comments_df, append("EXP", comments_df[1, 2:4] %>% t() %>% unlist() %>% as.character) %>% tolower)
-# comments_df <- comments_df[-1,]
-# # selfadmin <- selfadmin[!which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
-# 
-# 
-# selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("REWARD.*", "^ACTIVE.*", "^INACTIVE.*", "(BREAK|PR).*"), c("REWARD", "ACTIVE", "INACTIVE", "PR"))
-# selfadmin_exps <- grep("REWARD|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
-# selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
-# names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
-# selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
-# selfadmin_xl_cohort9 <- selfadmin_df
+filename <- cohortfiles_xl_c01_11[8]
+selfadmin <- u01.importxlsx(filename)[[1]] %>%
+  as.data.table
+selfadmin[ selfadmin == "n/a" ] <- NA # change all character n/a to actual NA
 
+# set correct column names
+# create date columns
+dates <- grep("^\\d+", as.character(unlist(selfadmin[251, ])), value = T) # use these columns to make date columns # ignore the ...\\d columns
+dates <- as.character(as.POSIXct(as.numeric(dates) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d")) # convert Excel character into dates
+
+
+setnames(selfadmin, toupper(as.character(names(selfadmin)))) # now that dates are moved into separate vector, remove from the column names
+selfadmin <- selfadmin[-c(1:2),]
+selfadmin <- remove_empty(selfadmin, "cols") # janitor::remove_empty_cols() deprecated
+
+nm <- names(selfadmin)[-c(1:2)] # make date columns for this vector of exp names
+nm <- ifelse(grepl("^\\D{2}A", nm), as.character(stringr::str_match(nm,"^\\D{2}A")), nm) # reg exp fixes issuse of extracting mA
+nm <- ifelse(grepl("PRESHOCK[[:space:]]\\(LGA15\\)", nm), "LGA", nm) # applies to cohort 8; technician error
+nm <- gsub(" |[(]|[)]|[-]", "", nm) # remove all unwanted characters
+nm <- gsub("^(1hr|PreShock).+", "preshock", nm, ignore.case = T) # XX GET HIS INPUT ON THIS -- currently one HOUR admin; is preshock (in cohort7 also the same)
+nm <- ifelse(grepl("^PR(?!E)", nm, perl = T), as.character(stringr::str_match(nm,"PR")), nm)
+nm <- ifelse(grepl("^Shock", nm, ignore.case = T), "Shock", nm) # make date columns for this vector of exp names
+
+# make experiment name unique (# code from G. Grothendieck (Stack Overflow) )
+uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x))
+nm <- ave(nm, nm, FUN = uniquify)
+
+# if only one shock, then should be made into shock03
+if(length(grep("^Shock", nm)) == 1)
+  nm <- gsub("^Shock", "Shock03", nm)
+
+
+names(selfadmin) <- append(nm, c("RAT", "RFID"), 0)
+
+nm1 <- paste("date", nm, sep = "_") # make these date columns
+selfadmin[ , ( nm1 ) := lapply( dates, function(x) rep(x, each = .N) ) ] # make the date columns
+
+#extract comments
+selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("COMMENT.*", "CONFLICT.*", "RESO.*"), c("COMMENT", "CONFLICT", "RESOLUTION"))
+comments_df <- selfadmin[which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))] #extact comments
+comments_df <- comments_df %>% select(-matches("RFID|date")) %>% t() %>%
+  as.data.frame() %>%
+  rownames_to_column()
+setnames(comments_df, append("EXP", comments_df[1, 2:4] %>% t() %>% unlist() %>% as.character) %>% tolower)
+comments_df <- comments_df[-1,]
+# selfadmin <- selfadmin[!which(selfadmin$RAT %in% c("COMMENT", "CONFLICT", "RESOLUTION"))]
+
+
+selfadmin$RAT <- mgsub::mgsub(selfadmin$RAT , c("REWARD.*", "^ACTIVE.*", "^INACTIVE.*", "(BREAK|PR).*"), c("REWARD", "ACTIVE", "INACTIVE", "PR"))
+selfadmin_exps <- grep("REWARD|ACTIVE|INACTIVE|PR$", selfadmin$RAT)
+selfadmin_split <- split(selfadmin, cumsum(1:nrow(selfadmin) %in% selfadmin_exps))
+names(selfadmin_split) <- lapply(selfadmin_split, function(x){ x$RAT %>% head(1)}) %>% unlist() %>% as.character()
+selfadmin_split <- lapply(selfadmin_split, function(x){ x %>% dplyr::filter(grepl("^[MF]\\d+", RAT))})
+selfadmin_df <- selfadmin_split %>% rbindlist(idcol = "measurement")
+selfadmin_xl_cohort9 <- selfadmin_df
+selfadmin_xl_cohort9 <- selfadmin_xl_cohort9 %>% mutate(measurement = ifelse(measurement == "F936", "REWARD", measurement))
 
 
 ########################
