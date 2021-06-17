@@ -6,6 +6,11 @@ write.csv(rats_allcohorts_weights, "rats_allcohorts_weights_c01_11.csv", row.nam
 
 write.csv(oliviercocaine_14_wfu_metadata, "~/Desktop/Database/csv files/u01_olivier_george_cocaine/oliviercocaine_14_wfu_metadata.csv", row.names = F)
 
+
+# raw data
+write.csv(pr_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_pr_raw_c01_11_oldnewdirs.csv", row.names = F)
+
+
 ## nida gwas traits
 
 cocaine_xl_sha_df_qc %>% 
