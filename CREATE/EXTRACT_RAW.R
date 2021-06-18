@@ -1313,7 +1313,8 @@ shock_rai_df <- shock_rai_df %>%
 
 shock_rai_df <- shock_rai_df %>% 
   add_count(subject, exp, cohort) %>% 
-  subset(!(n!=1&rewards==0&active==0&inactive==0))
+  subset(!(n!=1&rewards==0&active==0&inactive==0)) %>% 
+  select(-n)
 
 shock_rai_df %>% get_dupes(subject, exp, cohort) 
 

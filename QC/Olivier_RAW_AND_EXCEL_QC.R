@@ -1129,6 +1129,61 @@ pr_raw_df_qc %>% subset(QC == "fail") %>% naniar::vis_miss()
 pr_raw_df_qc %>% subset(QC == "fail"&!is.na(QC_diff)) %>% pivot_wider(names_from = name, values_from = c("raw", "excel", "QC_diff", "QC")) %>% 
   openxlsx::write.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/pr_tobeqc_c01_11.xlsx")
 
+
+
+
+
+
+
+
+
+
+# =================================================
+## SHOCK
+shock_raw_df <- shock_rai_df %>% 
+  mutate(session_duration = as.character(session_duration)) %>% 
+  mutate(exp = tolower(exp))
+
+# pr_raw_df is saved as read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_pr_raw_c01_11_oldnewdirs.csv")
+shock_raw_df_long <- shock_raw_df %>% pivot_longer(cols = where(is.numeric), values_to = "raw")
+
+
+shock_xl_long <- oliviercocaine_excel_all %>% 
+  select(cohort, measurement, labanimalid, rfid, matches("shock")) %>% 
+  pivot_longer(cols = matches("shock")) %>% 
+  mutate(measurement = ifelse(grepl("date", name), "date", measurement),
+         name = ifelse(grepl("date", name), gsub("date_", "", name), name)) %>% 
+  distinct() %>% 
+  # %>% 
+  # pivot_wider(names_from = measurement, values_from = value) %>% 
+  rename("exp" = "name",
+         "name" = "measurement", 
+         "excel" = "value")
+
+
+shock_raw_df_qc <- shock_raw_df_long %>% full_join(shock_xl_long, by = c("subject" = "labanimalid", "exp", "name", "cohort")) %>% 
+  mutate(excel = as.numeric(excel)) %>%  
+  # select_all(~gsub("\\.x", "_raw", .)) %>% 
+  # select_all(~gsub("\\.y", "_xl", .)) 
+  group_by(subject) %>% 
+  fill(rfid, .direction = "downup") %>% 
+  ungroup()
+
+shock_raw_df_qc <- shock_raw_df_qc %>% 
+  mutate(QC_diff = excel - raw,
+         QC = ifelse(QC_diff == 0&!is.na(QC_diff), "pass", "fail")) 
+# %>% 
+# naniar::vis_miss() # overall missingness
+# select(QC) %>% table() %>% prop.table() # proportion of pass vs fail
+# select(QC_diff) %>% summary # spread of differences
+
+# most of the fails are from missing raw and excels
+shock_raw_df_qc %>% subset(QC == "fail") %>% naniar::vis_miss()
+
+# subset from the ones that failed to only include those that have QC diff values to ask the team to go over and check 
+shock_raw_df_qc %>% subset(QC == "fail"&!is.na(QC_diff)) %>% pivot_wider(names_from = name, values_from = c("raw", "excel", "QC_diff", "QC")) %>% 
+  openxlsx::write.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/shock_tobeqc_c01_11.xlsx")
+
   
 
 

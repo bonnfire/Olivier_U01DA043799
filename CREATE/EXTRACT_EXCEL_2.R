@@ -23,13 +23,17 @@ oliviercocaine_excel_all <- list(
          measurement = gsub("^PR.*", "pr_breakpoint", measurement),
          measurement = gsub("^REWARD(S)?.*", "rewards", measurement)) %>% 
   mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
-  select(cohort, measurement, labanimalid, rfid, matches("^(sha|pr|lga)"), matches("date")) # reorder columns
+  mutate(shock03 = coalesce(shock03, shock)) %>% 
+  select(-shock) %>% 
+  mutate(date_shock03 = coalesce(date_shock03, date_shock)) %>% 
+  select(-date_shock) %>% 
+  select(cohort, measurement, labanimalid, rfid, matches("^(sha|pr|lga|(pre)?shock)"), matches("date")) # reorder columns
 
 
 ## check for dupes in rfid
 oliviercocaine_excel_all %>% distinct(labanimalid, rfid) %>% get_dupes(rfid)
 oliviercocaine_excel_all <- oliviercocaine_excel_all %>% mutate(labanimalid = ifelse(rfid == "933000120138282", "F105", labanimalid))
-oliviercocaine_excel_all %>% select(cohort, measurement, labanimalid, rfid, matches("^(sha|pr|lga)"), matches("date")) %>% names
+oliviercocaine_excel_all %>% select(cohort, measurement, labanimalid, rfid, matches("^(sha|pr|lga|(pre)?shock)"), matches("date")) %>% names
 # oliviercocaine_excel_all <- oliviercocaine_excel_all %>% 
   # subset(!grepl("\\D+:", labanimalid)) %>% 
   # subset(!(is.na(labanimalid)&cohort %in% c("C01", "C03", "C04"))) # add to investigate other cohorts before removing, ensure with naniar::vis_miss()
