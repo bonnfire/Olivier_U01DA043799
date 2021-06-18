@@ -1270,96 +1270,57 @@ shock_rai <- lapply(shock_new_files_c01_11, function(x){
     cbind(session_duration = session_duration$session_duration) %>% 
     cbind(internal_filename)
   
-  # 
-  # if(grepl("GWAS 2hNEW", unique(internal_filename$V1))){
-  #   rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
-  #   active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
-  #   inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
-  # }
-  # else{
-  #   rewards = fread(paste0("awk '/^W:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
-  #   active =  fread(paste0("awk '/^R:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
-  #   inactive = fread(paste0("awk '/^L:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
-  # }
-  # 
-  # data = list("rewards" = rewards,
-  #             "active" = active,
-  #             "inactive" = inactive  
-  # ) %>% do.call(cbind, .)
-  # 
-  # data <- cbind(metadata, data) %>% 
-  #   rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
-  #   mutate(filename = x )
-  # 
-  # return(data)
-  
-  return(metadata)
+  names(metadata) <- c("subject", "box", "startdate", "session_duration", "internal_filename")
+
+    rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+    inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive
+  ) %>% do.call(cbind, .)
+
+  data <- cbind(metadata, data) %>%
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>%
+    mutate(filename = x )
+
+  return(data)
 })
 
-sha_rai_df <- shock_rai %>% 
+shock_rai_df <- shock_rai %>% 
   rbindlist(fill = T) %>% 
   mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
          subject = str_extract(toupper(subject), "[MF]\\d+"),
          filename = gsub(".*/SHOCK/", "", filename),
-         exp = gsub(".*HS", "", filename) ,
+         exp = gsub(".*HS", "", filename) %>% gsub("-\\d+$", "", .),
+         exp = ifelse(grepl("PRE", exp), str_extract(exp, "PRESHOCK"), 
+                      ifelse(parse_number(cohort) > 6&!grepl("PRE", exp), "SHOCK03", exp)), #clean up exp
          room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHOCK/", "", .), NA),
          box = as.character(box)) %>% 
   distinct()
 
 
-# label data with...
-shock_subjects_new <- process_subjects_new(shock_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>%
-  arrange(filename, as.numeric(row)) %>% select(-c(row, filename)) #1474
-# extract data with same function from `readrewards_pr` for pr
-shock_rewards_new <- lapply(shock_new_files, readrewards_pr) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(shock_subjects_new) %>%
-  separate(
-    labanimalid,
-    into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"),
-    sep = "_"
-  ) %>% mutate(
-    date = lubridate::mdy(date),
-    time = chron::chron(times = time),
-    rewards = as.numeric(rewards)
-  ) %>%
-  mutate(exp = replace(exp, exp == "SHOCK01-2" & cohort=="C03", "SHOCK01"), # clean up the exp name shocks 
-    exp = replace(exp, parse_number(cohort) > 6 & !grepl("PRE", exp), "SHOCK03"),
-    exp = replace(exp, parse_number(cohort) > 6 & grepl("PRE", exp), "PRESHOCK")) %>% # if after cohort 6, change to shock03 
-  left_join(., date_time_subject_df_comp %>% 
-              mutate(start_time = format(lubridate::ymd_hms(start), "%H:%M:%S") %>% chron::chron(times = .)) %>% 
-              select(cohort, exp, filename, valid, start_date, start_time, exp_dur_min) %>% 
-              rename("date" = "start_date", "time" = "start_time"), 
-            by = c("cohort", "exp", "filename", "date", "time")) ## 1474
-
-shock_rewards_new_valid <- shock_rewards_new %>%  
-  dplyr::filter(valid == "yes") %>% 
-  mutate(time = as.character(time)) %>% 
-  distinct() # 904 ## includes C01-C08 XX 08/05/2020, needs to update the date_time_comp cohort object to be more than 8 cohorts 
 
 # qc with...
-shock_rewards_new %>% count(labanimalid, exp, cohort) %>% subset(n!=1)
-shock_rewards_new_valid %>% get_dupes(labanimalid, exp, cohort) 
-shock_rewards_new %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1)
+shock_rai_df %>% get_dupes(subject, exp, cohort) 
 
 # deal with the missing subjects...
-# join and update "df" by reference, i.e. without copy 
+shock_rai_df <- shock_rai_df %>% 
+  group_by(cohort, room, box) %>% 
+  fill(subject, .direction = "downup") %>% 
+  ungroup()
 
-## add _valid
-setDT(shock_rewards_new_valid)             # convert to data.table without copy
-shock_rewards_new_valid[setDT(shock_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% 
-                             left_join(., date_time_subject_df_comp %>% 
-                                         dplyr::filter(grepl("PR", exp)) %>% 
-                                         mutate(time = as.character(start_time), 
-                                                date = as.character(start_date)), 
-                                       by = c("exp", "filename", "date", "time"), all.x = T)), 
-                     on = c("rewards", "exp", "filename", "date", "time"), labanimalid := labanimalid.y] # don't want to make another missing object
-setDF(shock_rewards_new_valid)
-shock_rewards_new_valid %<>% 
-  mutate_at(vars(rewards), as.numeric)
-# remove invalid point
-shock_rewards_new_valid %<>% dplyr::filter(!(labanimalid == "F717" & exp == "PR01" & time == "07:45:31"))
-shock_rewards_new_valid %>% distinct() %>% add_count(labanimalid, exp, cohort) %>% subset(n!=1) # dim of df is dim of distinct(df)
-shock_rewards_new_valid <- shock_rewards_new_valid %>% mutate(date = lubridate::ymd(date))
+shock_rai_df <- shock_rai_df %>% 
+  add_count(subject, exp, cohort) %>% 
+  subset(!(n!=1&rewards==0&active==0&inactive==0))
+
+shock_rai_df %>% get_dupes(subject, exp, cohort) 
+
+# fix duplicates 
+shock_rai_df <- shock_rai_df %>% 
+  mutate(subject = ifelse(subject == "F7"&box == "7"&exp == "SHOCK03"&rewards == 34, "F16", subject))
+
 
 ###### OLD FILES ##############
 ## no old files for SHOCK
