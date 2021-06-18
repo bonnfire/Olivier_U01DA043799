@@ -1124,8 +1124,98 @@ lga_rai_df <- lga_rai_df %>%
 
 lga_rai_df %>% get_dupes(subject, exp, cohort) 
 
+# correct duplicates because of error filenames
+
+lga_rai_df <- lga_rai_df %>% 
+  mutate(filename = replace(filename, cohort == "C07"&startdate == "02/11/19", "MED1110C07HSLGA05"),
+         exp  = replace(filename, cohort == "C07"&startdate == "02/11/19", "LGA05")) %>% 
+  subset(!(filename == "BSB273DC11HSLGA02"&startdate == "03/05/20"))
 
 
+
+
+###### OLD FILES ##############
+lga_old_files <- grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
+
+# label data with... 
+
+lga_rai_old <- lapply(lga_old_files, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/^ProgramName/{flag=1;next}/ProgramDate/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  subject = fread(paste0("awk '/^RatNumber/{flag=1;next}/ProgramName/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  box = fread(paste0("awk '/^BoxNumber/{flag=1;next}/Sessionlength/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  metadata = cbind(subject = subject, box = box)
+  
+  # checked that all msn/program name are "SAOneLever"
+  rewards = fread(paste0("awk '/^totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  to_responses = fread(paste0("awk '/^TotalTOResponses/{flag=1;next}/TotalRspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  inactive = fread(paste0("awk '/^TotalRspInAct/{flag=1;next}/TotalTORspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+
+  active = rewards + to_responses
+  
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive
+  ) %>% do.call(cbind, .)
+  
+  
+  internal_filename <- cbind(msn = internal_filename, cbind(metadata, data)) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(internal_filename)
+})
+
+lga_rai_old_df <- lga_rai_old %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/LGA/", "", filename),
+         exp = gsub(".*HS(.*)-.*", "\\1", filename) %>% gsub("-\\d+", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         box = as.character(box)) %>% 
+  mutate(subject = toupper(subject))
+
+# qc with...
+lga_rai_old_df %>% get_dupes(subject, exp)
+lga_rai_old_df %>% subset(!grepl("[MF]\\d+", subject))
+
+# assign wrong subjects 
+lga_rai_old_df <- lga_rai_old_df %>% 
+  mutate(subject = ifelse(filename == "Q3C03HSLGA01-20180221.txt", paste0("M", subject), 
+                          ifelse(filename == "K3C04HSLGA12-20180516.txt"&box == "4", "M459",
+                                 ifelse(filename == "K2C04HSLGA15-20180524.txt"&box == "2", "M451", subject))))
+
+# deal with the missing subjects...
+lga_rai_old_df <- lga_rai_old_df %>% 
+  mutate(subject = ifelse(!grepl("[MF]\\d+", subject), NA, subject)) %>% 
+  group_by(cohort, room, box) %>% 
+  fill(subject, .direction = "downup") %>% 
+  ungroup()
+
+lga_rai_old_df %>% get_dupes(subject, exp)
+
+# fix repeats 
+lga_rai_old_df <- lga_rai_old_df %>% 
+  add_count(subject, exp, cohort) %>% 
+  subset(!(n!=1&rewards==0&active==0&inactive==0)) %>% 
+  select(-n)
+
+lga_rai_old_df %>% get_dupes(subject, exp)
+
+lga_rai_old_df <- lga_rai_old_df %>% 
+  add_count(subject, exp) %>% 
+  rowwise() %>% 
+  mutate(subject = ifelse(n!=1&parse_number(cohort)!= substr(as.character(parse_number(subject)), 1, 1)&parse_number(cohort)>3, gsub("\\d(\\d+)$", "\\1" %>% paste0(as.character(parse_number(cohort)),.), subject), subject)) %>% 
+  select(-n) %>% 
+  ungroup()
+
+lga_rai_old_df <- lga_rai_old_df %>% 
+  subset(!(subject == "M460"&rewards == 1&active==1))
+
+lga_rai_old_df %>% get_dupes(subject, exp)
 
 
 
@@ -1211,66 +1301,6 @@ pr_rai_df %>% get_dupes(subject, exp)
 pr_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*PR/", value = T) # 62 files
 
 # extract subject, box, and rewards, active, inactive, pr 
-pr_rai_old <- lapply(pr_old_files, function(x){
-  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
-  internal_filename = fread(paste0("awk '/^ProgramName/{flag=1;next}/ProgramDate/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-  
-  subject = fread(paste0("awk '/^RatNumber/{flag=1;next}/ProgramName/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-  
-  box = fread(paste0("awk '/^BoxNumber/{flag=1;next}/Sessionlength/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-  
-  metadata = cbind(subject = subject, box = box)
-  
-  # checked that all msn/program name are "SAOneLever"
-  rewards = fread(paste0("awk '/^totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-  active = fread(paste0("awk '/^TotalResponses/{flag=1;next}/TotalTOResponses/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-  inactive = fread(paste0("awk '/^TotalRspInAct/{flag=1;next}/TotalTORspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-  pr <- fread(paste0("awk '/^fr/{flag=1;next}/RewarfDuration/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-  
-  data = list("rewards" = rewards,
-              "active" = active,
-              "inactive" = inactive,
-              "pr" = pr
-  ) %>% do.call(cbind, .)
-  
-  
-  internal_filename <- cbind(msn = internal_filename, cbind(metadata, data)) %>% 
-    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
-    mutate(filename = x )
-  
-  return(internal_filename)
-})
-
-pr_rai_old_df <- pr_rai_old %>% 
-  rbindlist(fill = T) %>% 
-  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
-         filename = gsub(".*/PR/", "", filename),
-         exp = gsub(".*HS(.*)-.*", "\\1", filename),
-         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*PR/", "", .), NA),
-         box = as.character(box)) %>% 
-  mutate(subject = toupper(subject))
-
-# qc with...
-pr_rai_old_df %>% get_dupes(subject, exp)
-pr_rai_old_df %>% subset(!grepl("[MF]", subject))
-
-# deal with the missing subjects...
-pr_rai_old_df <- pr_rai_old_df %>% 
-  mutate(subject = ifelse(!grepl("[MF]", subject), NA, subject)) %>% 
-  group_by(cohort, room, box) %>% 
-  fill(subject, .direction = "downup") %>% 
-  ungroup()
-
-pr_rai_old_df %>% get_dupes(subject, exp)
-
-# fix repeats 
-pr_rai_old_df <- pr_rai_old_df %>% 
-  mutate(subject = replace(subject, filename == "K3C01HSPR02-20170905.txt"&box == "2", "M21"),
-         subject = replace(subject, filename == "K2C01HSPR01-20170814.txt"&box == "3", "M3")) %>% 
-  subset(!(rewards == 0 & filename %in% c("K2C04HSPR02-20180522.txt", "K2C01HSPR01-20170814.txt") & subject %in% c("F423", "M3")))
-
-pr_rai_old_df %>% get_dupes(subject, exp)
-
 
 
 
