@@ -1144,7 +1144,7 @@ shock_raw_df <- shock_rai_df %>%
   mutate(session_duration = as.character(session_duration)) %>% 
   mutate(exp = tolower(exp))
 
-# pr_raw_df is saved as read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_pr_raw_c01_11_oldnewdirs.csv")
+# shock_raw_df is saved as read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_shock_raw_c01_11_oldnewdirs.csv")
 shock_raw_df_long <- shock_raw_df %>% pivot_longer(cols = where(is.numeric), values_to = "raw")
 
 

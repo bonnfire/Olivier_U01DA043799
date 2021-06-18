@@ -1034,16 +1034,53 @@ lga_rewards_old <- lga_rewards_old %>% group_by(labanimalid, exp) %>%
 
 ###### NEW FILES ##############
 # label data with... 
-lga_new_files_10_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) %>% grep("C1[01]", ., value = T) # 76 files
+lga_new_files_01_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) %>% grep("C(0[1-9]|1[0-1])", ., value = T) # 464 files
+
+# check cohorts and experiments represented 
+lga_new_files_01_11 %>% as.data.frame() %>% 
+  mutate(cohort = str_extract(., "C\\d+"),
+         exp = str_extract(gsub("-\\d+$", "", .), "LGA(\\d+)$")) %>% 
+  select(cohort, exp) %>% table(exclude = NULL)
+
+# check which ones are NA
+shock_new_files_c01_11 %>% as.data.frame() %>% 
+  mutate(cohort = str_extract(., "C\\d+"),
+         exp = str_extract(gsub("-\\d+$", "", .), "LGA(\\d+)$")) %>% 
+  subset(is.na(exp))
+
 
 # extract subject, box, and rewards, active, inactive (rai)
-lga_rai <- lapply(lga_new_files_10_11, function(x){
+lga_rai <- lapply(lga_new_files_01_11, function(x){
   setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+  
   subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
   
   box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
   
-  metadata = cbind(subject = subject, box = box)
+  date = fread(paste0("awk '/^Start Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  enddate = fread(paste0("awk '/^End Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  time = fread(paste0("awk '/^Start Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  endtime = fread(paste0("awk '/^End Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  session_duration <- cbind(date = date, enddate = enddate) %>%
+    cbind(time = time) %>% cbind(endtime = endtime) 
+  names(session_duration) <- c("date", "enddate", "time", "endtime")
+  session_duration <- session_duration %>% 
+    mutate(start_datetime = lubridate::mdy_hms(paste(format(as.Date(date, "%m/%d/%y"), "%m/%d/20%y"), time)),
+           end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
+           session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
+  
+  metadata = cbind(subject = subject, box = box) %>% 
+    cbind(startdate = date) %>% 
+    cbind(session_duration = session_duration$session_duration) %>% 
+    cbind(internal_filename)
+  
+  names(metadata) <- c("subject", "box", "startdate", "session_duration", "internal_filename")
+  
+  
+  # metadata = cbind(subject = subject, box = box)
   
   rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
   active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
@@ -1065,10 +1102,27 @@ lga_rai_df <- lga_rai %>%
   rbindlist(fill = T) %>% 
   mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
          filename = gsub(".*/LGA/", "", filename),
-         exp = gsub(".*HS", "", filename) ,
+         exp = gsub(".*HS", "", filename) %>% gsub("-\\d+$", "", .),
          room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
          box = as.character(box)) 
 
+# qc with...
+lga_rai_df %>% get_dupes(subject, exp, cohort) 
+
+# deal with the missing subjects...
+lga_rai_df <- lga_rai_df %>% 
+  mutate(subject = ifelse(!grepl("[MF]", subject), NA, subject)) %>% 
+  group_by(cohort, room, box) %>% 
+  fill(subject, .direction = "downup") %>% 
+  ungroup()
+
+# remove duplicates if measurements are all 0
+lga_rai_df <- lga_rai_df %>% 
+  add_count(subject, exp, cohort) %>% 
+  subset(!(n!=1&rewards==0&active==0&inactive==0)) %>% 
+  select(-n)
+
+lga_rai_df %>% get_dupes(subject, exp, cohort) 
 
 
 
