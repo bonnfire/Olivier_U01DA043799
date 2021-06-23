@@ -10,6 +10,8 @@ write.csv(oliviercocaine_14_wfu_metadata, "~/Desktop/Database/csv files/u01_oliv
 # raw data
 write.csv(pr_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_pr_raw_c01_11_oldnewdirs.csv", row.names = F)
 write.csv(shock_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_shock_raw_c01_11_oldnewdirs.csv", row.names = F) #named for consistency but there are no old dir files for shock
+write.csv(lga_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_lga_raw_c01_11_oldnewdirs.csv", row.names = F) #named for consistency but there are no old dir files for shock
+write.csv(sha_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_sha_raw_c01_11_oldnewdirs.csv", row.names = F) #named for consistency but there are no old dir files for shock
 
 
 

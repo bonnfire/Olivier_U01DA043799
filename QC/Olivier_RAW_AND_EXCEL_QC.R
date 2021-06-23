@@ -1084,6 +1084,119 @@ write.csv(cohort5_lga, file = "cohort5_lga.csv", row.names = F)
 
 
 # =================================================
+## SHA
+sha_raw_df <- bind_rows(sha_rai_df, sha_rai_old_df) %>% 
+  subset(!is.na(subject)) %>% 
+  mutate(session_duration = as.character(session_duration)) %>% 
+  mutate(exp = tolower(exp)) %>% 
+  mutate_at(vars(one_of("box", "session_duration")), as.character) %>% 
+  mutate(subject = ifelse(subject == "M7678", "M768", subject))
+
+# sha_raw_df is saved as read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_sha_raw_c01_11_oldnewdirs.csv", stringsAsFactors = F)
+sha_raw_df_long <- sha_raw_df %>% pivot_longer(cols = where(is.numeric), values_to = "raw")
+
+
+sha_xl_long <- oliviercocaine_excel_all %>% 
+  select(cohort, measurement, labanimalid, rfid, matches("sha")) %>% 
+  pivot_longer(cols = matches("sha")) %>% 
+  mutate(measurement = ifelse(grepl("date", name), "date", measurement),
+         name = ifelse(grepl("date", name), gsub("date_", "", name), name)) %>% 
+  distinct() %>% 
+  # %>% 
+  # pivot_wider(names_from = measurement, values_from = value) %>% 
+  rename("exp" = "name",
+         "name" = "measurement", 
+         "excel" = "value")
+
+
+sha_raw_df_qc <- sha_raw_df_long %>% full_join(sha_xl_long, by = c("subject" = "labanimalid", "exp", "name", "cohort")) %>% 
+  mutate(excel = as.numeric(excel)) %>%  
+  # select_all(~gsub("\\.x", "_raw", .)) %>% 
+  # select_all(~gsub("\\.y", "_xl", .)) 
+  group_by(subject) %>% 
+  fill(rfid, .direction = "downup") %>% 
+  ungroup()
+
+sha_raw_df_qc <- sha_raw_df_qc %>% 
+  mutate(QC_diff = excel - raw,
+         QC = ifelse(QC_diff == 0&!is.na(QC_diff), "pass", "fail")) 
+# %>% 
+# naniar::vis_miss() # overall missingness
+# select(QC) %>% table() %>% prop.table() # proportion of pass vs fail
+# select(QC_diff) %>% summary # spread of differences
+
+# most of the fails are from missing raw and excels
+sha_raw_df_qc %>% subset(QC == "fail") %>% naniar::vis_miss()
+
+# subset from the ones that failed to only include those that have QC diff values to ask the team to go over and check 
+sha_raw_df_qc %>% subset(QC == "fail"&!is.na(QC_diff)) %>% pivot_wider(names_from = name, values_from = c("raw", "excel", "QC_diff", "QC")) %>% 
+  openxlsx::write.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/sha_tobeqc_c01_11.xlsx")
+  
+# join to corrections
+sha_raw_df_qc %>% 
+  full_join(read.xlsx("") %>% ## XX use the lab's excel file name 
+            ) %>%   # sha_raw_df_qc %>% subset(QC == "fail"&!is.na(QC_diff)) %>% pivot_wider(names_from = name, values_from = c("raw", "excel", "QC_diff", "QC")) %>% pivot_longer(cols = -c(subject, box, startdate, session_duration, internal_filename, filename, cohort, exp, room, rfid, matches("QC_(in|act|re)"))) ) %>% ## XX 
+  mutate(value = ifelse(QC == "pass", raw, 
+                        ifelse(QC == "fail"&is.na(QC_diff), coalesce(raw, excel),
+                               ifelse(QC, NA))))  ## XX temporary stand in, use the column name that lab uses 
+ 
+# calculate actual values 
+
+
+
+
+
+# =================================================
+## LGA
+lga_raw_df <- bind_rows(lga_rai_df, lga_rai_old_df) %>% 
+  subset(!is.na(subject)) %>% 
+  mutate(session_duration = as.character(session_duration)) %>% 
+  mutate(exp = tolower(exp))
+
+# lga_raw_df is saved as read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_lga_raw_c01_11_oldnewdirs.csv")
+lga_raw_df_long <- lga_raw_df %>% pivot_longer(cols = where(is.numeric), values_to = "raw")
+
+
+lga_xl_long <- oliviercocaine_excel_all %>% 
+  select(cohort, measurement, labanimalid, rfid, matches("lga")) %>% 
+  pivot_longer(cols = matches("lga")) %>% 
+  mutate(measurement = ifelse(grepl("date", name), "date", measurement),
+         name = ifelse(grepl("date", name), gsub("date_", "", name), name)) %>% 
+  distinct() %>% 
+  # %>% 
+  # pivot_wider(names_from = measurement, values_from = value) %>% 
+  rename("exp" = "name",
+         "name" = "measurement", 
+         "excel" = "value")
+
+
+lga_raw_df_qc <- lga_raw_df_long %>% full_join(lga_xl_long, by = c("subject" = "labanimalid", "exp", "name", "cohort")) %>% 
+  mutate(excel = as.numeric(excel)) %>%  
+  # select_all(~gsub("\\.x", "_raw", .)) %>% 
+  # select_all(~gsub("\\.y", "_xl", .)) 
+  group_by(subject) %>% 
+  fill(rfid, .direction = "downup") %>% 
+  ungroup()
+
+lga_raw_df_qc <- lga_raw_df_qc %>% 
+  mutate(QC_diff = excel - raw,
+         QC = ifelse(QC_diff == 0&!is.na(QC_diff), "pass", "fail")) 
+# %>% 
+# naniar::vis_miss() # overall missingness
+# select(QC) %>% table() %>% prop.table() # proportion of pass vs fail
+# select(QC_diff) %>% summary # spread of differences
+
+# most of the fails are from missing raw and excels
+lga_raw_df_qc %>% subset(QC == "fail") %>% naniar::vis_miss()
+
+# subset from the ones that failed to only include those that have QC diff values to ask the team to go over and check 
+lga_raw_df_qc %>% subset(QC == "fail"&!is.na(QC_diff)) %>% pivot_wider(names_from = name, values_from = c("raw", "excel", "QC_diff", "QC")) %>% 
+  openxlsx::write.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/lga_tobeqc_c01_11.xlsx")
+
+
+
+
+# =================================================
 ## PR
 pr_raw_df <- bind_rows(pr_rai_df, pr_rai_old_df) %>% 
   mutate(exp = tolower(exp)) %>% 

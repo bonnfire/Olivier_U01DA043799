@@ -733,17 +733,19 @@ sha_rai <- lapply(sha_new_files_01_11, function(x){
   endtime = fread(paste0("awk '/^End Time:/{print $3}' '", x, "'"), header = F, fill = T)
     
   session_duration <- cbind(date = date, enddate = enddate) %>%
-    cbind(time = time) %>% cbind(endtime = endtime) %>% 
+    cbind(time = time) %>% cbind(endtime = endtime) 
+  names(session_duration) <- c("date", "enddate", "time", "endtime")
+  session_duration <- session_duration %>% 
     mutate(start_datetime = lubridate::mdy_hms(paste(format(as.Date(date, "%m/%d/%y"), "%m/%d/20%y"), time)),
          end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
          session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
   
   metadata = cbind(subject = subject, box = box) %>% 
     cbind(startdate = date) %>% 
-    cbind(session_duration = session_duration$session_duration)
-  # %>% 
-  # cbind(internal_filename)
+    cbind(session_duration = session_duration$session_duration) %>% 
+    cbind(internal_filename)
   
+  names(metadata) <- c("subject", "box", "startdate", "session_duration", "internal_filename")
   
   if(grepl("GWAS 2hNEW", unique(internal_filename$V1))){
     rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
@@ -773,32 +775,30 @@ sha_rai_df <- sha_rai %>%
   mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
          subject = str_extract(toupper(subject), "[MF]\\d+"),
          filename = gsub(".*/SHA/", "", filename),
-         exp = gsub(".*HS", "", filename) ,
-         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         exp = gsub(".*HS", "", toupper(filename)) %>% gsub("-\\d+$", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHA/", "", .), NA),
          box = as.character(box)) %>% 
   distinct()
 
-## testmsn <- lapply(sha_new_files_01_11, function(x){
-# setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
-# internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
-# 
-# data <- cbind(unique(internal_filename)) %>% mutate(filename = x)
-# return(data)
-# }) %>% rbindlist()
-# testmsn %>% get_dupes(filename)
-
+# check msn
+sha_rai_df <- sha_rai_df %>% 
+  subset(internal_filename != "MSN:OXYGWAS12h")
 
 # fix NA subjects and duplicated values
 sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
+sha_rai_df <- sha_rai_df %>% 
+  subset(!(session_duration %in% c("0", "1"))) 
+  
 # NA subjects 
 sha_rai_df <- sha_rai_df %>% 
+  mutate(subject = ifelse(!grepl("[MF]\\d+", subject), NA, subject)) %>% 
   group_by(cohort, box, room) %>% 
   fill(subject, .direction = "downup") %>% 
   ungroup()
 
 # check again 
-# sha_rai_df %>% get_dupes(subject, exp) %>% View()
+sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
 # replace NA subjects for animals that died from the start of SHA, don't have any values to fill
 sha_rai_df <- sha_rai_df %>% 
@@ -813,64 +813,95 @@ sha_rai_df <- sha_rai_df %>%
   subset(!(n > 1&rewards==0&active==0&inactive==0)) %>%  # remove if bad session
   select(-n)
 
+sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
-## reconsider since the data may not be updated from the date_time_subject_df_comp object
-sha_rewards_new_valid <- sha_rewards_new %>% 
-  dplyr::filter(valid == "yes") %>%
-  # dplyr::filter(valid == "yes"|is.na(valid)) %>% ## XX ALLOW INTO THE CODE ONCE WE HAVE THE EXCEL SHEETS FOR C10 AND C11
-  mutate(time = as.character(time)) %>%
-  dplyr::filter(!filename %in% c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")) %>% # update records several lines down from meeting to show other team's confirmation 
-  distinct() # fixes duplicates in filenames %in% c("MED1113C07HSSHA06", "MED1110C05HSSHA08", "MED1110C05HSSHA09") ### there are no dupes for dplyr::filter(!grepl("[MF]\\d+", labanimalid)) 
+sha_rai_df <- sha_rai_df %>% 
+  add_count(subject, exp) %>% 
+  subset(!(cohort == "C01" & session_duration < 200&n!=1)) %>% 
+  mutate(exp = replace(exp, n!=1&cohort == "C07"&startdate == "01/25/19", "SHA05")) %>% 
+  select(-n) 
+  
+sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
-## notes 
-## exclude files (from meeting)
-# c("C01HSSHA06", "MED1113C07HSSHA05", "MED1114C07HSSHA08")
-## exclude cases (from meeting )
-# c("F720") for SHA03 bc both files with her data seem incorrect (MED1112C07HSSHA03 and MED1112C07HSSHA03-2)
-# MED1113C07HSSHA07 is actually LGA data (code that validates the date is filtering out these cases, and in the file, sha07 data and pr data follows)
+sha_rai_df <- sha_rai_df %>% 
+  add_count(subject, exp) %>% 
+  subset(!(n > 1&rewards==0&active==0&inactive==0)) %>%  # remove if bad session
+  select(-n) 
 
-# deal with the missing subjects...
-# join and update "df" by reference, i.e. without copy 
+sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
-## ADDED _valid 5/20 -- remove once unneeded 
-setDT(sha_rewards_new_valid)             # convert to data.table without copy
-sha_rewards_new_valid[setDT(sha_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
-                        left_join(., date_time_subject_df_comp %>% 
-                                    select(labanimalid, cohort, exp, filename, start_date, start_time, exp_dur_min) %>% 
-                                    rename("date" = "start_date", "time" = "start_time") %>% 
-                                    mutate(time = as.character(time)), 
-                                  by = c("cohort", "exp", "filename", "date", "time")) ), 
-                on = c("rewards", "cohort", "exp", "filename", "date", "time", "valid"), labanimalid := labanimalid.y] # don't want to make another missing object
-setDF(sha_rewards_new_valid)
-sha_rewards_new_valid %<>% 
-  mutate_at(vars(rewards), as.numeric)
-## case: deal with mislabelled subject?
-sha_rewards_new_valid %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
-sha_rewards_new_valid %<>% mutate(labanimalid = replace(labanimalid, exp=="SHA01"&time=="09:24:16", "M768")) ## extracted as M7678 from file, but verified to have the same box (box 16)
+sha_rai_df <- sha_rai_df %>% 
+  subset(!(subject == "M759"&session_duration == 120&exp =="SHA05"))
+
+sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
 
 
 ###### OLD FILES ##############
 # label data with... 
-sha_subjects_old <- process_subjects_old(sha_old_files)
+sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T) # 214 files
+  
 # extract data...
-sha_rewards_old <- lapply(sha_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(sha_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
-  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
-  mutate(date = lubridate::ymd(date),
-         rewards = rewards %>% as.numeric()) %>% 
-  dplyr::filter(valid == "valid") # no need for distinct() bc it is not an issue here
+sha_rai_old <- lapply(sha_old_files, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/^ProgramName/{flag=1;next}/ProgramDate/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  subject = fread(paste0("awk '/^RatNumber/{flag=1;next}/ProgramName/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  box = fread(paste0("awk '/^BoxNumber/{flag=1;next}/Sessionlength/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  metadata = cbind(subject = subject, box = box)
+  
+  # checked that all msn/program name are "SAOneLever"
+  rewards = fread(paste0("awk '/^totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  to_responses = fread(paste0("awk '/^TotalTOResponses/{flag=1;next}/TotalRspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  inactive = fread(paste0("awk '/^TotalRspInAct/{flag=1;next}/TotalTORspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  active = rewards + to_responses
+  
+  data = list("rewards" = rewards,
+              "active" = active,
+              "inactive" = inactive
+  ) %>% do.call(cbind, .)
+  
+  
+  internal_filename <- cbind(internal_filename = internal_filename, cbind(metadata, data)) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(internal_filename)
+})
+
+sha_rai_old_df <- sha_rai_old %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/SHA/", "", filename),
+         exp = gsub(".*HS(.*)-.*", "\\1", filename) %>% gsub("-\\d+", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHA/", "", .), NA),
+         box = as.character(box)) %>% 
+  mutate(subject = toupper(subject) %>% gsub(".*([MF].*)", "\\1", .))
+
+# qc with...
+sha_rai_old_df %>% get_dupes(subject, exp)
+sha_rai_old_df %>% subset(!grepl("[MF]\\d+", subject))
 
 # deal with the missing subjects...
-sha_rewards_old %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% dim
-# will remove these cases bc these files have 7 subjects and both misssing subjects have another "session" (matched box)
-sha_rewards_old %<>% dplyr::filter(grepl("[MF]", labanimalid)) 
+sha_rai_old_df <- sha_rai_old_df %>% 
+  mutate(subject = ifelse(!grepl("[MF]\\d+", subject), NA, subject)) %>% 
+  group_by(cohort, room, box) %>% 
+  fill(subject, .direction = "downup") %>% 
+  ungroup()
 
-## case: deal with mislabelled subject?
-sha_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
-sha_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n)
+sha_rai_old_df %>% get_dupes(subject, exp)
 
-sha_rewards_old %>% get_dupes(labanimalid, cohort,exp)
+# fix repeats 
+sha_rai_old_df <- sha_rai_old_df %>% 
+  add_count(subject, exp) %>% 
+  subset(!(n!=1&rewards==0&active==0&inactive==0)) %>% 
+  select(-n)
+
+sha_rai_old_df %>% get_dupes(subject, exp)
+
 
 
 
@@ -1043,7 +1074,7 @@ lga_new_files_01_11 %>% as.data.frame() %>%
   select(cohort, exp) %>% table(exclude = NULL)
 
 # check which ones are NA
-shock_new_files_c01_11 %>% as.data.frame() %>% 
+lga_new_files_01_11 %>% as.data.frame() %>% 
   mutate(cohort = str_extract(., "C\\d+"),
          exp = str_extract(gsub("-\\d+$", "", .), "LGA(\\d+)$")) %>% 
   subset(is.na(exp))
@@ -1128,7 +1159,7 @@ lga_rai_df %>% get_dupes(subject, exp, cohort)
 
 lga_rai_df <- lga_rai_df %>% 
   mutate(filename = replace(filename, cohort == "C07"&startdate == "02/11/19", "MED1110C07HSLGA05"),
-         exp  = replace(filename, cohort == "C07"&startdate == "02/11/19", "LGA05")) %>% 
+         exp  = replace(exp, cohort == "C07"&startdate == "02/11/19", "LGA05")) %>% 
   subset(!(filename == "BSB273DC11HSLGA02"&startdate == "03/05/20"))
 
 
@@ -1162,7 +1193,7 @@ lga_rai_old <- lapply(lga_old_files, function(x){
   ) %>% do.call(cbind, .)
   
   
-  internal_filename <- cbind(msn = internal_filename, cbind(metadata, data)) %>% 
+  internal_filename <- cbind(internal_filename = internal_filename, cbind(metadata, data)) %>% 
     rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
     mutate(filename = x )
   
@@ -1359,15 +1390,19 @@ shock_rai <- lapply(shock_new_files_c01_11, function(x){
     rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
     active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
     inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
-
+    firstshock = fread(paste0("awk '/^M:/{flag=1;next}/5:/{flag=0}flag' ", "'",  shock_new_files_c01_11[51], "' | awk '/0:/{print $2}'"), header = F, fill = T)
+    
   data = list("rewards" = rewards,
               "active" = active,
-              "inactive" = inactive
+              "inactive" = inactive,
+              "firstshock" = firstshock
   ) %>% do.call(cbind, .)
 
   data <- cbind(metadata, data) %>%
     rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>%
-    mutate(filename = x )
+    mutate(filename = x ) %>% 
+    mutate(rewards_w_postshock1 = ifelse(rewards != 0&firstshock !=0, rewards-firstshock+1, 
+                                         ifelse(rewards != 0&firstshock == 0, rewards, 0)))
 
   return(data)
 })

@@ -69,8 +69,10 @@ cocaine_metadata_df <- cocaine_metadata %>%
   mutate(labanimalid = str_extract(labanimalid, "[MF]\\d+")) %>% 
   mutate(rfid = ifelse(rfid == "933000320047343", "933000320047009", rfid)) %>% # notes from excel  
   subset(!(rfid == "933000320047009"&is.na(d_o_b))) %>% # prevent duplicates in rfid, labanimalid
-  mutate(labanimalid = ifelse(rfid == "933000320047163", "F901", labanimalid))
-  
+  mutate(labanimalid = ifelse(rfid == "933000320047163", NA, labanimalid)) %>% 
+  mutate(labanimalid = ifelse(rfid == "933000120138352", "HSF79-1", labanimalid)) %>% # keep the extra tags for naive animals as they appear in the Excel file (they don't have testing data)
+  mutate(labanimalid = ifelse(rfid == "933000120138345", "HSM156-1", labanimalid))
+
 ## check if rfid's are all unique 
 cocaine_metadata_df %>% get_dupes(rfid)
 
