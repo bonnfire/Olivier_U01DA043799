@@ -13,6 +13,9 @@ write.csv(shock_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivie
 write.csv(lga_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_lga_raw_c01_11_oldnewdirs.csv", row.names = F) #named for consistency but there are no old dir files for shock
 write.csv(sha_raw_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_sha_raw_c01_11_oldnewdirs.csv", row.names = F) #named for consistency but there are no old dir files for shock
 
+write.csv(sha_gwasiti_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_sha_iti_c01_11_oldnewdirs.csv", row.names = F)
+write.csv(lga_gwasiti_df, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_lga_iti_c01_11_oldnewdirs.csv", row.names = F)
+
 
 
 ## nida gwas traits

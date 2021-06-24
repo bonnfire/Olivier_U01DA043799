@@ -101,6 +101,8 @@ sha_gwastraits <- sha_gwastraits %>%
   mutate(mean_inactive_sha_08_10 = rowMeans(select(., matches("inactive_sha(0[89]|10)")), na.rm = T)) %>% 
   mutate(mean_to_sha_08_10 = rowMeans(select(., matches("timeout_sha(0[89]|10)")), na.rm = T))
 
+# sha_iti <- rbind(sha_iti_timebin_df, )
+
 
 ######
 ## LGA
