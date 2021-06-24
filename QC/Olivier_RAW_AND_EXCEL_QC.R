@@ -1153,7 +1153,8 @@ lga_raw_df <- bind_rows(lga_rai_df, lga_rai_old_df) %>%
   mutate(session_duration = as.character(session_duration)) %>% 
   mutate(exp = tolower(exp))
 
-# lga_raw_df is saved as read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_lga_raw_c01_11_oldnewdirs.csv")
+# saved as
+# lga_raw_df <- read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_lga_raw_c01_11_oldnewdirs.csv", stringsAsFactors = F)
 lga_raw_df_long <- lga_raw_df %>% pivot_longer(cols = where(is.numeric), values_to = "raw")
 
 
@@ -1192,6 +1193,11 @@ lga_raw_df_qc %>% subset(QC == "fail") %>% naniar::vis_miss()
 # subset from the ones that failed to only include those that have QC diff values to ask the team to go over and check 
 lga_raw_df_qc %>% subset(QC == "fail"&!is.na(QC_diff)) %>% pivot_wider(names_from = name, values_from = c("raw", "excel", "QC_diff", "QC")) %>% 
   openxlsx::write.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/lga_tobeqc_c01_11.xlsx")
+
+
+
+# create object to
+
 
 
 

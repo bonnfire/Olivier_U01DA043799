@@ -50,13 +50,13 @@ process_subjects_new <- function(x){
     cbind(., box_new) %>% 
     rename("box" = "V1") %>%
     mutate(labanimalid = paste0( str_extract(labanimalid, "\\d+"), "_",
-                                str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_",
-                                str_extract(filename, "C\\d+"), "_",
-                                sub('.*HS', '', toupper(filename)), "_",
-                                sub(".*/.*/.*/", '', filename), "_",
-                                date_time, "_",
-                                box)) %>% # subject id, cohort, experiment, file/location perhaps
-  select(-c("date_time", "box"))
+                                 str_extract(toupper(labanimalid), "[MF]\\d{1,3}"), "_",
+                                 str_extract(filename, "C\\d+"), "_",
+                                 sub('.*HS', '', toupper(filename)), "_",
+                                 sub(".*/.*/.*/", '', filename), "_",
+                                 date_time, "_",
+                                 box)) %>% # subject id, cohort, experiment, file/location perhaps
+    select(-c("date_time", "box"))
   
   return(names_sha_append)
   
@@ -196,10 +196,10 @@ process_subjects_old <- function(x){
 read_fread_old <- function(x, varname){
   
   fread_old_statements <- data.frame(varname = c("leftresponses", "rightresponses", "rewards"),
-                                 statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/endl/{flag=0}flag' ",
-                                               "awk '/^ResponsesActBins/{flag=1;next}/endl/{flag=0}flag' ",
-                                               "awk '/totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ")) 
-                                               # "awk '/BinRewards/{flag=1;next}/endl/{flag=0}flag' "))  #### 	 In=L Act=R  Rew=W InTS=U	ActTS=Y  RewTS=V  RewIRI=Z 	
+                                     statement = c("awk '/^BinsInActiveResponses/{flag=1;next}/endl/{flag=0}flag' ",
+                                                   "awk '/^ResponsesActBins/{flag=1;next}/endl/{flag=0}flag' ",
+                                                   "awk '/totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ")) 
+  # "awk '/BinRewards/{flag=1;next}/endl/{flag=0}flag' "))  #### 	 In=L Act=R  Rew=W InTS=U	ActTS=Y  RewTS=V  RewIRI=Z 	
   statement <- fread_old_statements[which(fread_old_statements$varname == varname),]$statement
   rawdata <- fread(paste0(statement, "'", x, "' | nl -s _ | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
   rawdata$filename <- x
@@ -222,7 +222,7 @@ read_iri_old <- function(x){
   iricode$filename <- x
   names(iricode)[1] <- "iricode"
   
-
+  
   rawdata <- cbind(iri, iricode)
   rawdata <- rawdata[,-2]
   
@@ -260,7 +260,7 @@ convert_iri_matrix_to_df <- function(x){
   }
   return(x)
 }
-  
+
 
 
 ## 08/12/2020
@@ -324,8 +324,8 @@ subject0 <- date_time_subject_mut %>% split(., .$cohort) %>% lapply(., function(
                              labanimalid = replace(labanimalid, cohort == "C04"&box == "2", "F402"),
                              labanimalid = replace(labanimalid, cohort == "C04"&box == "4", "F404")) %>%  # spot checking for deaths
     arrange(labanimalid, start) 
-    return(x)
-  }) %>% rbindlist(., idcol = "cohort")
+  return(x)
+}) %>% rbindlist(., idcol = "cohort")
 
 # replace rbindlist... with openxlsx::write.xlsx(., "labanimalid_assign_bybox.xlsx") to create the excel sheets that I sent to their lab 
 # subject0[[3]] <- NULL
@@ -358,7 +358,7 @@ date_time_subject_df <- date_time_subject_df %>%
   mutate(labanimalid = replace(labanimalid, labanimalid == "F8256", "F826"),
          labanimalid = replace(labanimalid, labanimalid == "M5556", "M556")) %>% 
   mutate(exp = replace(exp, grepl("PRESHOCK", filename), "PRESHOCK"))
-  
+
 # waiting on their response for these cases (trying to assign labanimalid [MF]\\d{4,})
 ## date_time_subject_df %>% arrange(cohort, as.numeric(box)) %>% dplyr::filter(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )|lead(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T ))|lag(!grepl("[MF]\\d{1,3}(?!\\d+?)", labanimalid, perl = T )))
 ## OR  date_time_subject_df %>% dplyr::filter(grepl("[MF]\\d{4,}", labanimalid, perl = T ))
@@ -387,7 +387,7 @@ date_time_subject_df %>% subset(as.numeric(str_extract(cohort, "\\d+")) > 6) %>%
 cohorts_exp_date <- allcohorts2 %>% 
   # mutate(date_pr19 = replace(date_pr19, cohort == "cohort5", lubridate::ymd("2018-09-19")),
   mutate(date_sha02 = replace(date_sha02, cohort == "cohort5", lubridate::ymd("2018-07-31"))) %>% select(matches("date|cohort")) %>% distinct() %>% # for record keeping, make sure to make this change on the actual excel! 
-gather(v, value, date_sha01:date_lga23) %>% 
+  gather(v, value, date_sha01:date_lga23) %>% 
   separate(v, c("date", "exp")) %>% 
   arrange(cohort) %>% 
   select(-date) %>% 
@@ -406,8 +406,8 @@ date_time_subject_df_comp <- left_join(date_time_subject_df, cohorts_exp_date, b
     grepl("PR", exp) & exp_dur_min > 60 & excel_date == start_date~ "yes"),
     valid = replace(valid, is.na(valid), "no")
   )   # 9808 for cohorts C01-C09 (no C06) ## change the minimum times - Olivier (from 1/24 meeting)
-  # mutate()# temporarily give a free pass for cohort 9
-  
+# mutate()# temporarily give a free pass for cohort 9
+
 
 date_time_subject_df_comp <- date_time_subject_df_comp %>% 
   subset(!(labanimalid == "806"&box =="6"&room=="BSB273C"&exp =="LGA02")) # remove after manual check
@@ -447,8 +447,8 @@ subjects_exp_age_source <-  rat_info_allcohort_xl_df[, c("cohort", "labanimalid"
             gather("exp", "date", -cohort) %>% distinct() %>% 
             mutate(exp = gsub("date_", "", exp) %>% toupper) %>%
             rename("excel_date" = "date"))
-          , by = c("cohort")
-    ) %>% # XX TEMP get cohort 9 dates
+    , by = c("cohort")
+  ) %>% # XX TEMP get cohort 9 dates
   rename("start_date" = "excel_date") %>% 
   # left_join(date_time_subject_df_comp %>% 
   #             subset(valid == "yes") %>% 
@@ -483,7 +483,7 @@ subjects_exp_age <- subjects_exp_age_source %>%
 
 
 
-  # mutate_at(vars(-matches("labanimalid|cohort")), list(esc = ~.-dob)) # calculate the age 
+# mutate_at(vars(-matches("labanimalid|cohort")), list(esc = ~.-dob)) # calculate the age 
 
 
 ## box table
@@ -514,7 +514,7 @@ box_metadata_long <- rat_info_allcohort_xl_df[, c("cohort", "labanimalid", "rfid
          room_computer = replace(room_computer, grepl("SHOCK", exp)&parse_number(cohort)<=5, "MED1110")) %>% #using Brent's comments 09/23/2020 
   ungroup() %>% 
   subset(!is.na(labanimalid)|grepl("[MF]", labanimalid))
-  
+
 
 ## qc 
 box_metadata_long <- box_metadata_long %>% 
@@ -613,7 +613,7 @@ c01_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
   arrange(cohort, sex, labanimalid_num) %>% select(-c("labanimalid_num", "sex")) %>% 
   
   
-openxlsx::write.xlsx(c01_boxes, file = "cocaine_c01_boxes_toqc.xlsx")
+  openxlsx::write.xlsx(c01_boxes, file = "cocaine_c01_boxes_toqc.xlsx")
 
 setwd("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE")
 c02_boxes <- rewards %>% # already subsetted to "valid" or "yes" in valid
@@ -663,7 +663,7 @@ openxlsx::write.xlsx(c03_boxes, file = "cocaine_c03_boxes_toqc.xlsx")
 #   distinct() %>% 
 #   mutate(box = replace(box, is.na(box), "NA")) %>% 
 #   spread(exp, box)
-  
+
 
 
 box_metadata_wide_2 <- box_metadata_long_fill_2 %>% 
@@ -731,14 +731,14 @@ sha_rai <- lapply(sha_new_files_01_11, function(x){
   
   time = fread(paste0("awk '/^Start Time:/{print $3}' '", x, "'"), header = F, fill = T)
   endtime = fread(paste0("awk '/^End Time:/{print $3}' '", x, "'"), header = F, fill = T)
-    
+  
   session_duration <- cbind(date = date, enddate = enddate) %>%
     cbind(time = time) %>% cbind(endtime = endtime) 
   names(session_duration) <- c("date", "enddate", "time", "endtime")
   session_duration <- session_duration %>% 
     mutate(start_datetime = lubridate::mdy_hms(paste(format(as.Date(date, "%m/%d/%y"), "%m/%d/20%y"), time)),
-         end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
-         session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
+           end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
+           session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
   
   metadata = cbind(subject = subject, box = box) %>% 
     cbind(startdate = date) %>% 
@@ -789,7 +789,7 @@ sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
 sha_rai_df <- sha_rai_df %>% 
   subset(!(session_duration %in% c("0", "1"))) 
-  
+
 # NA subjects 
 sha_rai_df <- sha_rai_df %>% 
   mutate(subject = ifelse(!grepl("[MF]\\d+", subject), NA, subject)) %>% 
@@ -820,7 +820,7 @@ sha_rai_df <- sha_rai_df %>%
   subset(!(cohort == "C01" & session_duration < 200&n!=1)) %>% 
   mutate(exp = replace(exp, n!=1&cohort == "C07"&startdate == "01/25/19", "SHA05")) %>% 
   select(-n) 
-  
+
 sha_rai_df %>% get_dupes(subject, exp) %>% View()
 
 sha_rai_df <- sha_rai_df %>% 
@@ -840,7 +840,7 @@ sha_rai_df %>% get_dupes(subject, exp) %>% View()
 ###### OLD FILES ##############
 # label data with... 
 sha_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*SHA", value = T) # 214 files
-  
+
 # extract data...
 sha_rai_old <- lapply(sha_old_files, function(x){
   setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
@@ -946,11 +946,126 @@ sha_rai_df <- sha_rai %>%
   mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
          filename = gsub(".*/SHA/", "", filename),
          exp = gsub(".*HS", "", filename) ,
-         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHA/", "", .), NA),
          box = as.character(box)) 
 
 
+################################
+########## SHA ITI #############
+################################
 
+sha_sessions08_10 <- grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = "SHA(0[89]|10)", value = T) %>% grep("New",., value = T) #  files
+
+
+
+########## ITI #################
+
+sha_iti_timebin <- lapply(sha_sessions08_10, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+  
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  date = fread(paste0("awk '/^Start Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  enddate = fread(paste0("awk '/^End Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  time = fread(paste0("awk '/^Start Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  endtime = fread(paste0("awk '/^End Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  session_duration <- cbind(date = date, enddate = enddate) %>%
+    cbind(time = time) %>% cbind(endtime = endtime) 
+  names(session_duration) <- c("date", "enddate", "time", "endtime")
+  session_duration <- session_duration %>% 
+    mutate(start_datetime = lubridate::mdy_hms(paste(format(as.Date(date, "%m/%d/%y"), "%m/%d/20%y"), time)),
+           end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
+           session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
+  
+  metadata = cbind(subject = subject, box = box) %>% 
+    cbind(startdate = date) %>% 
+    cbind(session_duration = session_duration$session_duration) %>% 
+    cbind(internal_filename)
+  
+  names(metadata) <- c("subject", "box", "startdate", "session_duration", "internal_filename")
+  
+  
+  
+  # metadata = cbind(subject = subject, box = box)
+  
+  rewards_first10min =  fread(paste0("awk '/^W:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $3 + $4}'"), header = F, fill = T)
+  rewards_last60min = fread(paste0("awk '/^W:/{flag=1;next}/^Y:/{flag=0}flag' ", "'", x, "'| awk '{ if( $1==\"60:\" || $1==\"65:\" || $1==\"70:\" ) print $2+$3+$4+$5+$6}'"), header = F, fill = T) %>%
+    zoo::rollapply(., 3, sum, by = 3)
+  
+  # to get the median and sd of the iti
+  iti = fread(paste0("awk '/^V:/{flag=1;next}/^W:/{flag=0}flag' ", "'", x, "'"), header = F, fill = T) 
+  
+  data_indices <- grep("^0:$", iti$V1) # start of each subject
+  split_data <- split(iti, cumsum(1:nrow(iti) %in% data_indices))
+  
+  # all timestamps and intertrial times
+  iti_by_subject <- lapply(split_data, function(x){
+    indexremoved <- x[,-1]
+    nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ] # remove excessively trailing 0's 
+    processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
+    if(any(processeddata_df$timestamps > 7500)){
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1))) %<>% ## for long access 
+        dplyr::filter(timestamps != 0)
+    }
+    else{
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% ## for short access 
+        dplyr::filter(timestamps != 0) 
+    }
+    
+    processeddata_df <- processeddata_df %>%
+      mutate(intertrial_time = lead(timestamps) - timestamps,
+             bin = as.character(bin))
+    
+    return(processeddata_df)
+  }) 
+  
+  # get the rewards within the first hour 
+  rewards_first1hr <- iti_by_subject %>% 
+    lapply(function(x){
+      x %>% 
+        subset(bin <= 12) %>% 
+        nrow
+    }) %>% unlist %>% as.data.frame()
+  
+  
+  # iti median and sd 
+  iti_by_subject_agg <- iti_by_subject %>% 
+    lapply(function(x){
+      x %>% 
+        summarize(sha_median_iti = median(intertrial_time, na.rm = T),
+                  sha_sd_iti = sd(intertrial_time, na.rm = T))
+    }) %>% 
+    rbindlist()
+  
+  
+  
+  data = list("sha_rewards_first10min" = rewards_first10min,
+              "sha_rewards_last60min" = rewards_last60min,
+              iti_by_subject_agg,
+              "sha_rewards_first1hr" = rewards_first1hr
+  ) %>% do.call(cbind, .)
+  
+  data <- cbind(metadata, data) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(data)
+})
+
+lga_iti_timebin_df <- lga_iti_timebin %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/LGA/", "", filename),
+         exp = gsub(".*HS", "", filename) %>% gsub("-\\d+$", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         box = as.character(box)) 
 
 
 
@@ -960,107 +1075,6 @@ sha_rai_df <- sha_rai %>%
 ################################
 ########## LGA #################
 ################################
-
-###### NEW FILES ##############
-# label data with... 
-lga_new_files <- grep(grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*LGA", value = T) # 464 files
-lga_subjects_new <- process_subjects_new(lga_new_files) %>% separate(labanimalid, c("row", "labanimalid"), sep = "_", extra = "merge") %>% 
-  arrange(filename, as.numeric(row)) %>% select(-c(row, filename))
-# extract data with `read_rewards_new` same for sha
-lga_rewards_new <- lapply(lga_new_files, read_rewards_new) %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(lga_subjects_new) %>% 
-  separate(labanimalid, into = c("labanimalid", "cohort", "exp", "filename", "date", "time", "box"), sep = "_") %>% 
-  mutate(date = lubridate::mdy(date), time = chron::chron(times = time), rewards = as.numeric(rewards)) %>%  
-  left_join(., date_time_subject_df_comp %>% 
-              select(cohort, exp, filename, valid, start_date, start_time) %>% 
-              rename("date" = "start_date", "time" = "start_time"), 
-            by = c("cohort", "exp", "filename", "date", "time")) ## 6348 
-
-
-## XX 06/10/2020 MIGHT NEED TO ADD BOX BC OF 
-# subset(labanimalid == "F516"&exp=="LGA16") ## YES, THIS AND F507 START AT THE SAME TIME 
-## SHOULD BE DISTINCT, BUT THIS MIGHT BE CAUSING THE ISSUE 
-
-## XX  5/20 ADDED _valid TO lga_rewards_new
-lga_rewards_new_valid <- lga_rewards_new %>%  
-  dplyr::filter(valid == "yes") %>% 
-  mutate(time = as.character(time)) %>% 
-  distinct() # 3770
-
-lga_rewards_new_valid %>% get_dupes(labanimalid, exp) %>% dim
-
-# deal with the missing subjects...
-# join and update "df" by reference, i.e. without copy 
-setDT(lga_rewards_new_valid)             # convert to data.table without copy
-lga_rewards_new_valid[setDT(lga_rewards_new_valid %>% dplyr::filter(!grepl("[MF]", labanimalid)) %>% # this captures all "NA" cases as checked with mutate_at(vars(labanimalid), na_if, "NA") %>% dplyr::filter(is.na(labanimalid))
-                        left_join(., date_time_subject_df_comp %>% 
-                                    select(labanimalid, cohort, exp, filename, start_date, start_time, exp_dur_min) %>% 
-                                    rename("date" = "start_date", "time" = "start_time") %>% 
-                                    mutate(time = as.character(time)), 
-                                  by = c("cohort", "exp", "filename", "date", "time")) ), 
-                on = c("rewards", "cohort", "exp", "filename", "date", "time", "valid"), labanimalid := labanimalid.y] # don't want to make another missing object
-setDF(lga_rewards_new_valid)
-lga_rewards_new_valid %<>% 
-  mutate_at(vars(rewards), as.numeric)
-## case: deal with mislabelled subject?
-lga_rewards_new_valid %>% count(labanimalid, cohort,exp) %>% subset(n != 1)
-# lga_rewards_new %>% subset(labanimalid=="M763"&exp %in% c("LGA09", "LGA10"))
-# lga_rewards_new  %>% subset(exp %in% c("LGA09", "LGA10")) %>% select(labanimalid, exp) %>% table() 
-lga_rewards_new_valid %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA09"&time=="09:00:21"&filename=="MED1114C07HSLGA09", "M779"))
-lga_rewards_new_valid %<>% mutate(labanimalid = replace(labanimalid, exp=="LGA10"&time=="09:21:34"&filename=="MED1114C07HSLGA10", "M779"))
-lga_rewards_new_valid %<>% dplyr::filter(!(grepl("MED1114C07HSLGA(09|10)",filename) & labanimalid == "M779"))
-lga_rewards_new_valid %<>% dplyr::filter(!(labanimalid == "F516" & box %in% c("7", "15")))
-
-
-
-lga_rewards_new_valid %>% get_dupes(labanimalid, exp)
-
-
-###### OLD FILES ##############
-lga_old_files <- grep(list.files(path = ".", recursive = T, full.names = T), pattern = ".*Old.*LGA", value = T) # 424 files
-
-# label data with... 
-lga_subjects_old <- process_subjects_old(lga_old_files) ## quick qc lga_subjects_old %>% dplyr::filter(grepl("NA", labanimalid))
-lga_subjects_old %<>% mutate(filename = as.character(filename), 
-                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==4, "M368_1_C03_LGA01_Q3_20180221_valid"),
-                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==354, "M369_2_C03_LGA01_Q3_20180221_valid"),
-                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==750, "M370_3_C03_LGA01_Q3_20180221_valid"),
-                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==1072, "M371_4_C03_LGA01_Q3_20180221_valid"),
-                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==1406, "M372_5_C03_LGA01_Q3_20180221_valid"),
-                             labanimalid = replace(labanimalid, filename=="./C03/Old/LGA/Q3C03HSLGA01-20180221.txt"&row==1866, "M373_6_C03_LGA01_Q3_20180221_valid"),
-                             labanimalid = replace(labanimalid, filename=="./C04/Old/LGA/K3C04HSLGA12-20180516.txt"&row==344, "M459_4_C04_LGA12_K3_20180516_valid"),
-                             labanimalid = replace(labanimalid, filename=="./C04/Old/LGA/K2C04HSLGA15-20180524.txt"&row==4, "M451_2_C04_LGA15_K2_20180524_valid")
-                             ) 
-
-# extract data...
-lga_rewards_old <- lapply(lga_old_files, read_fread_old, "rewards") %>% rbindlist() %>% separate(V1, into = c("row", "rewards"), sep = "_") %>% arrange(filename, as.numeric(row)) %>% select(-row) %>% 
-  bind_cols(lga_subjects_old %>% arrange(filename, as.numeric(row)) %>% select(-c("row", "filename"))) %>% 
-  separate(labanimalid, into = c("labanimalid", "box", "cohort", "exp", "computer", "date", "valid"), sep = "_") %>% 
-  mutate(date = lubridate::ymd(date),
-         rewards = rewards %>% as.numeric()) %>% 
-  dplyr::filter(valid == "valid") # 2376 # no need for distinct() bc it is not an issue here
-
-# deal with the missing subjects...
-
-## case: deal with mislabelled subject?
-lga_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1)
-# lga_rewards_old %<>% add_count(labanimalid, cohort,exp) %<>% dplyr::filter(n == 1|(n==2&rewards!=0)) %<>% select(-n) ## don't use this code bc this doesn't allow for any 0's 
-lga_rewards_old %>% add_count(labanimalid, cohort,exp) %>% subset(n != 1) %>% arrange(filename)
-lga_rewards_old <- lga_rewards_old %>% group_by(labanimalid, exp) %>% 
-  dplyr::filter(rewards == max(rewards)) %>%
-  distinct() %>% 
-  dplyr::filter(!(exp=="LGA06" & labanimalid=="M457" & box=="3")) %>% 
-  ungroup() #2326
-# %>% 
-#   add_count(labanimalid, cohort,exp) %>% 
-#   subset(n != 1) 
-
-
-
-## exclude the following files - Olivier (1/24 meeting)
-### -----
-### -----
-
 
 
 ###### NEW FILES ##############
@@ -1181,10 +1195,10 @@ lga_rai_old <- lapply(lga_old_files, function(x){
   metadata = cbind(subject = subject, box = box)
   
   # checked that all msn/program name are "SAOneLever"
-  rewards = fread(paste0("awk '/^totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  rewards = fread(paste0("awk '/^BinRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
   to_responses = fread(paste0("awk '/^TotalTOResponses/{flag=1;next}/TotalRspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
   inactive = fread(paste0("awk '/^TotalRspInAct/{flag=1;next}/TotalTORspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
-
+  
   active = rewards + to_responses
   
   data = list("rewards" = rewards,
@@ -1247,6 +1261,255 @@ lga_rai_old_df <- lga_rai_old_df %>%
   subset(!(subject == "M460"&rewards == 1&active==1))
 
 lga_rai_old_df %>% get_dupes(subject, exp)
+
+
+
+################################
+########## LGA ITI #############
+################################
+
+
+# NEW DIRECTORY 
+lga_sessions12_14_new <- grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = "LGA(1[2-4])", value = T) %>% grep("New",., value = T) #  files
+
+
+
+########## ITI #################
+
+lga_iti_timebin <- lapply(lga_sessions12_14_new, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+  
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  date = fread(paste0("awk '/^Start Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  enddate = fread(paste0("awk '/^End Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  time = fread(paste0("awk '/^Start Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  endtime = fread(paste0("awk '/^End Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  session_duration <- cbind(date = date, enddate = enddate) %>%
+    cbind(time = time) %>% cbind(endtime = endtime) 
+  names(session_duration) <- c("date", "enddate", "time", "endtime")
+  session_duration <- session_duration %>% 
+    mutate(start_datetime = lubridate::mdy_hms(paste(format(as.Date(date, "%m/%d/%y"), "%m/%d/20%y"), time)),
+           end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
+           session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
+  
+  metadata = cbind(subject = subject, box = box) %>% 
+    cbind(startdate = date) %>% 
+    cbind(session_duration = session_duration$session_duration) %>% 
+    cbind(internal_filename)
+  
+  names(metadata) <- c("subject", "box", "startdate", "session_duration", "internal_filename")
+  
+  
+  
+  # metadata = cbind(subject = subject, box = box)
+  
+  rewards_first10min =  fread(paste0("awk '/^W:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $3 + $4}'"), header = F, fill = T)
+  rewards_last60min = fread(paste0("awk '/^W:/{flag=1;next}/^Y:/{flag=0}flag' ", "'", x, "'| awk '{ if( $1==\"60:\" || $1==\"65:\" || $1==\"70:\" ) print $2+$3+$4+$5+$6}'"), header = F, fill = T) %>%
+    zoo::rollapply(., 3, sum, by = 3)
+  
+  # to get the median and sd of the iti
+  iti = fread(paste0("awk '/^V:/{flag=1;next}/^W:/{flag=0}flag' ", "'", x, "'"), header = F, fill = T) 
+  
+  data_indices <- grep("^0:$", iti$V1) # start of each subject
+  split_data <- split(iti, cumsum(1:nrow(iti) %in% data_indices))
+  
+  # all timestamps and intertrial times
+  iti_by_subject <- lapply(split_data, function(x){
+    indexremoved <- x[,-1]
+    nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ] # remove excessively trailing 0's 
+    processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
+    if(any(processeddata_df$timestamps > 7500)){
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1))) %<>% ## for long access 
+        dplyr::filter(timestamps != 0)
+    }
+    else{
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% ## for short access 
+        dplyr::filter(timestamps != 0) 
+    }
+    
+    processeddata_df <- processeddata_df %>%
+      mutate(intertrial_time = lead(timestamps) - timestamps,
+             bin = as.character(bin))
+    
+    return(processeddata_df)
+  }) 
+  
+  # get the rewards within the first hour 
+  rewards_first1hr <- iti_by_subject %>% 
+    lapply(function(x){
+      x %>% 
+        subset(bin <= 12) %>% 
+        nrow
+    }) %>% unlist %>% as.data.frame()
+  
+  
+  # iti median and sd 
+  iti_by_subject_agg <- iti_by_subject %>% 
+    lapply(function(x){
+      x %>% 
+        summarize(lga_median_iti = median(intertrial_time, na.rm = T),
+                  lga_sd_iti = sd(intertrial_time, na.rm = T))
+    }) %>% 
+    rbindlist()
+  
+  
+  
+  data = list("lga_rewards_first10min" = rewards_first10min,
+              "lga_rewards_last60min" = rewards_last60min,
+              iti_by_subject_agg,
+              "lga_rewards_first1hr" = rewards_first1hr
+  ) %>% do.call(cbind, .)
+  
+  data <- cbind(metadata, data) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(data)
+})
+
+lga_iti_timebin_df <- lga_iti_timebin %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/LGA/", "", filename),
+         exp = gsub(".*HS", "", filename) %>% gsub("-\\d+$", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         box = as.character(box)) 
+
+
+
+
+# OLD DIRECTORY 
+lga_sessions12_14_old <- grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = "LGA(1[2-4])", value = T) %>% grep("Old",., value = T) #  files
+
+
+
+########## ITI #################
+setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+internal_filename = fread(paste0("awk '/^ProgramName/{flag=1;next}/ProgramDate/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+
+subject = fread(paste0("awk '/^RatNumber/{flag=1;next}/ProgramName/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+
+box = fread(paste0("awk '/^BoxNumber/{flag=1;next}/Sessionlength/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+
+metadata = cbind(subject = subject, box = box)
+
+# checked that all msn/program name are "SAOneLever"
+rewards = fread(paste0("awk '/^totalRewards/{flag=1;next}/TotalResponses/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+to_responses = fread(paste0("awk '/^TotalTOResponses/{flag=1;next}/TotalRspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+inactive = fread(paste0("awk '/^TotalRspInAct/{flag=1;next}/TotalTORspInAct/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+
+active = rewards + to_responses
+
+data = list("rewards" = rewards,
+            "active" = active,
+            "inactive" = inactive
+) %>% do.call(cbind, .)
+
+
+internal_filename <- cbind(internal_filename = internal_filename, cbind(metadata, data)) %>% 
+  rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+  mutate(filename = x )
+
+return(internal_filename)
+})
+
+
+
+lga_iti_timebin <- lapply(lga_sessions12_14_new, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/^ProgramName/{flag=1;next}/ProgramDate/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  subject = fread(paste0("awk '/^RatNumber/{flag=1;next}/ProgramName/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  box = fread(paste0("awk '/^BoxNumber/{flag=1;next}/Sessionlength/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  metadata = cbind(subject = subject, box = box) %>% 
+    cbind(internal_filename)
+  
+  rewards_first10min =  fread(paste0("awk '/^W:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $3 + $4}'"), header = F, fill = T)
+  rewards_last60min = fread(paste0("awk '/^W:/{flag=1;next}/^Y:/{flag=0}flag' ", "'", x, "'| awk '{ if( $1==\"60:\" || $1==\"65:\" || $1==\"70:\" ) print $2+$3+$4+$5+$6}'"), header = F, fill = T) %>%
+    zoo::rollapply(., 3, sum, by = 3)
+  
+  # to get the median and sd of the iti
+  iti = fread(paste0("awk '/^V:/{flag=1;next}/^W:/{flag=0}flag' ", "'", x, "'"), header = F, fill = T) 
+  
+  data_indices <- grep("^0:$", iti$V1) # start of each subject
+  split_data <- split(iti, cumsum(1:nrow(iti) %in% data_indices))
+  
+  # all timestamps and intertrial times
+  iti_by_subject <- lapply(split_data, function(x){
+    indexremoved <- x[,-1]
+    nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ] # remove excessively trailing 0's 
+    processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
+    if(any(processeddata_df$timestamps > 7500)){
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1))) %<>% ## for long access 
+        dplyr::filter(timestamps != 0)
+    }
+    else{
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% ## for short access 
+        dplyr::filter(timestamps != 0) 
+    }
+    
+    processeddata_df <- processeddata_df %>%
+      mutate(intertrial_time = lead(timestamps) - timestamps,
+             bin = as.character(bin))
+    
+    return(processeddata_df)
+  }) 
+  
+  # get the rewards within the first hour 
+  rewards_first1hr <- iti_by_subject %>% 
+    lapply(function(x){
+      x %>% 
+        subset(bin <= 12) %>% 
+        nrow
+    }) %>% unlist %>% as.data.frame()
+  
+  
+  # iti median and sd 
+  iti_by_subject_agg <- iti_by_subject %>% 
+    lapply(function(x){
+      x %>% 
+        summarize(lga_median_iti = median(intertrial_time, na.rm = T),
+                  lga_sd_iti = sd(intertrial_time, na.rm = T))
+    }) %>% 
+    rbindlist()
+  
+  
+  
+  data = list("lga_rewards_first10min" = rewards_first10min,
+              "lga_rewards_last60min" = rewards_last60min,
+              iti_by_subject_agg,
+              "lga_rewards_first1hr" = rewards_first1hr
+  ) %>% do.call(cbind, .)
+  
+  data <- cbind(metadata, data) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(data)
+})
+
+lga_iti_timebin_df <- lga_iti_timebin %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/LGA/", "", filename),
+         exp = gsub(".*HS", "", filename) %>% gsub("-\\d+$", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*LGA/", "", .), NA),
+         box = as.character(box)) 
+
+
+
 
 
 
@@ -1386,24 +1649,23 @@ shock_rai <- lapply(shock_new_files_c01_11, function(x){
     cbind(internal_filename)
   
   names(metadata) <- c("subject", "box", "startdate", "session_duration", "internal_filename")
-
-    rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
-    active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
-    inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
-    firstshock = fread(paste0("awk '/^M:/{flag=1;next}/5:/{flag=0}flag' ", "'",  shock_new_files_c01_11[51], "' | awk '/0:/{print $2}'"), header = F, fill = T)
-    
+  
+  rewards = fread(paste0("awk '/^B: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  active = fread(paste0("awk '/^G: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  inactive = fread(paste0("awk '/^A: /{print $2}' ", "'", x, "'"), header = F, fill = T)
+  firstshock = fread(paste0("awk '/^M:/{flag=1;next}/5:/{flag=0}flag' ", "'", x, "' | awk '/0:/{print $2}'"), header = F, fill = T)
+  
   data = list("rewards" = rewards,
               "active" = active,
               "inactive" = inactive,
               "firstshock" = firstshock
   ) %>% do.call(cbind, .)
-
+  
   data <- cbind(metadata, data) %>%
     rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>%
     mutate(filename = x ) %>% 
-    mutate(rewards_w_postshock1 = ifelse(rewards != 0&firstshock !=0, rewards-firstshock+1, 
-                                         ifelse(rewards != 0&firstshock == 0, rewards, 0)))
-
+    mutate(rewards_w_postshock1 = ifelse(rewards != 0&firstshock !=0, rewards-firstshock+1, NA))
+  
   return(data)
 })
 
@@ -1664,7 +1926,7 @@ lga_c01_11_timeout_trials1_14_brent_decision <- lga_c01_11_timeout_trials1_14_br
   # mutate(notes = replace(notes, grepl("blank replaced with corr(r)?ect animal ID, toss repeats", notes)|grepl("typo", notes), NA)) %>%  # after fixing
   ungroup() 
 # %>% 
-  # select(-decision, -notes) # after fixing
+# select(-decision, -notes) # after fixing
 
 lga_c01_11_timeout_trials1_14_brent_decision %>% get_dupes(labanimalid, session) %>% View()  
 # provide graphs for olivier
@@ -1677,7 +1939,7 @@ lga_c01_11_timeout_trials1_14_brent_decision %>% mutate(to_active_presses = as.n
 
 # lga_c01_11_timeout_trials1_14_brent_decision <- lga_c01_11_timeout_trials1_14_brent_decision %>% 
 #   mutate(labanimalid)
-  
+
 # mutate()
 # mutate_at(vars(-decision, -notes, -matches("_2")), ~ . = coalesce(., select(., !! matches("_2"))))
 
@@ -1885,7 +2147,7 @@ shock_c01_11_files <- list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine
 
 
 shock_c01_11_timeout <- lapply(shock_c01_11_files, function(x){
-
+  
   df <- fread(paste0("awk '/Subject/{print NR \"_\" $2}' ", "'", x, "'"), fill = T, header = F)
   df$filename = x 
   df$rewards = fread(paste0("awk '/B:/{print $2}' ", "'", x, "'"), fill = T, header = F)
@@ -1942,7 +2204,7 @@ shock_c01_11_timeout_brent <- shock_c01_11_timeout_distinct %>%
   distinct()
 
 openxlsx::write.xlsx(shock_c01_11_timeout_brent, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/github/Olivier_U01Cocaine/CREATE/cocaine_shock_to_presses.xlsx")
-  
+
 
 # use brent's file to correct 
 shock_c01_11_timeout_brent_decision <- shock_c01_11_timeout_brent %>% 
