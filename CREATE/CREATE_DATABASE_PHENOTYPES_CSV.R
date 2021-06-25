@@ -419,7 +419,13 @@ gwas_prelim2_indices <- gwas_prelim2_indices %>%
               clean_names %>% 
               mutate(rfid = as.character(rfid)) %>%
               rename("add_ind_olivier" = "add_ind") %>% 
-              select(rfid, add_ind_olivier), by = "rfid")
+              select(rfid, add_ind_olivier), by = "rfid") %>% 
+  select(-sex) %>% 
+  left_join(cocaine_metadata_df %>% distinct(rfid, sex), by = "rfid") %>% 
+  mutate_at(vars(-one_of("cohort", "labanimalid", "rfid", "box", "sex")), as.numeric) %>% 
+  select(cohort, labanimalid, rfid, sex, box, everything())
+
+gwas_prelim2_indices %>% naniar::vis_miss()
 
 write.csv(gwas_prelim2_indices, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/tier1_gwas_prelim_n545.csv", row.names = F)
   
