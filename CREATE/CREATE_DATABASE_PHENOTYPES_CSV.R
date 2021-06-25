@@ -101,7 +101,11 @@ sha_gwastraits <- sha_gwastraits %>%
   mutate(mean_inactive_sha_08_10 = rowMeans(select(., matches("inactive_sha(0[89]|10)")), na.rm = T)) %>% 
   mutate(mean_to_sha_08_10 = rowMeans(select(., matches("timeout_sha(0[89]|10)")), na.rm = T))
 
-# sha_iti <- rbind(sha_iti_timebin_df, )
+# check for dupes
+sha_gwastraits %>% get_dupes(labanimalid)
+
+# join columns for iti data
+sha_gwastraits_all <- left_join(sha_gwastraits, sha_gwasiti_df_agg, by = c("labanimalid" = "subject")) 
 
 
 ######
@@ -162,10 +166,28 @@ lga_gwastraits <- lga_gwasprelim2 %>%
               clean_names %>% 
               mutate_at(vars(starts_with("lga")), as.numeric) %>% 
               select(labanimalid, sex, matches("lga(01|1[2-4])")) %>% 
-              select_all(~gsub("(lga.*)", "timeout_\\1", tolower(.))) , by = c("labanimalid"))
+              select_all(~gsub("(lga.*)", "timeout_\\1", tolower(.))) , by = c("labanimalid")) %>% 
+  select(-box) %>% 
+  distinct() 
+
+
+#check for dupes 
+lga_gwastraits %>% get_dupes(labanimalid)
+
+lga_gwastraits <- lga_gwastraits %>%
+  subset(!is.na(sex)) %>% 
+  fill(-labanimalid, -rfid, -cohort, -sex) %>% 
+  distinct() 
+
+## leave as NA's for now 
+lga_gwastraits %>% get_dupes(labanimalid)
+
 
 # calculate esc
-lga_gwastraits <- lga_gwastraits %>% 
+lga_gwastraits_2 <- lga_gwastraits %>% 
+  add_count(labanimalid) %>% 
+  subset(n==1) %>% 
+  select(-n) %>% 
   mutate_at(vars(starts_with("rewards"), starts_with("inactive")), as.numeric) %>% 
   mutate_at(vars(matches("rewards_lga1[234]")), list(esc = ~.-rewards_lga01)) %>%
   mutate(mean_lga_delta_esc_12_14 = rowMeans(select(., ends_with("_esc")), na.rm = T)) %>% 
@@ -173,8 +195,12 @@ lga_gwastraits <- lga_gwastraits %>%
   mutate(mean_inactive_lga_12_14 = rowMeans(select(., matches("inactive_lga(1[2-4])")), na.rm = T)) %>% 
   mutate(mean_to_lga_12_14 = rowMeans(select(., matches("timeout_lga(1[2-4])")), na.rm = T))
   
+lga_gwastraits_2 %>% get_dupes(labanimalid)
 
+# join columns for iti data
+lga_gwastraits_all <- left_join(lga_gwastraits_2, lga_gwasiti_df_agg, by = c("labanimalid" = "subject")) 
 
+lga_gwastraits_all %>% get_dupes(labanimalid)
 
 ######
 ## PR 
@@ -245,6 +271,9 @@ pr_gwastraits <- pr_gwastraits %>%
          "pr_02_lga_breakpoint" = "pr_breakpoint_pr02" ,
          "pr_03_postshock_breakpoint" = "pr_breakpoint_pr03")
 
+# check dupes
+pr_gwastraits %>% get_dupes(labanimalid)
+
 ######
 ## SHOCK 
 ######
@@ -282,12 +311,20 @@ shock_gwastraits <- shock_rawgwas %>%
   pivot_wider(names_from = exp, values_from = raw) %>% 
   mutate(shock_03_pre = (shock03-preshock)/preshock)
 
+# remove duplicate animals for now 
+shock_gwastraits2 <- shock_gwastraits %>% 
+  add_count(labanimalid) %>% 
+  subset(n == 1) %>% 
+  select(-n)
+
 ## XX join to the lga object to calculate another trait  
-shock_gwastraits <- shock_rawgwas_traits %>% 
-  left_join(XX lga_gwastraits %>% , by = "labanimalid") %>% 
-  mutate(shock_03_avg1h = (shock03-avghour1_lgalast3)/avghour1_lgalast3)
+shock_gwastraits2 <- shock_gwastraits2 %>% 
+  left_join(lga_gwastraits_all %>% 
+              select(labanimalid, lga_rewards_first1hr), by = "labanimalid") %>% 
+  mutate(shock_03_avg1h = (shock03-lga_rewards_first1hr)/lga_rewards_first1hr)
 
-
+## get dupes
+shock_gwastraits2 %>% distinct() %>% get_dupes(labanimalid)
 
 
 
@@ -296,5 +333,99 @@ shock_gwastraits <- shock_rawgwas_traits %>%
 
 
 # bind all objects into one object and create csv file 
-gwas_prelim2 <- full_join()
+gwas_prelim2 <- full_join(sha_gwastraits_all %>% 
+                            select(cohort, labanimalid, rfid, sex, box, date_sha08, mean_sha_delta_esc_08_10:sha_sd_iti), 
+                          lga_gwastraits_all %>% 
+                            select(labanimalid, date_lga12, mean_lga_delta_esc_12_14:lga_sd_iti), by = "labanimalid") %>% 
+  full_join(shock_gwastraits2 %>% 
+              select(labanimalid, shock03, shock_03_pre, shock_03_avg1h), by = "labanimalid") %>% 
+  left_join(oliviercocaine_excel_all %>% select(labanimalid, matches("date_shock03")) %>% distinct(), by = "labanimalid") %>% 
+  full_join(pr_gwastraits %>% 
+              select(labanimalid, pr_01_sha:pr_max_02_03_breakpoint), by = "labanimalid") %>% 
+  left_join(cocaine_metadata_df %>% 
+              distinct(rfid, d_o_b) %>% 
+              mutate(d_o_b = as.Date(d_o_b)), by = "rfid") %>% 
+  mutate_at(vars(matches("date")), list(age = ~difftime(., d_o_b, units = c("days")) %>% as.numeric)) %>% 
+  select_all(~gsub("^date_(.*age$)", "\\1", tolower(.))) %>% 
+  select(-matches("date|d_o_b")) %>% 
+  rename("iti_median_sha_08_10" = "sha_median_iti",
+         "behavior_stability_sha_08_10" = "sha_sd_iti",
+         "iti_median_esc_12_14" = "lga_median_iti",
+         "behavior_stability_esc_12_14" = "lga_sd_iti",
+         
+         "loading_phase_intake_sha_08_10" = "sha_rewards_first10min",
+         "titration_phase_sha_08_10" = "sha_rewards_last60min",
+         
+         "loading_phase_intake_esc_12_14" = "lga_rewards_first10min",
+         "titration_phase_esc_12_14" = "lga_rewards_last60min"
+         )
+
+# take care of later 
+gwas_prelim2 <- gwas_prelim2 %>% 
+  subset(labanimalid != "F91") 
+
+
+# addiction indices
+gwas_prelim2_indices <- gwas_prelim2 %>%
+  mutate(pr_max_02_03 = as.numeric(pr_max_02_03)) %>%
+  
+  # without sex
+  group_by(cohort) %>% 
+  mutate(mean_lga_delta_esc_12_14_zscore = scale(mean_lga_delta_esc_12_14),
+         pr_max_02_03_zscore = scale(pr_max_02_03),
+         shock03_zscore = scale(shock03)) %>% 
+  ungroup() %>% 
+  mutate(addiction_index_noSexZ = rowMeans(select(., ends_with("zscore")), na.rm = TRUE)) %>% 
+  select(-matches("zscore")) %>% 
+  
+  # with sex
+  group_by(cohort, sex) %>% 
+  mutate(mean_lga_delta_esc_12_14_zscore = scale(mean_lga_delta_esc_12_14),
+         pr_max_02_03_zscore = scale(pr_max_02_03),
+         shock03_zscore = scale(shock03)) %>% 
+  ungroup() %>% 
+  mutate(add_index_sexcohortZ = rowMeans(select(., ends_with("zscore")), na.rm = TRUE)) %>% 
+  select(-matches("zscore")) %>% 
+  
+  # without sex or cohort
+  mutate(add_ind_calc_noZ_shock_03 = rowMeans(select(., matches("(mean_lga_delta_esc_12_14|pr_max_02_03|shock03)$")), na.rm = TRUE)) %>% 
+  
+  # repeat with a diff variable for shock
+  group_by(cohort) %>% 
+  mutate(mean_lga_delta_esc_12_14_zscore = scale(mean_lga_delta_esc_12_14),
+         pr_max_02_03_zscore = scale(pr_max_02_03),
+         shock03_zscore = scale(shock_03_avg1h)) %>% 
+  ungroup() %>% 
+  mutate(addiction_index_noSexZ_shock_03_avg1h = rowMeans(select(., ends_with("zscore")), na.rm = TRUE)) %>% 
+  select(-matches("zscore")) %>% 
+  
+  group_by(cohort, sex) %>% 
+  mutate(mean_lga_delta_esc_12_14_zscore = scale(mean_lga_delta_esc_12_14),
+         pr_max_02_03_zscore = scale(pr_max_02_03),
+         shock03_zscore = scale(shock_03_avg1h)) %>% 
+  ungroup() %>% 
+  mutate(add_index_palmer_shock_03_avg1h = rowMeans(select(., ends_with("zscore")), na.rm = TRUE)) %>% 
+  select(-matches("zscore")) %>% 
+  
+  # without sex or cohort
+  mutate(add_ind_calc_noZ_shock_03_avg1h = rowMeans(select(., matches("(mean_lga_delta_esc_12_14|pr_max_02_03|shock_03_avg1h)$")), na.rm = TRUE))  
+  
+ # calculate the add_ind with and without normalizing for sex (add_ind_calc and add_ind_calc-noSexZ, respectively) and without normalizing for sex or cohort (add_ind_calc-noZscoreatALL). 
+  
+# join to Olivier's addiction indices
+  
+gwas_prelim2_indices <- gwas_prelim2_indices %>% 
+  left_join(openxlsx::read.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_gwas_addind_06242021.xlsx") %>% 
+              clean_names %>% 
+              mutate(rfid = as.character(rfid)) %>%
+              rename("add_ind_olivier" = "add_ind") %>% 
+              select(rfid, add_ind_olivier), by = "rfid")
+
+write.csv(gwas_prelim2_indices, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/tier1_gwas_prelim_n545.csv", row.names = F)
+  
+
+
+
+
+
   

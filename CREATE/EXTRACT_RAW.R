@@ -1117,6 +1117,14 @@ sha_gwasiti_df <- sha_gwasiti_df %>%
 
 sha_gwasiti_df %>% get_dupes(subject, exp)
 
+# take means by labanimalid
+sha_gwasiti_df_agg <- sha_gwasiti_df %>% 
+  select(subject, matches("^sha")) %>% 
+  group_by(subject) %>% 
+  summarise_all(~mean(., na.rm = T)) %>% 
+  ungroup()
+
+## keep an eye on the C13 ID's, C1317, C1319 subset(!grepl("[MF]", subject))
 
 
 ################################
@@ -1533,6 +1541,12 @@ lga_gwasiti_df <- lga_gwasiti_df %>%
 lga_gwasiti_df %>% get_dupes(subject, exp)
 
 
+# take means by labanimalid
+lga_gwasiti_df_agg <- lga_gwasiti_df %>% 
+  select(subject, matches("^lga")) %>% 
+  group_by(subject) %>% 
+  summarise_all(~mean(., na.rm = T)) %>% 
+  ungroup()
 
 
 
