@@ -97,15 +97,103 @@ sha_gwastraits <- sha_gwastraits %>%
   mutate_at(vars(starts_with("rewards"), starts_with("inactive")), as.numeric) %>% 
   mutate_at(vars(matches("rewards_sha(0[89]|10)")), list(esc = ~.-rewards_sha01)) %>%
   mutate(mean_sha_delta_esc_08_10 = rowMeans(select(., ends_with("_esc")), na.rm = T)) %>% 
-  mutate(mean_sha_08_10 = rowMeans(select(., matches("rewards_sha(0[89]|10)")), na.rm = T)) %>% 
-  mutate(mean_inactive_sha_08_10 = rowMeans(select(., matches("inactive_sha(0[89]|10)")), na.rm = T)) %>% 
-  mutate(mean_to_sha_08_10 = rowMeans(select(., matches("timeout_sha(0[89]|10)")), na.rm = T))
+  mutate(mean_sha_08_10 = rowMeans(select(., matches("rewards_sha(0[89]|10)$")), na.rm = T)) %>% 
+  mutate(mean_inactive_sha_08_10 = rowMeans(select(., matches("inactive_sha(0[89]|10)$")), na.rm = T)) %>% 
+  mutate(mean_to_sha_08_10 = rowMeans(select(., matches("timeout_sha(0[89]|10)$")), na.rm = T))
 
 # check for dupes
 sha_gwastraits %>% get_dupes(labanimalid)
 
+
+
+## create the same for SHA01-03
+sha_rawgwas_01_03 <- sha_rawgwas %>% 
+  subset(exp %in% c("sha01", "sha02", "sha03"))
+
+sha_rawgwas_01_03 %>% subset(is.na(rfid))
+
+sha_rawgwas_01_03 <- sha_rawgwas_01_03 %>% 
+  mutate(subject = ifelse(subject == "M7678", "M768", subject),
+         rfid = ifelse(subject == "M768", "933000320046611", rfid)) %>% 
+  rowwise() %>%
+  mutate(subject = ifelse(is.na(rfid), gsub("F", "M", subject), subject)) %>% # fix the sex in the ID and then rejoin to metadata
+  ungroup() %>%
+  group_by(subject) %>% 
+  fill(rfid, .direction = 'downup') %>% 
+  ungroup() %>% 
+  mutate(subject = ifelse(is.na(rfid), gsub("M", "F", subject), subject))# if it didn't fix, then switch back
+
+# now use boxes to clean up
+sha_rawgwas_01_03 %>% subset(is.na(rfid))
+
+# sha_rawgwas_01_03 %>% subset(box == "14"&cohort == "C04") # check for non dupes in sessions
+
+sha_rawgwas_01_03 <- sha_rawgwas_01_03 %>% 
+  mutate(subject = ifelse(subject == "F414", "F424", subject)
+         # subject = ifelse(subject == "F124", "F524", subject), # technically an error but there is already an existing session for this animal
+         # subject = ifelse(subject == "F123", "F523", subject), # technically an error but there is already an existing session for this animal
+         # subject = ifelse(subject == "F125", "F525", subject), # technically an error but there is already an existing session for this animal
+  ) %>% 
+  subset(!(subject %in% c("F124", "F123", "F125")&cohort == "C05")) %>% 
+  group_by(subject) %>% 
+  fill(rfid, .direction = "downup") %>% 
+  ungroup()
+
+
+sha_gwasprelim3 <- oliviercocaine_excel_all %>% 
+  select(cohort, measurement, labanimalid, rfid, matches("sha(0[123])")) %>% 
+  pivot_longer(cols = matches("sha")) %>% 
+  mutate(measurement = ifelse(grepl("date", name), "date", measurement),
+         name = ifelse(grepl("date", name), gsub("date_", "", name), name)) %>% 
+  distinct() %>% 
+  full_join(sha_rawgwas_01_03, by = c("labanimalid" = "subject", "measurement" = "name", "name" = "exp")) %>% # join to raw file and fill NA's
+  mutate(cohort = coalesce(cohort.x, cohort.y),
+         rfid = coalesce(rfid.x, rfid.y)) %>% 
+  select(-matches("[.][xy]$")) %>% 
+  mutate(value = coalesce(value, as.character(raw))) %>%
+  group_by(rfid) %>%
+  # fill(cohort, .direction = "downup") %>% 
+  # fill(sex, .direction = "downup") %>% 
+  fill(labanimalid, .direction = "downup") %>%
+  fill(box, .direction = "downup") %>% 
+  ungroup() %>% 
+  select(-raw) %>%
+  distinct
+
+## potentially needs to be corrected by the compromised table, bc they're naives?
+# use to QC sha_rawgwas %>% subset(is.na(rfid)) %>% distinct(subject, cohort) %>% mutate(subject = parse_number(subject)) %>% select(subject) %>% unlist() %>% paste0(collapse = "|") %>% cat 
+
+sha_gwasprelim3 <- sha_gwasprelim3 %>% 
+  subset(measurement %in% c("inactive", "rewards", "date"))
+
+sha_gwastraits_2 <- sha_gwasprelim3 %>% 
+  pivot_wider(names_from = c("measurement", "name"), values_from = "value") %>% 
+  left_join(openxlsx::read.xlsx("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/cocaine_sha_to_presses_final.xlsx") %>%  # join to TO file 
+              clean_names %>% 
+              mutate_at(vars(starts_with("sha")), as.numeric) %>% 
+              select(labanimalid, sex, matches("sha(0[123])")) %>% 
+              select_all(~gsub("(sha.*)", "timeout_\\1", tolower(.))) , by = c("labanimalid"))
+
+# calculate traits for 01-03 sessions
+sha_gwastraits_2 <- sha_gwastraits_2 %>% 
+  mutate_at(vars(starts_with("rewards"), starts_with("inactive")), as.numeric) %>% 
+  mutate(mean_sha_01_03 = rowMeans(select(., matches("rewards_sha(0[123])$")), na.rm = T)) %>% 
+  mutate(mean_inactive_sha_01_03 = rowMeans(select(., matches("inactive_sha(0[123])$")), na.rm = T)) %>% 
+  mutate(mean_to_sha_01_03 = rowMeans(select(., matches("timeout_sha(0[123])$")), na.rm = T)) %>% 
+  select(labanimalid, mean_sha_01_03:mean_to_sha_01_03)
+
+# check for dupes
+sha_gwastraits_2 %>% get_dupes(labanimalid)
+
+
+
+
+
+
+
 # join columns for iti data
-sha_gwastraits_all <- left_join(sha_gwastraits, sha_gwasiti_df_agg, by = c("labanimalid" = "subject")) 
+sha_gwastraits_all <- left_join(sha_gwastraits, sha_gwasiti_df_agg, by = c("labanimalid" = "subject")) %>% 
+  left_join(sha_gwastraits_2, "labanimalid")
 
 
 ######
@@ -191,9 +279,9 @@ lga_gwastraits_2 <- lga_gwastraits %>%
   mutate_at(vars(starts_with("rewards"), starts_with("inactive")), as.numeric) %>% 
   mutate_at(vars(matches("rewards_lga1[234]")), list(esc = ~.-rewards_lga01)) %>%
   mutate(mean_lga_delta_esc_12_14 = rowMeans(select(., ends_with("_esc")), na.rm = T)) %>% 
-  mutate(mean_lga_12_14 = rowMeans(select(., matches("rewards_lga(1[2-4])")), na.rm = T)) %>% 
-  mutate(mean_inactive_lga_12_14 = rowMeans(select(., matches("inactive_lga(1[2-4])")), na.rm = T)) %>% 
-  mutate(mean_to_lga_12_14 = rowMeans(select(., matches("timeout_lga(1[2-4])")), na.rm = T))
+  mutate(mean_lga_12_14 = rowMeans(select(., matches("rewards_lga(1[2-4])$")), na.rm = T)) %>% 
+  mutate(mean_inactive_lga_12_14 = rowMeans(select(., matches("inactive_lga(1[2-4])$")), na.rm = T)) %>% 
+  mutate(mean_to_lga_12_14 = rowMeans(select(., matches("timeout_lga(1[2-4])$")), na.rm = T))
   
 lga_gwastraits_2 %>% get_dupes(labanimalid)
 
@@ -327,16 +415,39 @@ shock_gwastraits2 <- shock_gwastraits2 %>%
 shock_gwastraits2 %>% distinct() %>% get_dupes(labanimalid)
 
 
+## covariate weight
 
+#cocaine_metadata_df %>% select(cohort, rfid, matches("surgery")) %>% subset(!is.na(weight_2_surgery)) %>% View()
+surgery_weights <- cocaine_metadata_df %>% 
+  mutate(weight_2_surgery = coalesce(weight_2_sugery, weight_2_surgery)) %>% 
+  mutate(surgery_weight = coalesce(weight_1_surgery, weight_2_surgery) %>% as.numeric) %>% 
+  select(rfid, surgery_weight)
+  
+# to use first weight or surgery weight
+  #mutate(weight_pre_shipment = coalesce(weight_1_pre_shipment, weight_1_11_26_2018) %>% 
+  #          coalesce(weight_1_4_5_2018)) %>% 
+  # select(cohort, rfid, matches("surgery|shipment")) %>%
+  # mutate(surgery_weight = coalesce(weight_1_surgery, weight_2_surgery) %>% as.numeric) %>% 
+  # select(cohort, rfid, surgery_weight, weight_pre_shipment) %>% 
+  # pivot_longer(cols = surgery_weight:weight_pre_shipment, names_to = "weight_event", values_to = "weight") %>% 
+  # mutate(weight_event_cohort = paste0(cohort, "_", weight_event)) %>% 
+  # mutate(weight_event_cohort_2 = ifelse(grepl("surgery", weight_event), "surgery", "non_surgery")) %>% 
+  # mutate(weight_event_cohort_3 = ifelse(grepl("surgery", weight_event), "surgery", weight_event_cohort))
+# 
+# 
+# ggplot(surgery_weights, aes(x = weight, color = weight_event_cohort)) + geom_density() 
+# ggplot(surgery_weights, aes(x = weight, group = weight_event_cohort, color = weight_event_cohort_2)) + geom_density() 
+# ggplot(surgery_weights, aes(x = weight, group = weight_event_cohort, color = weight_event_cohort_3)) + geom_density() 
 
-
+# check for no dupes 
+surgery_weights %>% get_dupes(rfid)
 
 
 # bind all objects into one object and create csv file 
 gwas_prelim2 <- full_join(sha_gwastraits_all %>% 
-                            select(cohort, labanimalid, rfid, sex, box, date_sha08, mean_sha_delta_esc_08_10:sha_sd_iti), 
+                            select(cohort, labanimalid, rfid, sex, box, date_sha08, mean_sha_delta_esc_08_10:sha_sd_iti_na, mean_sha_01_03:mean_to_sha_01_03), 
                           lga_gwastraits_all %>% 
-                            select(labanimalid, date_lga12, mean_lga_delta_esc_12_14:lga_sd_iti), by = "labanimalid") %>% 
+                            select(labanimalid, date_lga12, mean_lga_delta_esc_12_14:lga_sd_iti_na), by = "labanimalid") %>% 
   full_join(shock_gwastraits2 %>% 
               select(labanimalid, shock03, shock_03_pre, shock_03_avg1h), by = "labanimalid") %>% 
   left_join(oliviercocaine_excel_all %>% select(labanimalid, matches("date_shock03")) %>% distinct(), by = "labanimalid") %>% 
@@ -345,13 +456,19 @@ gwas_prelim2 <- full_join(sha_gwastraits_all %>%
   left_join(cocaine_metadata_df %>% 
               distinct(rfid, d_o_b) %>% 
               mutate(d_o_b = as.Date(d_o_b)), by = "rfid") %>% 
+  left_join(surgery_weights, by = "rfid") %>% 
   mutate_at(vars(matches("date")), list(age = ~difftime(., d_o_b, units = c("days")) %>% as.numeric)) %>% 
   select_all(~gsub("^date_(.*age$)", "\\1", tolower(.))) %>% 
   select(-matches("date|d_o_b")) %>% 
+  mutate(sha_coefficient_of_variation = sha_sd_iti/sha_mean_iti, 
+         esc_coefficient_of_variation = lga_sd_iti/lga_mean_iti) %>% 
   rename("iti_median_sha_08_10" = "sha_median_iti",
          "behavior_stability_sha_08_10" = "sha_sd_iti",
+         "behavior_stability_sha_08_10_na" = "sha_sd_iti_na",
+         
          "iti_median_esc_12_14" = "lga_median_iti",
          "behavior_stability_esc_12_14" = "lga_sd_iti",
+         "behavior_stability_esc_12_14_na" = "lga_sd_iti_na",
          
          "loading_phase_intake_sha_08_10" = "sha_rewards_first10min",
          "titration_phase_sha_08_10" = "sha_rewards_last60min",
@@ -361,6 +478,7 @@ gwas_prelim2 <- full_join(sha_gwastraits_all %>%
          )
 
 # take care of later 
+# get_dupes(rfid) results 
 gwas_prelim2 <- gwas_prelim2 %>% 
   subset(labanimalid != "F91") 
 
@@ -388,7 +506,14 @@ gwas_prelim2_indices <- gwas_prelim2 %>%
   select(-matches("zscore")) %>% 
   
   # without sex or cohort
-  mutate(add_ind_calc_noZ_shock_03 = rowMeans(select(., matches("(mean_lga_delta_esc_12_14|pr_max_02_03|shock03)$")), na.rm = TRUE)) %>% 
+  # mutate(add_ind_calc_noZ_shock_03 = rowMeans(select(., matches("(mean_lga_delta_esc_12_14|pr_max_02_03|shock03)$")), na.rm = TRUE)) %>% 
+  
+  # without sex or cohort
+  mutate(mean_lga_delta_esc_12_14_zscore = scale(mean_lga_delta_esc_12_14),
+         pr_max_02_03_zscore = scale(pr_max_02_03),
+         shock03_zscore = scale(shock03)) %>% 
+  mutate(add_ind_calc_noZ_shock_03 = rowMeans(select(., ends_with("zscore")), na.rm = TRUE)) %>% 
+  select(-matches("zscore")) %>% 
   
   # repeat with a diff variable for shock
   group_by(cohort) %>% 
@@ -408,7 +533,14 @@ gwas_prelim2_indices <- gwas_prelim2 %>%
   select(-matches("zscore")) %>% 
   
   # without sex or cohort
-  mutate(add_ind_calc_noZ_shock_03_avg1h = rowMeans(select(., matches("(mean_lga_delta_esc_12_14|pr_max_02_03|shock_03_avg1h)$")), na.rm = TRUE))  
+  # mutate(add_ind_calc_noZ_shock_03_avg1h = rowMeans(select(., matches("(mean_lga_delta_esc_12_14|pr_max_02_03|shock_03_avg1h)$")), na.rm = TRUE)) 
+  
+  # without sex or cohort
+  mutate(mean_lga_delta_esc_12_14_zscore = scale(mean_lga_delta_esc_12_14),
+         pr_max_02_03_zscore = scale(pr_max_02_03),
+         shock03_zscore = scale(shock_03_avg1h)) %>% 
+  mutate(add_ind_calc_noZ_shock_03_avg1h = rowMeans(select(., ends_with("zscore")), na.rm = TRUE)) %>% 
+  select(-matches("zscore")) %>% 
   
  # calculate the add_ind with and without normalizing for sex (add_ind_calc and add_ind_calc-noSexZ, respectively) and without normalizing for sex or cohort (add_ind_calc-noZscoreatALL). 
   
@@ -423,7 +555,8 @@ gwas_prelim2_indices <- gwas_prelim2_indices %>%
   select(-sex) %>% 
   left_join(cocaine_metadata_df %>% distinct(rfid, sex), by = "rfid") %>% 
   mutate_at(vars(-one_of("cohort", "labanimalid", "rfid", "box", "sex")), as.numeric) %>% 
-  select(cohort, labanimalid, rfid, sex, box, everything())
+  select(cohort, labanimalid, rfid, sex, box, everything()) %>% 
+  mutate_if(is.numeric, list(~na_if(., Inf)))
 
 gwas_prelim2_indices %>% naniar::vis_miss()
 

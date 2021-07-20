@@ -988,12 +988,31 @@ sha_iti_timebin_new <- lapply(sha_sessions08_10_new, function(x){
     }) %>% unlist %>% as.data.frame()
   
   
-  # iti median and sd 
+  # iti median, mean, and sd 
   iti_by_subject_agg <- iti_by_subject %>% 
     lapply(function(x){
-      x %>% 
-        summarize(sha_median_iti = median(intertrial_time, na.rm = T),
-                  sha_sd_iti = sd(intertrial_time, na.rm = T))
+      if(nrow(x) > 2){
+        x %>% 
+          summarize(sha_median_iti = median(intertrial_time, na.rm = T),
+                    sha_mean_iti = mean(intertrial_time, na.rm = T),
+                    sha_sd_iti = sd(intertrial_time, na.rm = T)) %>% 
+          mutate(sha_sd_iti_na = sha_sd_iti)  
+      }
+      else if(nrow(x) %in% c(1, 2)){
+        x %>% 
+          summarize(sha_median_iti = median(intertrial_time, na.rm = T),
+                    sha_mean_iti = mean(intertrial_time, na.rm = T),
+                    sha_sd_iti = sd(intertrial_time, na.rm = T),
+                    sha_sd_iti_na = 0)
+      }
+      else if(nrow(x) == 0){
+        x %>% 
+          summarize(sha_median_iti = median(intertrial_time, na.rm = T),
+                    sha_mean_iti = mean(intertrial_time, na.rm = T),
+                    sha_sd_iti = sd(intertrial_time, na.rm = T)) %>% 
+          mutate(sha_sd_iti_na = sha_sd_iti)
+      }
+      
     }) %>% 
     rbindlist()
   
@@ -1049,24 +1068,30 @@ sha_iti_old <- lapply(sha_sessions08_10_old, function(x){
   # all reward bins
   subject_traits <- lapply(split_data, function(x){
     
-    if(nrow(x) != 0){
-    indexremoved <- x[-c(1:2),] # remove excess
+    if(nrow(x) != 0){ # if the data frame/vector isn't empty 
+    indexremoved <- x[-c(1:2),] # remove excess info
     
     data = data.frame(sha_rewards_first10min = indexremoved[1,] %>% unlist() %>% as.numeric,
+                      sha_rewards_first1hr = indexremoved[1:6,] %>% unlist() %>% as.numeric %>% sum(na.rm = T),
                       sha_rewards_last60min = indexremoved[7:12] %>% unlist() %>% as.numeric() %>% sum(na.rm = T))
     
-    iti <- 10/as.numeric(unlist(indexremoved)) 
-    iti[!is.finite(iti)] <- 0
+    iti <- 10/as.numeric(unlist(indexremoved)) * 60
+    iti[!is.finite(iti)] <- NA
     
     data$sha_median_iti = median(iti, na.rm = T)# from Brent's email -- since we do not have proper time stamp data for all the old comp files, the ITI should be calculated using (bin time)/(bin rewards). So for a 10 min bin with 5 rewards, the “Bin ITI” or average ITI for that bin would be 2 min. With that, we can still use the old comp data for ITI and we will at least be able to have a reasonable stdev value based off the average ITI per bin. 
+    data$sha_mean_iti = mean(iti, na.rm = T)
     data$sha_sd_iti = sd(iti, na.rm = T)
+    data$sha_sd_iti_na = ifelse(indexremoved %>% unlist %>% as.numeric %>% sum %in% c(1, 2), 0, data$sha_sd_iti)
     
     }
     else{
       data = data.frame(sha_rewards_first10min = NA,
+                        sha_rewards_first1hr = NA, 
                         sha_rewards_last60min = NA,
                         sha_median_iti = NA,
-                        sha_sd_iti = NA)
+                        sha_mean_iti = NA, 
+                        sha_sd_iti = NA,
+                        sha_sd_iti_na = NA)
     }
     
     return(data)
@@ -1405,13 +1430,31 @@ lga_iti_timebin <- lapply(lga_sessions12_14_new, function(x){
         nrow
     }) %>% unlist %>% as.data.frame()
   
-  
-  # iti median and sd 
+  # iti median, mean, and sd 
   iti_by_subject_agg <- iti_by_subject %>% 
     lapply(function(x){
-      x %>% 
-        summarize(lga_median_iti = median(intertrial_time, na.rm = T),
-                  lga_sd_iti = sd(intertrial_time, na.rm = T))
+      if(nrow(x) > 2){
+        x %>% 
+          summarize(lga_median_iti = median(intertrial_time, na.rm = T),
+                    lga_mean_iti = mean(intertrial_time, na.rm = T),
+                    lga_sd_iti = sd(intertrial_time, na.rm = T)) %>% 
+          mutate(lga_sd_iti_na = lga_sd_iti)  
+      }
+      else if(nrow(x) %in% c(1, 2)){
+        x %>% 
+          summarize(lga_median_iti = median(intertrial_time, na.rm = T),
+                    lga_mean_iti = mean(intertrial_time, na.rm = T),
+                    lga_sd_iti = sd(intertrial_time, na.rm = T),
+                    lga_sd_iti_na = 0)
+      }
+      else if(nrow(x) == 0){
+        x %>% 
+          summarize(lga_median_iti = median(intertrial_time, na.rm = T),
+                    lga_mean_iti = mean(intertrial_time, na.rm = T), 
+                    lga_sd_iti = sd(intertrial_time, na.rm = T)) %>% 
+          mutate(lga_sd_iti_na = lga_sd_iti)
+      }
+      
     }) %>% 
     rbindlist()
   
@@ -1430,7 +1473,7 @@ lga_iti_timebin <- lapply(lga_sessions12_14_new, function(x){
   return(data)
 })
 
-lga_iti_timebin_df <- lga_iti_timebin %>% 
+lga_iti_new_df <- lga_iti_timebin %>% 
   rbindlist(fill = T) %>% 
   mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
          filename = gsub(".*/LGA/", "", filename),
@@ -1468,21 +1511,27 @@ lga_iti_old <- lapply(lga_sessions12_14_old, function(x){
     if(nrow(x) != 0){
       indexremoved <- x[-c(1:2),] # remove excess
       
-      data = data.frame(lga_rewards_first10min = indexremoved[1,] %>% unlist() %>% as.numeric,
+      data = data.frame(lga_rewards_first10min = indexremoved[1] %>% unlist() %>% as.numeric,
+                        lga_rewards_first1hr = indexremoved[1:6] %>% unlist() %>% as.numeric %>% sum(na.rm = T),
                         lga_rewards_last60min = indexremoved[31:36] %>% unlist() %>% as.numeric() %>% sum(na.rm = T))
       
-      iti <- 10/as.numeric(unlist(indexremoved)) 
-      iti[!is.finite(iti)] <- 0
+      iti <- 10/as.numeric(unlist(indexremoved)) * 60
+      iti[!is.finite(iti)] <- NA
       
       data$lga_median_iti = median(iti, na.rm = T)# from Brent's email -- since we do not have proper time stamp data for all the old comp files, the ITI should be calculated using (bin time)/(bin rewards). So for a 10 min bin with 5 rewards, the “Bin ITI” or average ITI for that bin would be 2 min. With that, we can still use the old comp data for ITI and we will at least be able to have a reasonable stdev value based off the average ITI per bin. 
+      data$lga_mean_iti = mean(iti, na.rm = T)
       data$lga_sd_iti = sd(iti, na.rm = T)
+      data$lga_sd_iti_na = ifelse(indexremoved %>% unlist %>% as.numeric %>% sum %in% c(1, 2), 0, data$lga_sd_iti)
       
     }
     else{
       data = data.frame(lga_rewards_first10min = NA,
+                        lga_rewards_first1hr = NA,
                         lga_rewards_last60min = NA,
                         lga_median_iti = NA,
-                        lga_sd_iti = NA)
+                        lga_mean_iti = NA,
+                        lga_sd_iti = NA,
+                        lga_sd_iti_na = NA)
     }
     
     return(data)
@@ -1523,7 +1572,7 @@ lga_iti_old_df %>% get_dupes(subject, exp)
 lga_iti_new_df %>% names
 lga_iti_old_df %>% names
 
-lga_gwasiti_df <- bind_rows(lga_iti_timebin_df, lga_iti_old_df)
+lga_gwasiti_df <- bind_rows(lga_iti_new_df, lga_iti_old_df)
 
 lga_gwasiti_df %>% get_dupes(subject, exp)
 
@@ -1547,6 +1596,9 @@ lga_gwasiti_df_agg <- lga_gwasiti_df %>%
   group_by(subject) %>% 
   summarise_all(~mean(., na.rm = T)) %>% 
   ungroup()
+
+
+
 
 
 
