@@ -1152,6 +1152,273 @@ sha_gwasiti_df_agg <- sha_gwasiti_df %>%
 ## keep an eye on the C13 ID's, C1317, C1319 subset(!grepl("[MF]", subject))
 
 
+
+
+
+################################
+########## SHA (01-03) ITI #############
+################################
+
+sha_sessions01_03_new <- grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = "SHA(0[123])", value = T) %>% grep("New",., value = T) #  files
+
+
+
+########## ITI #################
+
+sha_iti_timebin_new_2 <- lapply(sha_sessions01_03_new, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/MSN:/{print $1 $2 $3}' '", x, "'"), header = F, fill = T)
+  
+  subject = fread(paste0("awk '/Subject:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  box = fread(paste0("awk '/Box:/{print $2}' '", x, "'"), header = F, fill = T)
+  
+  date = fread(paste0("awk '/^Start Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  enddate = fread(paste0("awk '/^End Date:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  time = fread(paste0("awk '/^Start Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  endtime = fread(paste0("awk '/^End Time:/{print $3}' '", x, "'"), header = F, fill = T)
+  
+  session_duration <- cbind(date = date, enddate = enddate) %>%
+    cbind(time = time) %>% cbind(endtime = endtime) 
+  names(session_duration) <- c("date", "enddate", "time", "endtime")
+  session_duration <- session_duration %>% 
+    mutate(start_datetime = lubridate::mdy_hms(paste(format(as.Date(date, "%m/%d/%y"), "%m/%d/20%y"), time)),
+           end_datetime = lubridate::mdy_hms(paste(format(as.Date(enddate, "%m/%d/%y"), "%m/%d/20%y"), endtime)),
+           session_duration = difftime(end_datetime, start_datetime, units = "mins") %>% as.numeric() %>% round(0))
+  
+  metadata = cbind(subject = subject, box = box) %>% 
+    cbind(startdate = date) %>% 
+    cbind(session_duration = session_duration$session_duration) %>% 
+    cbind(internal_filename)
+  
+  names(metadata) <- c("subject", "box", "startdate", "session_duration", "internal_filename")
+  
+  
+  
+  # metadata = cbind(subject = subject, box = box)
+  
+  rewards_first10min =  fread(paste0("awk '/^W:/{flag=1;next}/5:/{flag=0}flag' ", "'",  x, "' | awk '/0:/{print $3 + $4}'"), header = F, fill = T)
+  rewards_last60min = fread(paste0("awk '/^W:/{flag=1;next}/^Y:/{flag=0}flag' ", "'", x, "'| awk '{ if( $1==\"10:\" || $1==\"15:\" || $1==\"20:\" ) print $2+$3+$4+$5+$6}'"), header = F, fill = T) %>%
+    zoo::rollapply(., 3, sum, by = 3)
+  
+  # to get the median and sd of the iti
+  iti = fread(paste0("awk '/^V:/{flag=1;next}/^W:/{flag=0}flag' ", "'", x, "'"), header = F, fill = T) 
+  
+  data_indices <- grep("^0:$", iti$V1) # start of each subject
+  split_data <- split(iti, cumsum(1:nrow(iti) %in% data_indices))
+  
+  # all timestamps and intertrial times
+  iti_by_subject <- lapply(split_data, function(x){
+    indexremoved <- x[,-1]
+    nonzerorows <- indexremoved[rowSums(indexremoved) > 0, ] # remove excessively trailing 0's 
+    processeddata_df <- data.frame(timestamps = as.vector(t(data.matrix(nonzerorows)))) # transpose to get by row
+    if(any(processeddata_df$timestamps > 7500)){
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 73, by = 300), right = T, labels = seq(from = 1, to = 72, by =1))) %<>% ## for long access 
+        dplyr::filter(timestamps != 0)
+    }
+    else{
+      processeddata_df %<>% 
+        mutate(bin = cut(timestamps, breaks=seq(from = 0, length.out = 25, by = 300), right = T, labels = seq(from = 1, to = 24, by =1))) %<>% ## for short access 
+        dplyr::filter(timestamps != 0) 
+    }
+    
+    processeddata_df <- processeddata_df %>%
+      mutate(intertrial_time = lead(timestamps) - timestamps,
+             bin = as.character(bin))
+    
+    return(processeddata_df)
+  }) 
+  
+  # get the rewards within the first hour 
+  rewards_first1hr <- iti_by_subject %>% 
+    lapply(function(x){
+      x %>% 
+        subset(bin <= 12) %>% 
+        nrow
+    }) %>% unlist %>% as.data.frame()
+  
+  
+  # iti median, mean, and sd 
+  iti_by_subject_agg <- iti_by_subject %>% 
+    lapply(function(x){
+      if(nrow(x) > 2){
+        x %>% 
+          summarize(sha_median_iti = median(intertrial_time, na.rm = T),
+                    sha_mean_iti = mean(intertrial_time, na.rm = T),
+                    sha_sd_iti = sd(intertrial_time, na.rm = T)) %>% 
+          mutate(sha_sd_iti_na = sha_sd_iti)  
+      }
+      else if(nrow(x) %in% c(1, 2)){
+        x %>% 
+          summarize(sha_median_iti = median(intertrial_time, na.rm = T),
+                    sha_mean_iti = mean(intertrial_time, na.rm = T),
+                    sha_sd_iti = sd(intertrial_time, na.rm = T),
+                    sha_sd_iti_na = 0)
+      }
+      else if(nrow(x) == 0){
+        x %>% 
+          summarize(sha_median_iti = median(intertrial_time, na.rm = T),
+                    sha_mean_iti = mean(intertrial_time, na.rm = T),
+                    sha_sd_iti = sd(intertrial_time, na.rm = T)) %>% 
+          mutate(sha_sd_iti_na = sha_sd_iti)
+      }
+      
+    }) %>% 
+    rbindlist()
+  
+  
+  
+  data = list("sha_rewards_first10min" = rewards_first10min,
+              "sha_rewards_last60min" = rewards_last60min,
+              iti_by_subject_agg,
+              "sha_rewards_first1hr" = rewards_first1hr
+  ) %>% do.call(cbind, .)
+  
+  data <- cbind(metadata, data) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(data)
+})
+
+sha_iti_new_df_2 <- sha_iti_timebin_new_2 %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/SHA/", "", filename),
+         exp = gsub(".*HS", "", filename) %>% gsub("-\\d+$", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHA/", "", .), NA),
+         box = as.character(box)) 
+
+
+
+
+################### 
+### OLD DIRECTORY
+
+
+sha_sessions01_03_old <- grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = "SHA(0[123])", value = T) %>% grep("Old",., value = T) #  files
+
+# extract data...
+sha_iti_old_2 <- lapply(sha_sessions01_03_old, function(x){
+  setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
+  internal_filename = fread(paste0("awk '/^ProgramName/{flag=1;next}/ProgramDate/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  subject = fread(paste0("awk '/^RatNumber/{flag=1;next}/ProgramName/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  box = fread(paste0("awk '/^BoxNumber/{flag=1;next}/Sessionlength/{flag=0}flag' ", "'", x, "' | sed \"s/[[:blank:]]//g\""), fill = T, header = F)
+  
+  metadata = cbind(subject = subject, box = box)
+  
+  # checked that all msn/program name are "SAOneLever"
+  rewards_bins = fread(paste0("awk '/^BinRewards\\r/{flag=1;next}/endl/{flag=0}flag' ", "'", x, "'"), fill = T, header = F) # 10 min bins
+  
+  data_indices <- grep("^list$", rewards_bins$V1) # start of each subject
+  split_data <- split(rewards_bins, cumsum(1:nrow(rewards_bins) %in% data_indices))
+  
+  # all reward bins
+  subject_traits <- lapply(split_data, function(x){
+    
+    if(nrow(x) != 0){ # if the data frame/vector isn't empty 
+      indexremoved <- x[-c(1:2),] # remove excess info
+      
+      data = data.frame(sha_rewards_first10min = indexremoved[1,] %>% unlist() %>% as.numeric,
+                        sha_rewards_first1hr = indexremoved[1:6,] %>% unlist() %>% as.numeric %>% sum(na.rm = T),
+                        sha_rewards_last60min = indexremoved[7:12] %>% unlist() %>% as.numeric() %>% sum(na.rm = T))
+      
+      iti <- 10/as.numeric(unlist(indexremoved)) * 60
+      iti[!is.finite(iti)] <- NA
+      
+      data$sha_median_iti = median(iti, na.rm = T)# from Brent's email -- since we do not have proper time stamp data for all the old comp files, the ITI should be calculated using (bin time)/(bin rewards). So for a 10 min bin with 5 rewards, the “Bin ITI” or average ITI for that bin would be 2 min. With that, we can still use the old comp data for ITI and we will at least be able to have a reasonable stdev value based off the average ITI per bin. 
+      data$sha_mean_iti = mean(iti, na.rm = T)
+      data$sha_sd_iti = sd(iti, na.rm = T)
+      data$sha_sd_iti_na = ifelse(indexremoved %>% unlist %>% as.numeric %>% sum %in% c(1, 2), 0, data$sha_sd_iti)
+      
+    }
+    else{
+      data = data.frame(sha_rewards_first10min = NA,
+                        sha_rewards_first1hr = NA, 
+                        sha_rewards_last60min = NA,
+                        sha_median_iti = NA,
+                        sha_mean_iti = NA, 
+                        sha_sd_iti = NA,
+                        sha_sd_iti_na = NA)
+    }
+    
+    return(data)
+  }) %>% rbindlist()
+  
+  internal_filename <- cbind(internal_filename = internal_filename, cbind(metadata, subject_traits)) %>% 
+    rename_all(~ stringr::str_replace_all(., '[.](V1)?', '')) %>% 
+    mutate(filename = x )
+  
+  return(internal_filename)
+})
+
+sha_iti_old_df_2 <- sha_iti_old_2 %>% 
+  rbindlist(fill = T) %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/SHA/", "", filename),
+         exp = gsub(".*HS(.*)-.*", "\\1", filename) %>% gsub("-\\d+", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHA/", "", .), NA),
+         box = as.character(box)) %>% 
+  mutate(subject = toupper(subject) %>% gsub(".*([MF].*)", "\\1", .))
+
+# qc with...
+sha_iti_old_df_2 %>% get_dupes(subject, exp)
+sha_iti_old_df_2 %>% subset(!grepl("[MF]\\d+", subject))
+
+# fix repeats 
+sha_iti_old_df_2 <- sha_iti_old_df_2 %>% 
+  add_count(subject, exp) %>% 
+  subset(!(n!=1&sha_rewards_first10min==0&sha_rewards_last60min==0&sha_median_iti==0&sha_sd_iti==0)) %>% 
+  select(-n)
+
+sha_iti_old_df %>% get_dupes(subject, exp)
+
+
+
+### join the ITI dataframes
+sha_iti_new_df_2 %>% names
+sha_iti_old_df_2 %>% names
+
+sha_gwasiti_df_2 <- bind_rows(sha_iti_new_df_2, sha_iti_new_df_2)
+
+sha_gwasiti_df_2 <- sha_gwasiti_df_2 %>% 
+  mutate(cohort = str_match(filename, "C\\d+") %>% as.character,
+         filename = gsub(".*/SHA/", "", filename),
+         exp = gsub(".*HS(.*)-.*", "\\1", filename) %>% gsub("-\\d+", "", .),
+         room = ifelse(grepl("[[:alnum:]]+C\\d{2}HS", filename), gsub("C\\d{2}HS.*", "", filename) %>% gsub(".*SHA/", "", .), NA),
+         box = as.character(box)) %>% 
+  mutate(subject = toupper(subject) %>% gsub(".*([MF].*)", "\\1", .)) %>% 
+  distinct
+
+  
+sha_gwasiti_df_2 %>% get_dupes(subject, exp)
+
+sha_gwasiti_df_2 <- sha_gwasiti_df_2 %>% 
+  add_count(subject, exp) %>% 
+  subset(!(subject == 0|n != 1 & session_duration < 5)) %>% 
+  select(-n)
+
+sha_gwasiti_df_2 %>% get_dupes(subject, exp)
+
+# take means by labanimalid
+sha_gwasiti_df_agg_2 <- sha_gwasiti_df_2 %>% 
+  select(subject, matches("^sha")) %>% 
+  group_by(subject) %>% 
+  summarise_all(~mean(., na.rm = T)) %>% 
+  ungroup() %>% 
+  rename_all(~ stringr::str_replace_all(., '(.*)', '\\1_2')) %>% 
+  rename_all(~ stringr::str_replace_all(., '_2_2', '_2')) %>% 
+  rename("subject" = "subject_2")
+
+## keep an eye on the C13 ID's, C1317, C1319 subset(!grepl("[MF]", subject))
+
+
+
+
 ################################
 ########## LGA #################
 ################################
