@@ -59,11 +59,3 @@ read.csv("~/Downloads/db_cocaine_selfadmin_phenotypes.csv", colClasses = "charac
   distinct(cohort) 
 
 
-## connect to database and write data into 
-# install.packages("RPostgres")
-# install.packages("DBI")
-library(DBI)
-
-con <- dbConnect(RPostgres::Postgres(), dbname = "PalmerLab_Datasets", host = "palmerlab-main-database-c2021-08-02.c6sgfwysomht.us-west-2.rds.amazonaws.com", port = 5432, user = "postgres", password = "palmerlab-amapostgres")
-table_ID <- Id(schema = "u01_olivier_george_cocaine", table = "gwas_phenotypes")
-dbWriteTable(conn = con, name = table_ID, value = read.csv("~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/tier1_gwas_prelim_n545_v2.csv", stringsAsFactors = F) %>% distinct %>% clean_names, append = T)
