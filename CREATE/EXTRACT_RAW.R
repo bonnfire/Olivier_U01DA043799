@@ -705,7 +705,6 @@ setwd("~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS")
 
 ###### NEW FILES ##############
 sha_new_files_01_11 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) %>% grep("C(0[1-9]|1[01])", ., value = T) # 254 files
-sha_new_files_13 <- grep(grep(list.files(path = "~/Dropbox (Palmer Lab)/GWAS (1)/Cocaine/Cocaine GWAS", recursive = T, full.names = T), pattern = ".*txt", inv = T, value = T), pattern = ".*SHA", value = T) %>% grep("C(13)", ., value = T) # 40 files
 
 # check cohorts and experiments represented 
 sha_new_files_01_11 %>% as.data.frame() %>% 
