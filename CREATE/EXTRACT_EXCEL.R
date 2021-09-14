@@ -464,19 +464,104 @@ cohort5$tselfadmin[, date_sha02 := lubridate::ymd("2018-07-31")]
 
 
 ## extract the irritability tables for all cohorts
-irritability <- lapply(lapply(ls(pattern = "^cohort\\d$"), get), function(x){
-  x$tirritability
-})  
-names(irritability) <- paste0("C", str_pad(parse_number(ls(pattern = "^cohort\\d$")), 2, "left", "0"))
-irritability_df <- irritability %>% rbindlist(fill = T, idcol = "cohort") %>% 
+irritability_xlfiles <- list.files(path = "~/Dropbox (Palmer Lab)/Olivier_George_U01/DATA Updated", full.names = T, pattern = ".xlsx")
+
+
+irritability_xl <- lapply(irritability_xlfiles, function(filename){
+  
+  
+  irritability <- u01.importxlsx(filename)
+  
+  names(irritability) <- make_clean_names(names(irritability))
+  
+  irritability <- irritability$irritability %>% 
+    as.data.table 
+  
+  irritability[, names(irritability) := lapply(.SD, as.character)] 
+  if(any(grepl("^[[:digit:]]{5,}", irritability$Date))){
+    irritability$Date <- as.character(as.POSIXct(as.numeric(irritability$Date) * (60*60*24), origin="1899-12-30", tz="UTC", format="%Y-%m-%d"))
+  } # convert Excel character into dates
+  
+  uniquify <- function(x) if (length(x) == 1) x else sprintf("%s%02d", x, seq_along(x)) 
+  irritability$Rat <- ave(irritability$Rat, irritability$Rat, FUN = uniquify) # make unique measure values
+  
+  irritability <- rbindlist(list(irritability, as.list(names(irritability))), fill=FALSE) # preserve experiment name as rows before tranposing
+  
+  # print(irritability)
+  
+  tirritability <- data.table::transpose(irritability)
+  colnames(tirritability) <- as.character(tirritability[1,]) # make colnames 
+  tirritability <- tirritability[-1,] # remove first row that held colnames
+  
+  # make colnames clean
+  setnames(tirritability, gsub(" ", "_", tolower(names(tirritability))))
+  
+  # make date and time values (removed a third value (scorer), only found in first cohort and all values were marked DC)
+  if(any(grep("Scorer", tirritability$rat))){
+    tirritability <- tirritability[!grepl("Scorer", rat),] # remove the row with dates
+  }
+  
+  nm_irr <- grep("^(def|agg)", names(tirritability), value = T) # use these columns to make date columns
+  nm1_irr <- paste("date", nm_irr, sep = "_") # make these date columns
+  tirritability[ , ( nm1_irr ) := lapply( .SD, function(x) c(grep("^\\d{4}\\-(0?[1-9]|1[012])\\-(0?[1-9]|[12][0-9]|3[01])$", x, value = T)) ) ,  .SDcols = nm_irr ]
+  ind_irr <- grep("^(date)", names(tirritability), perl = T) # bring date characters back to posixct
+  for (i in seq_along(ind_irr)) {
+    set(tirritability, NULL, ind_irr[i], as.POSIXct(tirritability[[ind_irr[i]]], tz = "UTC"))
+  }
+  tirritability <- tirritability[!grepl("^\\d{4}\\-", unlist(tirritability[,2])),] # remove the row with dates
+  
+  nm2_irr <- paste("timepoint", nm_irr, sep = "_") # make these time columns
+  tirritability[ , ( nm2_irr ) := lapply( .SD, function(x) c(grep("^(before|after)", x, value = T)) ) ,  .SDcols = nm_irr ]
+  tirritability <- tirritability[!grepl("^[[:alpha:]]", unlist(tirritability[,2])),] # remove the row with timepoints
+  
+  # clean up the var types (to numeric) and the character na (to NA) 
+  ind <- grep(pattern = "^(def|agg)", names(tirritability))
+  for(j in seq_along(ind)){
+    set(tirritability, i=which(tirritability[[j]]=="n/a"), j=j, value=NA)
+  }
+  
+  # quant data should be numeric
+  for (i in seq_along(ind)) {
+    set(tirritability, NULL, ind[i], as.numeric(tirritability[[ind[i]]]))
+  }
+  
+  # extract [*DATA DICTIONARY*]
+  irritability_datadictionary <- irritability[, 1:3] # vertical formatting is preferred in selfadmin
+  tirritability <- tirritability[-c(1:2), ] # remove data dictionary from data
+  
+  return(tirritability)
+  
+})
+
+names(irritability_xl) <- str_extract(irritability_xlfiles, "C\\d+")
+irritability_df <- irritability_xl %>% rbindlist(fill = T, idcol = "cohort") %>% 
   rename("labanimalid" = "rat") %>% 
   mutate("labanimalid" = str_extract(labanimalid, "[MF]\\d+"))
 
+# restructure cohort 1 into rest of data
+irritability_df <- irritability_df %>% 
+  mutate(defensive02 = coalesce(defensive, defensive02),
+         aggressive02 = coalesce(aggressive, aggressive02),
+         date_defensive02 = coalesce(date_defensive, date_defensive02),
+         date_aggressive02 = coalesce(date_aggressive, date_aggressive02),
+         timepoint_defensive02 = coalesce(timepoint_defensive, timepoint_defensive02),
+         timepoint_aggressive02 = coalesce(timepoint_aggressive, timepoint_aggressive02)) %>% 
+  subset(!is.na(rfid)) %>% 
+  mutate_at(vars(matches("date_(.*)0[12]")), ~ as.Date(as.POSIXct(., 'UTC'))) %>% 
+  mutate(date_defensive01 = replace(date_defensive01, cohort == "C09", as.Date("2019-09-16")),
+         date_aggressive01 = replace(date_aggressive01, cohort == "C09", as.Date("2019-09-16")),
+         date_defensive02 = replace(date_defensive02, cohort == "C09", as.Date("2019-11-07")),
+         date_aggressive02 = replace(date_aggressive02, cohort == "C09", as.Date("2019-11-07")),
+         
+         date_defensive01 = replace(date_defensive01, cohort == "C10", as.Date("2019-12-18")),
+         date_aggressive01 = replace(date_aggressive01, cohort == "C10", as.Date("2019-12-18")),
+         date_defensive02 = replace(date_defensive02, cohort == "C10", as.Date("2020-02-12")),
+         date_aggressive02 = replace(date_aggressive02, cohort == "C10", as.Date("2020-02-12")))
 
+irritability_df %>% naniar::vis_miss()
 
-
-
-
+irritability_df <- irritability_df %>% 
+  select(-matches("(defensive|aggressive)$"))
 
 
 

@@ -4,7 +4,10 @@
 setwd("~/Desktop/Database/csv files/u01_olivier_george_cocaine")
 write.csv(rats_allcohorts_weights, "rats_allcohorts_weights_c01_11.csv", row.names = F)
 
-write.csv(oliviercocaine_14_wfu_metadata, "~/Desktop/Database/csv files/u01_olivier_george_cocaine/oliviercocaine_14_wfu_metadata.csv", row.names = F)
+write.csv(oliviercocaine_14_wfu_metadata, "~/Desktop/Database/csv files/u01_olivier_george_cocaine/oliviercocaine_14_wfu_metadata.csv", row.names = F) # actually C15
+write.csv(oliviercocaine_16_wfu_metadata, "~/Desktop/Database/csv files/u01_olivier_george_cocaine/oliviercocaine_16_wfu_metadata.csv", row.names = F)
+write.csv(oliviercocaine_17_wfu_metadata, "~/Desktop/Database/csv files/u01_olivier_george_cocaine/oliviercocaine_17_wfu_metadata.csv", row.names = F)
+write.csv(oliviercocaine_18_wfu_metadata, "~/Desktop/Database/csv files/u01_olivier_george_cocaine/oliviercocaine_18_wfu_metadata.csv", row.names = F)
 
 
 # raw data

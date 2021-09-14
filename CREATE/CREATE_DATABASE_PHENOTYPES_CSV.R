@@ -193,7 +193,8 @@ sha_gwastraits_2 %>% get_dupes(labanimalid)
 
 # join columns for iti data
 sha_gwastraits_all <- left_join(sha_gwastraits, sha_gwasiti_df_agg, by = c("labanimalid" = "subject")) %>% 
-  left_join(sha_gwastraits_2, "labanimalid")
+  left_join(sha_gwastraits_2, by = "labanimalid") %>% 
+  left_join(sha_gwasiti_df_agg_2, by = c("labanimalid" = "subject"))
 
 
 ######
@@ -405,14 +406,32 @@ shock_gwastraits2 <- shock_gwastraits %>%
   subset(n == 1) %>% 
   select(-n)
 
-## XX join to the lga object to calculate another trait  
+## join to the lga object to calculate another trait  
 shock_gwastraits2 <- shock_gwastraits2 %>% 
   left_join(lga_gwastraits_all %>% 
               select(labanimalid, lga_rewards_first1hr), by = "labanimalid") %>% 
   mutate(shock_03_avg1h = (shock03-lga_rewards_first1hr)/lga_rewards_first1hr)
 
+
 ## get dupes
 shock_gwastraits2 %>% distinct() %>% get_dupes(labanimalid)
+
+
+
+
+## IRRITABILITY 
+
+irritability_gwastraits <- irritability_df %>% 
+  left_join(cocaine_metadata_df %>% select(rfid, d_o_b), by = "rfid") %>% # to get the age 
+  mutate(irr_age = difftime(date_defensive01, d_o_b, units = c("days")) %>% as.numeric) %>% # covariate 
+  mutate(irr_agg_change = aggressive02 - aggressive01,
+         irr_def_change = defensive02 - defensive01,
+         irr_total_change = (defensive02+aggressive02) - (defensive01+aggressive01)) %>% 
+  select(rfid, irr_age:irr_total_change)
+
+
+
+
 
 
 ## covariate weight
@@ -445,11 +464,12 @@ surgery_weights %>% get_dupes(rfid)
 
 # bind all objects into one object and create csv file 
 gwas_prelim2 <- full_join(sha_gwastraits_all %>% 
-                            select(cohort, labanimalid, rfid, sex, box, date_sha08, mean_sha_delta_esc_08_10:sha_sd_iti_na, mean_sha_01_03:mean_to_sha_01_03), 
+                            select(cohort, labanimalid, rfid, sex, box, date_sha01, date_sha08, mean_sha_delta_esc_08_10:sha_sd_iti_na, mean_sha_01_03:mean_to_sha_01_03, sha_rewards_first10min_2:sha_rewards_first1hr_2), 
                           lga_gwastraits_all %>% 
                             select(labanimalid, date_lga12, mean_lga_delta_esc_12_14:lga_sd_iti_na), by = "labanimalid") %>% 
   full_join(shock_gwastraits2 %>% 
               select(labanimalid, shock03, shock_03_pre, shock_03_avg1h), by = "labanimalid") %>% 
+  full_join(irritability_gwastraits, by = "rfid") %>% 
   left_join(oliviercocaine_excel_all %>% select(labanimalid, matches("date_shock03")) %>% distinct(), by = "labanimalid") %>% 
   full_join(pr_gwastraits %>% 
               select(labanimalid, pr_01_sha:pr_max_02_03_breakpoint), by = "labanimalid") %>% 
@@ -457,15 +477,19 @@ gwas_prelim2 <- full_join(sha_gwastraits_all %>%
               distinct(rfid, d_o_b) %>% 
               mutate(d_o_b = as.Date(d_o_b)), by = "rfid") %>% 
   left_join(surgery_weights, by = "rfid") %>% 
-  mutate_at(vars(matches("date")), list(age = ~difftime(., d_o_b, units = c("days")) %>% as.numeric)) %>% 
+  mutate_at(vars(matches("date")), list(age = ~ difftime(., d_o_b, units = c("days")) %>% as.numeric)) %>% 
   select_all(~gsub("^date_(.*age$)", "\\1", tolower(.))) %>% 
   select(-matches("date|d_o_b")) %>% 
   mutate(sha_coefficient_of_variation = sha_sd_iti/sha_mean_iti, 
+         sha_coefficient_of_variation_2 = sha_sd_iti_2/sha_mean_iti_2, 
          esc_coefficient_of_variation = lga_sd_iti/lga_mean_iti) %>% 
   rename("iti_median_sha_08_10" = "sha_median_iti",
          "behavior_stability_sha_08_10" = "sha_sd_iti",
          "behavior_stability_sha_08_10_na" = "sha_sd_iti_na",
          
+         "iti_median_sha_01_03" = "sha_median_iti_2",
+         "behavior_stability_sha_01_03" = "sha_sd_iti_2",
+
          "iti_median_esc_12_14" = "lga_median_iti",
          "behavior_stability_esc_12_14" = "lga_sd_iti",
          "behavior_stability_esc_12_14_na" = "lga_sd_iti_na",
@@ -473,9 +497,15 @@ gwas_prelim2 <- full_join(sha_gwastraits_all %>%
          "loading_phase_intake_sha_08_10" = "sha_rewards_first10min",
          "titration_phase_sha_08_10" = "sha_rewards_last60min",
          
+         "loading_phase_intake_sha_01_03" = "sha_rewards_first10min_2",
+         "titration_phase_sha_01_03" = "sha_rewards_last60min_2",
+         
          "loading_phase_intake_esc_12_14" = "lga_rewards_first10min",
          "titration_phase_esc_12_14" = "lga_rewards_last60min"
-         )
+         ) 
+
+
+
 
 # take care of later 
 # get_dupes(rfid) results 
@@ -542,8 +572,17 @@ gwas_prelim2_indices <- gwas_prelim2 %>%
   mutate(add_ind_calc_noZ_shock_03_avg1h = rowMeans(select(., ends_with("zscore")), na.rm = TRUE)) %>% 
   select(-matches("zscore")) %>% 
   
+  ## assign NA's if any of the three values in the index are missing
+  mutate_at(vars(matches("^add")), ~ ifelse(is.na(mean_lga_delta_esc_12_14)|is.na(pr_max_02_03)|is.na(shock_03_avg1h), NA, .))
+
+
+
+  
  # calculate the add_ind with and without normalizing for sex (add_ind_calc and add_ind_calc-noSexZ, respectively) and without normalizing for sex or cohort (add_ind_calc-noZscoreatALL). 
   
+
+
+
 # join to Olivier's addiction indices
   
 gwas_prelim2_indices <- gwas_prelim2_indices %>% 
@@ -560,8 +599,83 @@ gwas_prelim2_indices <- gwas_prelim2_indices %>%
 
 gwas_prelim2_indices %>% naniar::vis_miss()
 
-write.csv(gwas_prelim2_indices, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/tier1_gwas_prelim_n545.csv", row.names = F)
+
+## rename for database organization 
+gwas_prelim2_indices <- gwas_prelim2_indices %>% 
+  rename("sha_mean_delta_esc_08_10" = "mean_sha_delta_esc_08_10",
+         "sha_mean_08_10" = "mean_sha_08_10", 
+         "sha_mean_inactive_08_10" = "mean_inactive_sha_08_10",
+         "sha_mean_to_08_10" = "mean_to_sha_08_10",                     
+         "sha_loading_phase_intake_08_10" = "loading_phase_intake_sha_08_10",        
+         "sha_titration_phase_08_10" = "titration_phase_sha_08_10",             
+         "sha_iti_median_08_10" = "iti_median_sha_08_10",   
+         "sha_mean_iti" = "sha_mean_iti",                          
+         "sha_behavior_stability_08_10" = "behavior_stability_sha_08_10",          
+         "sha_behavior_stability_08_10_na" = "behavior_stability_sha_08_10_na",       
+         "sha_mean_01_03" = "mean_sha_01_03",
+         "sha_mean_inactive_01_03" = "mean_inactive_sha_01_03",               
+         "sha_mean_to_01_03" = "mean_to_sha_01_03",                     
+         "sha_loading_phase_intake_01_03" = "loading_phase_intake_sha_01_03",        
+         "sha_titration_phase_01_03" = "titration_phase_sha_01_03", 
+         "sha_iti_median_01_03" = "iti_median_sha_01_03",                  
+         "sha_mean_iti_2" = "sha_mean_iti_2",                        
+         "sha_behavior_stability_01_03" = "behavior_stability_sha_01_03",          
+         "sha_sd_iti_na_2" = "sha_sd_iti_na_2",
+         "sha_rewards_first1hr_2" = "sha_rewards_first1hr_2",                
+         "lga_mean_delta_esc_12_14" = "mean_lga_delta_esc_12_14",              
+         "lga_mean_12_14" = "mean_lga_12_14",                        
+         "lga_mean_inactive_12_14" = "mean_inactive_lga_12_14",
+         "lga_mean_to_12_14" = "mean_to_lga_12_14",                     
+         "lga_loading_phase_intake_12_14" = "loading_phase_intake_esc_12_14",       
+         "lga_titration_phase_12_14" = "titration_phase_esc_12_14",            
+         "lga_iti_median_12_14" = "iti_median_esc_12_14",  
+         "lga_mean_iti" = "lga_mean_iti",                          
+         "lga_behavior_stability_12_14" = "behavior_stability_esc_12_14",          
+         "lga_behavior_stability_12_14_na" = "behavior_stability_esc_12_14_na",       
+         "shock_03" = "shock03", 
+         "shock_03_pre" = "shock_03_pre",                          
+         "shock_03_avg1h" = "shock_03_avg1h",                        
+         "irr_age" = "irr_age",                              
+         "irr_agg_change" = "irr_agg_change", 
+         "irr_def_change" = "irr_def_change",                        
+         "irr_total_change" = "irr_total_change",                      
+         "pr_01_sha" = "pr_01_sha",                             
+         "pr_02_lga" = "pr_02_lga",
+         "pr_03_postshock" = "pr_03_postshock",                       
+         "pr_01_sha_breakpoint" = "pr_01_sha_breakpoint",                  
+         "pr_02_lga_breakpoint" = "pr_02_lga_breakpoint",                  
+         "pr_03_postshock_breakpoint" = "pr_03_postshock_breakpoint", 
+         "pr_max_02_03" = "pr_max_02_03",                          
+         "pr_max_02_03_breakpoint" = "pr_max_02_03_breakpoint",               
+         "weight_surgery" = "surgery_weight",  
+         "sha_01_age" = "sha01_age",  
+         "sha_08_age" = "sha08_age",  
+         "lga_12_age" = "lga12_age",                             
+         "shock_03_age" = "shock03_age",                           
+         "pr_01_age" = "pr01_age",                             
+         "pr_02_age" = "pr02_age",
+         "pr_03_age" = "pr03_age",                             
+         "sha_coefficient_of_variation" = "sha_coefficient_of_variation",         
+         "sha_coefficient_of_variation_2" = "sha_coefficient_of_variation_2",        
+         "lga_coefficient_of_variation" = "esc_coefficient_of_variation", 
+         "addiction_index_noSexZ" = "addiction_index_noSexZ",                
+         "add_index_sexcohortZ" = "add_index_sexcohortZ",                  
+         "add_ind_calc_noZ_shock_03" = "add_ind_calc_noZ_shock_03",            
+         "addiction_index_noSexZ_shock_03_avg1h" = "addiction_index_noSexZ_shock_03_avg1h",
+         "add_index_palmer_shock_03_avg1h" = "add_index_palmer_shock_03_avg1h",       
+         "add_ind_calc_noZ_shock_03_avg1h" = "add_ind_calc_noZ_shock_03_avg1h",      
+         "add_ind_olivier" = "add_ind_olivier"
+         )
+
+
+
+
+
+
+write.csv(gwas_prelim2_indices, "~/Dropbox (Palmer Lab)/Palmer Lab/Bonnie Lin/U01/Olivier_George_U01DA043799 (Cocaine)/excel_and_csv_files/tier1_gwas_prelim_n545_v2.csv", row.names = F)
   
+
+
 
 
 
